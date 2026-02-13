@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HOC – Gestão de Estagiários</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f172a;color:white;min-height:100vh}
+  input,select,textarea{font-family:inherit}
+  ::-webkit-scrollbar{width:6px}
+  ::-webkit-scrollbar-track{background:#1e293b}
+  ::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
+  button:active{transform:scale(0.97)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect} = React;
+
+const NIVEIS = {
+  1:{nome:"Introdução e Formação Básica",        cor:"#3B82F6", emoji:"🧼"},
+  2:{nome:"Suporte Clínico e Radiologia",         cor:"#8B5CF6", emoji:"🦷"},
+  3:{nome:"Ortodontia, Alinhadores e Placas",     cor:"#EC4899", emoji:"😁"},
+  4:{nome:"Odontopediatria e Cirurgias",          cor:"#F59E0B", emoji:"🔬"},
+  5:{nome:"Prótese e Gestão de Materiais",        cor:"#10B981", emoji:"🦴"},
+  6:{nome:"Gestão Administrativa e Operacional",  cor:"#EF4444", emoji:"📋"},
+  7:{nome:"Odontologia Digital",                  cor:"#06B6D4", emoji:"💻"},
+};
+
+const ATIVIDADES = {
+  1:[
+    {id:"lav",  nome:"Lavagem de materiais",              cat:"Esterilização", meta:20},
+    {id:"sec",  nome:"Secagem de materiais",              cat:"Esterilização", meta:20},
+    {id:"emb",  nome:"Embalagem de instrumentos",         cat:"Esterilização", meta:15},
+    {id:"aut",  nome:"Monitorização de autoclaves",       cat:"Esterilização", meta:5},
+    {id:"val",  nome:"Controle de validade (até 7 dias)", cat:"Esterilização", meta:10},
+    {id:"limp", nome:"Limpeza das clínicas",              cat:"Organização",   meta:10},
+    {id:"gess", nome:"Vazamento de modelos em gesso",     cat:"Laboratório",   meta:5},
+    {id:"alg",  nome:"Moldagens com alginato",            cat:"Laboratório",   meta:5},
+    {id:"cort", nome:"Corte e acabamento de modelos",     cat:"Laboratório",   meta:5},
+    {id:"apos", nome:"Estudo Apostila HOC",               cat:"Conhecimento",  meta:8},
+  ],
+  2:[
+    {id:"pan",  nome:"RX Panorâmico",                     cat:"Radiologia",    meta:10},
+    {id:"peri", nome:"Periapical digital/manual",         cat:"Radiologia",    meta:8},
+    {id:"dio",  nome:"Cadastro e uso plataforma DIO",     cat:"Radiologia",    meta:5},
+    {id:"kit",  nome:"Montagem de mesa clínica",          cat:"Clínica",       meta:15},
+    {id:"inst", nome:"Instalação e preparo de pacientes", cat:"Clínica",       meta:10},
+    {id:"ctrl", nome:"Controle Odonto / agendamentos",    cat:"Clínica",       meta:8},
+    {id:"rec",  nome:"Receitas e medicamentos",           cat:"Clínica",       meta:5},
+    {id:"wpp",  nome:"Suporte WhatsApp (pré/pós-op)",     cat:"Clínica",       meta:8},
+    {id:"obs",  nome:"Observação de procedimentos",       cat:"Clínica",       meta:8},
+  ],
+  3:[
+    {id:"omat", nome:"Materiais de ortodontia",           cat:"Ortodontia",    meta:10},
+    {id:"oaux", nome:"Auxílio em atendimentos ortod.",    cat:"Ortodontia",    meta:8},
+    {id:"oapa", nome:"Manuseio de aparelhos fixos/remov.",cat:"Ortodontia",    meta:5},
+    {id:"omol", nome:"Moldagem para placas (alginato)",   cat:"Placas",        meta:8},
+    {id:"ovaz", nome:"Vazamento e preparo de modelos",    cat:"Placas",        meta:8},
+    {id:"opla", nome:"Fabricação de placas (máquina)",    cat:"Placas",        meta:6},
+    {id:"ocon", nome:"Controle entrada/saída de placas",  cat:"Placas",        meta:5},
+    {id:"oali", nome:"Placas de alinhadores",             cat:"Placas",        meta:4},
+    {id:"ocla", nome:"Placas de clareamento",             cat:"Placas",        meta:4},
+  ],
+  4:[
+    {id:"pedo", nome:"Suporte em Odontopediatria",        cat:"Odontopediatria",meta:8},
+    {id:"exde", nome:"Exodontia de dentes decíduos",      cat:"Odontopediatria",meta:5},
+    {id:"ende", nome:"Endodontia em dentes decíduos",     cat:"Odontopediatria",meta:4},
+    {id:"cape", nome:"Atendimento CAPE (p. especiais)",   cat:"CAPE",          meta:6},
+    {id:"cmon", nome:"Montagem de mesa cirúrgica",        cat:"Cirurgia",      meta:8},
+    {id:"cexo", nome:"Auxílio em exodontias simples",     cat:"Cirurgia",      meta:6},
+    {id:"crea", nome:"Auxílio em reaberturas implantes",  cat:"Cirurgia",      meta:4},
+    {id:"ccom", nome:"Auxílio em cirurgias complexas",    cat:"Cirurgia",      meta:3},
+    {id:"eqp",  nome:"Manutenção preventiva de equipos",  cat:"Equipamentos",  meta:4},
+    {id:"vac",  nome:"Controle bombas vácuo/compressor",  cat:"Equipamentos",  meta:4},
+  ],
+  5:[
+    {id:"cuni", nome:"Componentes p/ dentes unitários",   cat:"Implantodontia",meta:8},
+    {id:"cpro", nome:"Componentes protocolo/barra",       cat:"Implantodontia",meta:5},
+    {id:"cmol", nome:"Técnicas de moldagem avançada",     cat:"Implantodontia",meta:5},
+    {id:"crea2",nome:"Materiais para reaberturas",        cat:"Implantodontia",meta:6},
+    {id:"rout", nome:"Registro entrada/saída próteses",   cat:"Prótese",       meta:8},
+    {id:"rpla", nome:"Planilha controle de próteses",     cat:"Prótese",       meta:5},
+    {id:"rage", nome:"Agenda de protesistas",             cat:"Prótese",       meta:5},
+    {id:"estq", nome:"Controle de estoque de materiais",  cat:"Gestão",        meta:8},
+    {id:"comp", nome:"Solicitação de compras",            cat:"Gestão",        meta:5},
+  ],
+  6:[
+    {id:"ginv", nome:"Atualização de inventário",         cat:"Estoque",       meta:8},
+    {id:"gval", nome:"Controle de validade de insumos",   cat:"Estoque",       meta:6},
+    {id:"grep", nome:"Reposição de materiais",            cat:"Estoque",       meta:5},
+    {id:"gfor", nome:"Comunicação com fornecedores",      cat:"Fornecedores",  meta:5},
+    {id:"gqua", nome:"Fiscalização de entregas",          cat:"Fornecedores",  meta:4},
+    {id:"gflu", nome:"Verificação de fluxos clínicos",    cat:"Operacional",   meta:6},
+    {id:"gpro", nome:"Padronização de protocolos",        cat:"Operacional",   meta:4},
+    {id:"grel", nome:"Relatórios administrativos",        cat:"Operacional",   meta:4},
+  ],
+  7:[
+    {id:"scan", nome:"Escaneamento dental (Medit)",       cat:"Digital",       meta:8},
+    {id:"exoc", nome:"Design de coroas no Exocad",        cat:"Digital",       meta:6},
+    {id:"medt", nome:"Planejamento digital no Medit",     cat:"Digital",       meta:6},
+    {id:"dcor", nome:"Desenho de coroas dentárias",       cat:"Digital",       meta:5},
+    {id:"dpla", nome:"Desenho de placas miorrelaxantes",  cat:"Digital",       meta:5},
+    {id:"imp3", nome:"Impressão 3D de trabalhos",         cat:"Digital",       meta:5},
+    {id:"acab", nome:"Acabamento de trabalhos digitais",  cat:"Digital",       meta:5},
+    {id:"dent", nome:"Plataforma DentistaOn",             cat:"Digital",       meta:4},
+  ],
+};
+
+const COMPORTAMENTO=[
+  {id:"pont",nome:"Pontualidade"},
+  {id:"unif",nome:"Uniforme / EPI"},
+  {id:"post",nome:"Postura profissional"},
+  {id:"ded", nome:"Dedicação"},
+  {id:"equi",nome:"Relacionamento c/ equipe"},
+  {id:"pac", nome:"Postura c/ pacientes"},
+  {id:"ini", nome:"Iniciativa / Proatividade"},
+];
+
+const MESES=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+
+const S={
+  page:{minHeight:"100vh",background:"#0f172a",fontFamily:"'Segoe UI',sans-serif",color:"white"},
+  hdr:{background:"linear-gradient(135deg,#1e3a5f,#1e293b)",borderBottom:"1px solid rgba(255,255,255,0.08)",padding:"14px 20px"},
+  hi:{maxWidth:820,margin:"0 auto",display:"flex",justifyContent:"space-between",alignItems:"center"},
+  wrap:{maxWidth:820,margin:"0 auto",padding:"20px 16px"},
+  card:{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:14,padding:18},
+  btnP:{width:"100%",padding:"14px",background:"linear-gradient(135deg,#3B82F6,#1d4ed8)",border:"none",borderRadius:12,color:"white",fontSize:15,fontWeight:700,cursor:"pointer"},
+  btnS:{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,color:"#94a3b8",padding:"6px 14px",fontSize:12,cursor:"pointer"},
+  input:{width:"100%",padding:"11px 14px",background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"white",fontSize:14,outline:"none",boxSizing:"border-box"},
+  sel:{padding:"10px 12px",background:"#1e293b",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,color:"white",fontSize:13,outline:"none",cursor:"pointer"},
+  lbl:{display:"block",color:"#94a3b8",fontSize:11,marginBottom:5,fontWeight:600,textTransform:"uppercase",letterSpacing:1},
+  tag:(c)=>({background:c,padding:"2px 10px",borderRadius:20,fontSize:11,fontWeight:700}),
+  tab:(a,k)=>({flex:1,padding:"9px 0",borderRadius:9,border:"none",background:a===k?"#3B82F6":"transparent",color:a===k?"white":"#94a3b8",fontSize:13,fontWeight:600,cursor:"pointer"}),
+};
+
+function App(){
+  const [tela,setTela]=useState("login");
+  const [user,setUser]=useState(null);
+  const [nome,setNome]=useState("");
+  const [niv,setNiv]=useState(1);
+  const [regs,setRegs]=useState([]);
+  const [qtds,setQtds]=useState({});
+  const [comp,setComp]=useState({});
+  const [obs,setObs]=useState("");
+  const [dt,setDt]=useState(new Date().toISOString().split("T")[0]);
+  const [saving,setSaving]=useState(false);
+  const [aba,setAba]=useState("reg");
+  const [abaA,setAbaA]=useState("dash");
+  const [fE,setFE]=useState("");
+  const [fM,setFM]=useState(new Date().getMonth());
+  const [fA,setFA]=useState(new Date().getFullYear());
+
+  useEffect(()=>{try{const d=localStorage.getItem("hoc_v3");if(d)setRegs(JSON.parse(d));}catch{}},[]);
+  useEffect(()=>{try{if(regs.length)localStorage.setItem("hoc_v3",JSON.stringify(regs));}catch{}},[regs]);
+
+  const entrar=()=>{if(!nome.trim())return;setUser({nome:nome.trim(),niv});setTela("est");};
+
+  const salvar=()=>{
+    const ativs=Object.entries(qtds).filter(([,v])=>v>0).map(([id,q])=>{
+      const a=ATIVIDADES[user.niv].find(x=>x.id===id);return{...a,quantidade:q};
+    });
+    if(!ativs.length){alert("Registre pelo menos uma atividade!");return;}
+    setSaving(true);
+    setTimeout(()=>{
+      setRegs(p=>[...p,{id:Date.now(),data:dt,estagiario:user.nome,nivel:user.niv,atividades:ativs,comportamento:comp,obs,ts:new Date().toISOString()}]);
+      setQtds({});setComp({});setObs("");setSaving(false);
+      alert("✅ Registro salvo com sucesso!");
+    },500);
+  };
+
+  const regsF=regs.filter(r=>{
+    const d=new Date(r.data);
+    return d.getMonth()===fM&&d.getFullYear()===fA&&(!fE||r.estagiario===fE);
+  });
+
+  const ests=[...new Set(regs.map(r=>r.estagiario))];
+
+  const stats=(rr)=>{
+    const tot=rr.reduce((a,r)=>a+r.atividades.reduce((s,x)=>s+x.quantidade,0),0);
+    const dias=new Set(rr.map(r=>r.data)).size;
+    return{tot,dias,med:dias?(tot/dias).toFixed(1):0,n:rr.length};
+  };
+
+  const desemp=()=>{
+    const m={};
+    regsF.forEach(r=>r.atividades.forEach(a=>{
+      if(!m[a.id])m[a.id]={nome:a.nome,cat:a.cat,tot:0,meta:a.meta};
+      m[a.id].tot+=a.quantidade;
+    }));
+    return Object.values(m);
+  };
+
+  const sem=(p)=>p>=100?{c:"#10B981"}:p>=75?{c:"#F59E0B"}:{c:"#EF4444"};
+
+  /* LOGIN */
+  if(tela==="login") return(
+    <div style={{...S.page,display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:"linear-gradient(135deg,#0f172a,#1e3a5f,#0f172a)"}}>
+      <div style={{width:"100%",maxWidth:430}}>
+        <div style={{textAlign:"center",marginBottom:28}}>
+          <div style={{display:"inline-flex",alignItems:"center",gap:12,marginBottom:10}}>
+            <div style={{width:54,height:54,borderRadius:14,background:"linear-gradient(135deg,#3B82F6,#1d4ed8)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,fontWeight:900,color:"white",boxShadow:"0 8px 24px rgba(59,130,246,0.4)"}}>H</div>
+            <div style={{textAlign:"left"}}>
+              <div style={{fontSize:22,fontWeight:800,letterSpacing:1}}>HOC</div>
+              <div style={{fontSize:11,color:"#94a3b8",letterSpacing:2,textTransform:"uppercase"}}>Hospital Odontológico</div>
+            </div>
+          </div>
+          <div style={{color:"#64748b",fontSize:13}}>Sistema de Gestão de Estagiários</div>
+        </div>
+        <div style={{...S.card,backdropFilter:"blur(20px)"}}>
+          <div style={{display:"flex",gap:6,marginBottom:24,background:"rgba(0,0,0,0.3)",borderRadius:10,padding:4}}>
+            <button style={{...S.tab("login","login"),flex:1}}>👨‍⚕️ Estagiário</button>
+            <button style={{...S.tab("login","adm"),flex:1}} onClick={()=>setTela("adm")}>🏥 Gestor</button>
+          </div>
+          <div style={{marginBottom:14}}>
+            <label style={S.lbl}>Seu Nome</label>
+            <input value={nome} onChange={e=>setNome(e.target.value)} onKeyDown={e=>e.key==="Enter"&&entrar()} placeholder="Digite seu nome completo" style={S.input}/>
+          </div>
+          <div style={{marginBottom:22}}>
+            <label style={S.lbl}>Nível do Estágio</label>
+            <select value={niv} onChange={e=>setNiv(+e.target.value)} style={{...S.sel,width:"100%"}}>
+              {Object.entries(NIVEIS).map(([k,v])=>(
+                <option key={k} value={k}>{v.emoji} Nível {k} — {v.nome}</option>
+              ))}
+            </select>
+          </div>
+          <button onClick={entrar} style={S.btnP}>Entrar →</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  /* ESTAGIÁRIO */
+  if(tela==="est"){
+    const st=stats(regs.filter(r=>r.estagiario===user.nome));
+    const cor=NIVEIS[user.niv].cor;
+    const porCat=ATIVIDADES[user.niv].reduce((acc,a)=>{if(!acc[a.cat])acc[a.cat]=[];acc[a.cat].push(a);return acc},{});
+    return(
+      <div style={S.page}>
+        <div style={S.hdr}>
+          <div style={S.hi}>
+            <div>
+              <div style={{fontSize:17,fontWeight:700}}>Olá, {user.nome}! {NIVEIS[user.niv].emoji}</div>
+              <div style={{marginTop:3}}><span style={S.tag(cor)}>Nível {user.niv}</span><span style={{marginLeft:8,color:"#94a3b8",fontSize:12}}>{NIVEIS[user.niv].nome}</span></div>
+            </div>
+            <button onClick={()=>setTela("login")} style={S.btnS}>Sair</button>
+          </div>
+        </div>
+        <div style={S.wrap}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:20}}>
+            {[["📋","Registros",st.n],["📅","Dias",st.dias],["⚡","Média/Dia",st.med]].map(([e,l,v])=>(
+              <div key={l} style={{...S.card,textAlign:"center",padding:"14px 8px"}}>
+                <div style={{fontSize:20}}>{e}</div>
+                <div style={{fontSize:20,fontWeight:800,color:cor}}>{v}</div>
+                <div style={{fontSize:10,color:"#64748b"}}>{l}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",gap:4,background:"rgba(0,0,0,0.3)",borderRadius:12,padding:4,marginBottom:20}}>
+            {[["reg","📝 Registrar"],["hist","📊 Histórico"]].map(([k,l])=>(
+              <button key={k} onClick={()=>setAba(k)} style={S.tab(aba,k)}>{l}</button>
+            ))}
+          </div>
+
+          {aba==="reg"&&<>
+            <div style={{marginBottom:16}}>
+              <label style={S.lbl}>Data</label>
+              <input type="date" value={dt} onChange={e=>setDt(e.target.value)} style={{...S.input,width:"auto"}}/>
+            </div>
+            {Object.entries(porCat).map(([cat,ativs])=>(
+              <div key={cat} style={{marginBottom:18}}>
+                <div style={{fontSize:11,color:cor,fontWeight:700,textTransform:"uppercase",letterSpacing:1.5,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+                  <div style={{height:2,width:16,background:cor,borderRadius:2}}/>{cat}
+                </div>
+                <div style={{display:"grid",gap:8}}>
+                  {ativs.map(a=>(
+                    <div key={a.id} style={{...S.card,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"11px 14px"}}>
+                      <div style={{flex:1,marginRight:12}}>
+                        <div style={{fontSize:13,fontWeight:500}}>{a.nome}</div>
+                        <div style={{fontSize:10,color:"#475569",marginTop:2}}>Meta: {a.meta}/mês</div>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+                        <button onClick={()=>setQtds(p=>({...p,[a.id]:Math.max(0,(p[a.id]||0)-1)}))} style={{width:30,height:30,borderRadius:8,border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.05)",color:"white",fontSize:18,cursor:"pointer"}}>−</button>
+                        <span style={{width:26,textAlign:"center",fontSize:16,fontWeight:800,color:(qtds[a.id]||0)>0?cor:"#475569"}}>{qtds[a.id]||0}</span>
+                        <button onClick={()=>setQtds(p=>({...p,[a.id]:(p[a.id]||0)+1}))} style={{width:30,height:30,borderRadius:8,border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.05)",color:"white",fontSize:18,cursor:"pointer"}}>+</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <div style={{marginBottom:18}}>
+              <div style={{fontSize:11,color:"#F59E0B",fontWeight:700,textTransform:"uppercase",letterSpacing:1.5,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+                <div style={{height:2,width:16,background:"#F59E0B",borderRadius:2}}/>Comportamento (1–5)
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                {COMPORTAMENTO.map(c=>(
+                  <div key={c.id} style={{...S.card,padding:"10px 12px"}}>
+                    <div style={{fontSize:12,color:"#94a3b8",marginBottom:6}}>{c.nome}</div>
+                    <div style={{display:"flex",gap:5}}>
+                      {[1,2,3,4,5].map(n=>(
+                        <button key={n} onClick={()=>setComp(p=>({...p,[c.id]:n}))} style={{width:27,height:27,borderRadius:6,border:"none",background:(comp[c.id]||0)>=n?"#F59E0B":"rgba(255,255,255,0.1)",cursor:"pointer",fontSize:11,fontWeight:700,color:(comp[c.id]||0)>=n?"#000":"#64748b"}}>{n}</button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{marginBottom:20}}>
+              <label style={S.lbl}>Observações do Dia</label>
+              <textarea value={obs} onChange={e=>setObs(e.target.value)} rows={3} placeholder="Aprendizados, dificuldades, ideias novas..." style={{...S.input,resize:"vertical"}}/>
+            </div>
+            <button onClick={salvar} disabled={saving} style={{...S.btnP,background:saving?"#334155":"linear-gradient(135deg,#3B82F6,#1d4ed8)",cursor:saving?"not-allowed":"pointer"}}>
+              {saving?"Salvando...":"💾 Salvar Registro do Dia"}
+            </button>
+          </>}
+
+          {aba==="hist"&&(
+            regs.filter(r=>r.estagiario===user.nome).length===0
+            ?<div style={{textAlign:"center",color:"#475569",padding:"40px 0"}}><div style={{fontSize:40}}>📋</div><div style={{marginTop:8}}>Nenhum registro ainda.</div></div>
+            :regs.filter(r=>r.estagiario===user.nome).sort((a,b)=>new Date(b.data)-new Date(a.data)).map(r=>(
+              <div key={r.id} style={{...S.card,marginBottom:12}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+                  <div style={{fontWeight:700}}>{new Date(r.data+"T12:00:00").toLocaleDateString("pt-BR")}</div>
+                  <span style={S.tag(NIVEIS[r.nivel].cor)}>{NIVEIS[r.nivel].emoji} Nível {r.nivel}</span>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                  {r.atividades.map((a,i)=>(
+                    <div key={i} style={{background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"6px 10px",fontSize:12}}>
+                      <span style={{color:"#94a3b8"}}>{a.nome}: </span><span style={{color:NIVEIS[r.nivel].cor,fontWeight:700}}>{a.quantidade}</span>
+                    </div>
+                  ))}
+                </div>
+                {r.obs&&<div style={{fontSize:12,color:"#94a3b8",background:"rgba(255,255,255,0.03)",borderRadius:8,padding:"8px 10px",marginTop:10}}>💬 {r.obs}</div>}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  /* GESTOR */
+  if(tela==="adm"){
+    const st=stats(regsF);
+    const dp=desemp();
+    return(
+      <div style={S.page}>
+        <div style={S.hdr}>
+          <div style={S.hi}>
+            <div><div style={{fontSize:17,fontWeight:700}}>Painel do Gestor 🏥</div><div style={{fontSize:12,color:"#64748b"}}>HOC – Hospital Odontológico</div></div>
+            <button onClick={()=>setTela("login")} style={S.btnS}>Sair</button>
+          </div>
+        </div>
+        <div style={S.wrap}>
+          <div style={{display:"flex",gap:4,background:"rgba(0,0,0,0.3)",borderRadius:12,padding:4,marginBottom:20}}>
+            {[["dash","📊 Dashboard"],["est2","👥 Estagiários"],["his2","📋 Histórico"]].map(([k,l])=>(
+              <button key={k} onClick={()=>setAbaA(k)} style={S.tab(abaA,k)}>{l}</button>
+            ))}
+          </div>
+          <div style={{...S.card,display:"flex",gap:12,flexWrap:"wrap",marginBottom:20,padding:"14px 16px"}}>
+            <div><label style={S.lbl}>Estagiário</label><select value={fE} onChange={e=>setFE(e.target.value)} style={S.sel}><option value="">Todos</option>{ests.map(e=><option key={e} value={e}>{e}</option>)}</select></div>
+            <div><label style={S.lbl}>Mês</label><select value={fM} onChange={e=>setFM(+e.target.value)} style={S.sel}>{MESES.map((m,i)=><option key={i} value={i}>{m}</option>)}</select></div>
+            <div><label style={S.lbl}>Ano</label><select value={fA} onChange={e=>setFA(+e.target.value)} style={S.sel}>{[2024,2025,2026,2027].map(a=><option key={a} value={a}>{a}</option>)}</select></div>
+          </div>
+
+          {abaA==="dash"&&<>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12,marginBottom:20}}>
+              {[["📋","Registros",st.n,"#3B82F6"],["⚡","Atividades",st.tot,"#10B981"],["📅","Dias",st.dias,"#8B5CF6"],["📈","Média/Dia",st.med,"#F59E0B"]].map(([e,l,v,c])=>(
+                <div key={l} style={{...S.card,display:"flex",alignItems:"center",gap:12,border:`1px solid ${c}30`}}>
+                  <div style={{width:42,height:42,borderRadius:12,background:`${c}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{e}</div>
+                  <div><div style={{fontSize:24,fontWeight:800,color:c}}>{v}</div><div style={{fontSize:11,color:"#64748b"}}>{l} — {MESES[fM]}</div></div>
+                </div>
+              ))}
+            </div>
+            {dp.length>0
+              ?<div style={S.card}>
+                <div style={{fontSize:14,fontWeight:700,marginBottom:16}}>📊 Desempenho vs Metas — {MESES[fM]} {fA}</div>
+                {dp.map(a=>{const p=Math.round((a.tot/a.meta)*100);const n=sem(p);return(
+                  <div key={a.nome} style={{marginBottom:14}}>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:5}}>
+                      <span>{a.nome} <span style={{color:"#475569"}}>({a.cat})</span></span>
+                      <span style={{color:n.c,fontWeight:700}}>{a.tot}/{a.meta} — {p}%</span>
+                    </div>
+                    <div style={{height:7,background:"rgba(255,255,255,0.08)",borderRadius:4,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${Math.min(p,100)}%`,background:n.c,borderRadius:4}}/>
+                    </div>
+                  </div>
+                );})}
+              </div>
+              :<div style={{...S.card,textAlign:"center",color:"#475569",padding:40}}><div style={{fontSize:40}}>📊</div><div style={{marginTop:8}}>Nenhum dado no período selecionado.</div></div>
+            }
+          </>}
+
+          {abaA==="est2"&&(
+            ests.length===0
+            ?<div style={{...S.card,textAlign:"center",color:"#475569",padding:40}}><div style={{fontSize:40}}>👥</div><div style={{marginTop:8}}>Nenhum estagiário registrado ainda.</div></div>
+            :ests.map(est=>{
+              const re=regs.filter(r=>r.estagiario===est);
+              const nv=re[re.length-1]?.nivel||1;
+              const se=stats(re);
+              const mc=(()=>{const v=re.flatMap(r=>Object.values(r.comportamento||{}));return v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):"—";})();
+              const c=NIVEIS[nv].cor;
+              return(
+                <div key={est} style={{...S.card,marginBottom:12}}>
+                  <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+                    <div style={{width:44,height:44,borderRadius:12,background:`${c}25`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:800,color:c,flexShrink:0}}>{est.charAt(0).toUpperCase()}</div>
+                    <div><div style={{fontWeight:700,fontSize:15}}>{est}</div><span style={S.tag(c)}>{NIVEIS[nv].emoji} Nível {nv} — {NIVEIS[nv].nome}</span></div>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+                    {[["Registros",se.n],["Atividades",se.tot],["Comportamento",mc]].map(([l,v])=>(
+                      <div key={l} style={{background:"rgba(0,0,0,0.2)",borderRadius:10,padding:"10px 0",textAlign:"center"}}>
+                        <div style={{fontSize:18,fontWeight:800,color:"#3B82F6"}}>{v}</div>
+                        <div style={{fontSize:10,color:"#64748b"}}>{l}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })
+          )}
+
+          {abaA==="his2"&&(
+            regsF.length===0
+            ?<div style={{...S.card,textAlign:"center",color:"#475569",padding:40}}><div style={{fontSize:40}}>📋</div><div style={{marginTop:8}}>Nenhum registro no período.</div></div>
+            :regsF.sort((a,b)=>new Date(b.data)-new Date(a.data)).map(r=>(
+              <div key={r.id} style={{...S.card,marginBottom:12}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+                  <div><div style={{fontWeight:700}}>{r.estagiario}</div><div style={{fontSize:12,color:"#64748b"}}>{new Date(r.data+"T12:00:00").toLocaleDateString("pt-BR")}</div></div>
+                  <span style={S.tag(NIVEIS[r.nivel].cor)}>{NIVEIS[r.nivel].emoji} Nível {r.nivel}</span>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                  {r.atividades.map((a,i)=>(
+                    <div key={i} style={{background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"6px 10px",fontSize:12}}>
+                      <span style={{color:"#94a3b8"}}>{a.nome}: </span><span style={{color:NIVEIS[r.nivel].cor,fontWeight:700}}>{a.quantidade}</span>
+                    </div>
+                  ))}
+                </div>
+                {r.obs&&<div style={{fontSize:12,color:"#94a3b8",background:"rgba(255,255,255,0.03)",borderRadius:8,padding:"8px 10px",marginTop:10}}>💬 {r.obs}</div>}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  }
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
