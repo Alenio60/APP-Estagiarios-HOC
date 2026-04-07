@@ -1,1 +1,570 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HOC - Sistema de Estagiários Completo</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:linear-gradient(135deg,#0a1628 0%,#1a2942 50%,#0a1628 100%);min-height:100vh;color:#fff}
+input,select,textarea,button{font-family:inherit}
+::-webkit-scrollbar{width:8px}
+::-webkit-scrollbar-track{background:#1a2942}
+::-webkit-scrollbar-thumb{background:#2d4a6f;border-radius:4px}
+.logo-hoc{max-width:280px;height:auto;margin:0 auto 20px;display:block}
+.hoc-card{background:rgba(255,255,255,0.05);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:32px;box-shadow:0 8px 32px rgba(0,0,0,0.3)}
+.hoc-input{width:100%;padding:14px 16px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;font-size:15px;outline:none;transition:all 0.2s}
+.hoc-input:focus{border-color:#4a9eff;background:rgba(255,255,255,0.1)}
+.hoc-input::placeholder{color:rgba(255,255,255,0.4)}
+.hoc-btn-primary{width:100%;padding:14px;background:linear-gradient(135deg,#4a9eff 0%,#2d7ad4 100%);border:none;border-radius:8px;color:#fff;font-size:16px;font-weight:600;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 12px rgba(74,158,255,0.3)}
+.hoc-btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(74,158,255,0.4)}
+.hoc-btn-primary:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+.hoc-btn-secondary{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);padding:10px 20px;border-radius:8px;color:rgba(255,255,255,0.8);font-size:14px;cursor:pointer;transition:all 0.2s}
+.hoc-btn-success{background:linear-gradient(135deg,#10b981,#059669);border:none;padding:10px 20px;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-right:8px}
+.hoc-btn-warning{background:linear-gradient(135deg,#f59e0b,#d97706);border:none;padding:10px 20px;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-right:8px}
+.hoc-btn-danger{background:linear-gradient(135deg,#ef4444,#dc2626);border:none;padding:8px 16px;border-radius:8px;color:#fff;font-size:13px;font-weight:600;cursor:pointer}
+.hoc-btn-sm{padding:6px 12px;font-size:12px}
+.hoc-label{display:block;color:rgba(255,255,255,0.7);font-size:13px;font-weight:500;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px}
+.hoc-tag{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600}
+.hoc-header{background:rgba(0,0,0,0.3);backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,0.1);padding:16px 24px}
+.hoc-footer{text-align:center;padding:20px;color:rgba(255,255,255,0.4);font-size:12px}
+.stat-card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;text-align:center}
+.nivel-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600}
+.alert-promo{background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px}
+.loading{text-align:center;padding:40px;color:rgba(255,255,255,0.6)}
+.spinner{border:3px solid rgba(255,255,255,0.1);border-top:3px solid #4a9eff;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:0 auto}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
+.modal-content{background:linear-gradient(135deg,#1e3a5f,#1a2942);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:32px;max-width:500px;width:100%;max-height:90vh;overflow-y:auto}
+.tab-btn{flex:1;padding:10px;border:none;border-radius:8px;background:transparent;color:rgba(255,255,255,0.6);font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s}
+.tab-btn.active{background:#4a9eff;color:#fff}
+.user-item{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;margin-bottom:12px}
+.biometric-icon{font-size:48px;text-align:center;margin:20px 0}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect} = React;
+const {createClient} = supabase;
 
+// Logo HOC em base64 (versão otimizada - você pode substituir pela imagem completa)
+const LOGO_HOC = "/mnt/user-data/uploads/1775562609181_image.png";
+
+// Inicializar Supabase
+const supabaseUrl = 'https://jxqrntxwwxjkupvalyan.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4cXJudHh3d3hqa3VwdmFseWFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0ODExOTMsImV4cCI6MjA5MTA1NzE5M30.xYTfRyPCr6Jb-ltIJyH4LFW1g6W_s-huVAHQtfASyLI';
+const sb = createClient(supabaseUrl, supabaseKey);
+
+const NIVEIS = {
+  1:{nome:"Introdução e Formação Básica",cor:"#4a9eff",emoji:"🧼",duracao:2},
+  2:{nome:"Suporte Clínico e Radiologia",cor:"#8b5cf6",emoji:"🦷",duracao:2},
+  3:{nome:"Ortodontia, Alinhadores e Placas",cor:"#ec4899",emoji:"😁",duracao:2},
+  4:{nome:"Odontopediatria e Cirurgias",cor:"#f59e0b",emoji:"🔬",duracao:2},
+  5:{nome:"Prótese e Gestão de Materiais",cor:"#10b981",emoji:"🦴",duracao:2},
+  6:{nome:"Gestão Administrativa",cor:"#ef4444",emoji:"📋",duracao:2},
+  7:{nome:"Odontologia Digital",cor:"#06b6d4",emoji:"💻",duracao:2},
+};
+
+const ATIVIDADES = {
+  1:[{id:"lav",nome:"Lavagem de materiais",cat:"Esterilização",meta:20},{id:"sec",nome:"Secagem de materiais",cat:"Esterilização",meta:20},{id:"emb",nome:"Embalagem de instrumentos",cat:"Esterilização",meta:15},{id:"aut",nome:"Monitorização de autoclaves",cat:"Esterilização",meta:5},{id:"val",nome:"Controle de validade",cat:"Esterilização",meta:10},{id:"limp",nome:"Limpeza das clínicas",cat:"Organização",meta:10},{id:"gess",nome:"Vazamento modelos gesso",cat:"Laboratório",meta:5},{id:"alg",nome:"Moldagens com alginato",cat:"Laboratório",meta:5},{id:"cort",nome:"Corte/acabamento modelos",cat:"Laboratório",meta:5},{id:"apos",nome:"Estudo Apostila HOC",cat:"Conhecimento",meta:8}],
+  2:[{id:"pan",nome:"RX Panorâmico",cat:"Radiologia",meta:10},{id:"peri",nome:"Periapical digital/manual",cat:"Radiologia",meta:8},{id:"dio",nome:"Plataforma DIO",cat:"Radiologia",meta:5},{id:"kit",nome:"Montagem mesa clínica",cat:"Clínica",meta:15},{id:"inst",nome:"Preparo de pacientes",cat:"Clínica",meta:10},{id:"ctrl",nome:"Controle Odonto/agenda",cat:"Clínica",meta:8},{id:"rec",nome:"Receitas e medicamentos",cat:"Clínica",meta:5},{id:"wpp",nome:"WhatsApp pré/pós-op",cat:"Clínica",meta:8},{id:"obs",nome:"Observação procedimentos",cat:"Clínica",meta:8}],
+  3:[{id:"omat",nome:"Materiais ortodontia",cat:"Ortodontia",meta:10},{id:"oaux",nome:"Auxílio atendimentos",cat:"Ortodontia",meta:8},{id:"oapa",nome:"Aparelhos fixos/removíveis",cat:"Ortodontia",meta:5},{id:"omol",nome:"Moldagem para placas",cat:"Placas",meta:8},{id:"ovaz",nome:"Vazamento modelos",cat:"Placas",meta:8},{id:"opla",nome:"Fabricação placas",cat:"Placas",meta:6},{id:"ocon",nome:"Controle placas",cat:"Placas",meta:5},{id:"oali",nome:"Placas alinhadores",cat:"Placas",meta:4},{id:"ocla",nome:"Placas clareamento",cat:"Placas",meta:4}],
+  4:[{id:"pedo",nome:"Odontopediatria",cat:"Odontopediatria",meta:8},{id:"exde",nome:"Exodontia decíduos",cat:"Odontopediatria",meta:5},{id:"ende",nome:"Endodontia decíduos",cat:"Odontopediatria",meta:4},{id:"cape",nome:"CAPE",cat:"CAPE",meta:6},{id:"cmon",nome:"Montagem mesa cirúrgica",cat:"Cirurgia",meta:8},{id:"cexo",nome:"Exodontias simples",cat:"Cirurgia",meta:6},{id:"crea",nome:"Reaberturas implantes",cat:"Cirurgia",meta:4},{id:"ccom",nome:"Cirurgias complexas",cat:"Cirurgia",meta:3},{id:"eqp",nome:"Manutenção equipos",cat:"Equipamentos",meta:4},{id:"vac",nome:"Bombas vácuo/compressor",cat:"Equipamentos",meta:4}],
+  5:[{id:"cuni",nome:"Componentes unitários",cat:"Implantodontia",meta:8},{id:"cpro",nome:"Protocolo/barra",cat:"Implantodontia",meta:5},{id:"cmol",nome:"Moldagem avançada",cat:"Implantodontia",meta:5},{id:"crea2",nome:"Materiais reaberturas",cat:"Implantodontia",meta:6},{id:"rout",nome:"Controle próteses",cat:"Prótese",meta:8},{id:"rpla",nome:"Planilha próteses",cat:"Prótese",meta:5},{id:"rage",nome:"Agenda protesistas",cat:"Prótese",meta:5},{id:"estq",nome:"Controle estoque",cat:"Gestão",meta:8},{id:"comp",nome:"Solicitação compras",cat:"Gestão",meta:5}],
+  6:[{id:"ginv",nome:"Atualização inventário",cat:"Estoque",meta:8},{id:"gval",nome:"Controle validade",cat:"Estoque",meta:6},{id:"grep",nome:"Reposição materiais",cat:"Estoque",meta:5},{id:"gfor",nome:"Comunicação fornecedores",cat:"Fornecedores",meta:5},{id:"gqua",nome:"Fiscalização entregas",cat:"Fornecedores",meta:4},{id:"gflu",nome:"Verificação fluxos",cat:"Operacional",meta:6},{id:"gpro",nome:"Padronização protocolos",cat:"Operacional",meta:4},{id:"grel",nome:"Relatórios admin",cat:"Operacional",meta:4}],
+  7:[{id:"scan",nome:"Escaneamento Medit",cat:"Digital",meta:8},{id:"exoc",nome:"Design Exocad",cat:"Digital",meta:6},{id:"medt",nome:"Planejamento Medit",cat:"Digital",meta:6},{id:"dcor",nome:"Desenho coroas",cat:"Digital",meta:5},{id:"dpla",nome:"Placas miorrelaxantes",cat:"Digital",meta:5},{id:"imp3",nome:"Impressão 3D",cat:"Digital",meta:5},{id:"acab",nome:"Acabamento trabalhos",cat:"Digital",meta:5},{id:"dent",nome:"DentistaOn",cat:"Digital",meta:4}],
+};
+
+const COMPORTAMENTO=[{id:"pont",nome:"Pontualidade"},{id:"unif",nome:"Uniforme/EPI"},{id:"post",nome:"Postura profissional"},{id:"ded",nome:"Dedicação"},{id:"equi",nome:"Relacionamento equipe"},{id:"pac",nome:"Postura c/ pacientes"},{id:"ini",nome:"Iniciativa"}];
+
+const MESES=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+
+// Hash de senha simples (em produção usar bcrypt)
+const hashSenha = (senha) => CryptoJS.SHA256(senha).toString();
+
+// Verificar se navegador suporta biometria
+const suportaBiometria = () => {
+  return window.PublicKeyCredential && navigator.credentials;
+};
+
+function App(){
+  const [tela,setTela]=useState("login");
+  const [user,setUser]=useState(null);
+  const [usuarios,setUsuarios]=useState([]);
+  const [regs,setRegs]=useState([]);
+  const [loading,setLoading]=useState(false);
+  const [modal,setModal]=useState(null);
+  
+  // Estados login
+  const [email,setEmail]=useState("");
+  const [senha,setSenha]=useState("");
+  const [usaBio,setUsaBio]=useState(false);
+  
+  // Estados registro
+  const [qtds,setQtds]=useState({});
+  const [comp,setComp]=useState({});
+  const [obs,setObs]=useState("");
+  const [dt,setDt]=useState(new Date().toISOString().split("T")[0]);
+  const [saving,setSaving]=useState(false);
+  const [aba,setAba]=useState("reg");
+  
+  // Estados admin
+  const [abaA,setAbaA]=useState("usuarios");
+  const [fE,setFE]=useState("");
+  const [fM,setFM]=useState(new Date().getMonth());
+  const [fA,setFA]=useState(new Date().getFullYear());
+  
+  // Cadastro novo estagiário
+  const [novoNome,setNovoNome]=useState("");
+  const [novoEmail,setNovoEmail]=useState("");
+  const [novoSenha,setNovoSenha]=useState("");
+  const [novoNivel,setNovoNivel]=useState(1);
+
+  // Carregar usuários e registros
+  const carregarDados = async () => {
+    setLoading(true);
+    try {
+      const [usersRes, regsRes] = await Promise.all([
+        sb.from('usuarios').select('*').eq('ativo',true).order('nome'),
+        sb.from('registros').select('*').order('data',{ascending:false})
+      ]);
+      if(usersRes.data) setUsuarios(usersRes.data);
+      if(regsRes.data) setRegs(regsRes.data);
+    } catch(err) {
+      console.error('Erro:',err);
+    }
+    setLoading(false);
+  };
+
+  useEffect(()=>{carregarDados();},[]);
+
+  // LOGIN
+  const fazerLogin = async () => {
+    if(!email || !senha) {alert("Preencha email e senha");return;}
+    setLoading(true);
+    try {
+      const hash = hashSenha(senha);
+      const {data} = await sb.from('usuarios').select('*').eq('email',email).eq('senha_hash',hash).eq('ativo',true).single();
+      if(data) {
+        setUser(data);
+        setTela(data.tipo==='admin'?'admin':'est');
+        // Salvar credencial para biometria
+        if(suportaBiometria() && usaBio) {
+          try {
+            const credential = await navigator.credentials.create({
+              publicKey: {
+                challenge: new Uint8Array(32),
+                rp: {name: "HOC"},
+                user: {id: new Uint8Array(16), name: email, displayName: data.nome},
+                pubKeyCredParams: [{alg: -7, type: "public-key"}],
+                authenticatorSelection: {authenticatorAttachment: "platform",userVerification:"required"},
+                timeout: 60000
+              }
+            });
+            localStorage.setItem('hoc_bio_'+email, JSON.stringify({id:data.id,nome:data.nome}));
+          } catch(bioErr) {
+            console.log('Biometria não configurada:',bioErr);
+          }
+        }
+      } else {
+        alert("Email ou senha incorretos");
+      }
+    } catch(err) {
+      alert("Erro ao fazer login");
+      console.error(err);
+    }
+    setLoading(false);
+  };
+
+  // LOGIN COM BIOMETRIA
+  const loginBiometria = async () => {
+    if(!suportaBiometria()) {alert("Seu dispositivo não suporta biometria");return;}
+    try {
+      const credential = await navigator.credentials.get({
+        publicKey: {
+          challenge: new Uint8Array(32),
+          timeout: 60000,
+          userVerification: "required"
+        }
+      });
+      const bioData = localStorage.getItem('hoc_bio_'+email);
+      if(bioData) {
+        const {id} = JSON.parse(bioData);
+        const {data} = await sb.from('usuarios').select('*').eq('id',id).eq('ativo',true).single();
+        if(data) {
+          setUser(data);
+          setTela(data.tipo==='admin'?'admin':'est');
+        }
+      } else {
+        alert("Biometria não cadastrada. Faça login com senha primeiro.");
+      }
+    } catch(err) {
+      alert("Falha na autenticação biométrica");
+      console.error(err);
+    }
+  };
+
+  // CADASTRAR ESTAGIÁRIO
+  const cadastrarEstagiario = async () => {
+    if(!novoNome || !novoEmail || !novoSenha) {alert("Preencha todos os campos");return;}
+    setLoading(true);
+    try {
+      const hash = hashSenha(novoSenha);
+      const {data,error} = await sb.from('usuarios').insert([{
+        nome: novoNome,
+        email: novoEmail,
+        senha_hash: hash,
+        nivel: novoNivel,
+        tipo: 'estagiario',
+        ativo: true
+      }]).select();
+      if(error) throw error;
+      alert("✅ Estagiário cadastrado!");
+      setNovoNome("");setNovoEmail("");setNovoSenha("");setNovoNivel(1);
+      setModal(null);
+      carregarDados();
+    } catch(err) {
+      alert("Erro ao cadastrar: " + err.message);
+    }
+    setLoading(false);
+  };
+
+  // PROMOVER NÍVEL
+  const promoverNivel = async (userId, nivelAtual) => {
+    if(nivelAtual >= 7) {alert("Estagiário já está no nível máximo");return;}
+    if(!confirm(`Promover para Nível ${nivelAtual+1}?`)) return;
+    try {
+      const {error} = await sb.from('usuarios').update({nivel: nivelAtual+1}).eq('id',userId);
+      if(error) throw error;
+      alert(`✅ Promovido para Nível ${nivelAtual+1}!`);
+      carregarDados();
+    } catch(err) {
+      alert("Erro ao promover");
+    }
+  };
+
+  // DESATIVAR ESTAGIÁRIO
+  const desativarEstagiario = async (userId) => {
+    if(!confirm("Desativar este estagiário?")) return;
+    try {
+      const {error} = await sb.from('usuarios').update({ativo:false}).eq('id',userId);
+      if(error) throw error;
+      alert("✅ Estagiário desativado");
+      carregarDados();
+    } catch(err) {
+      alert("Erro ao desativar");
+    }
+  };
+
+  // CALCULAR TEMPO NO NÍVEL
+  const tempoNoNivel = (userId) => {
+    const userRegs = regs.filter(r=>r.estagiario===usuarios.find(u=>u.id===userId)?.nome);
+    if(!userRegs.length) return 0;
+    const primeiraData = new Date(userRegs[userRegs.length-1].data);
+    const hoje = new Date();
+    const meses = (hoje.getFullYear() - primeiraData.getFullYear()) * 12 + (hoje.getMonth() - primeiraData.getMonth());
+    return meses;
+  };
+
+  // SALVAR REGISTRO
+  const salvar=async()=>{
+    const ativs=Object.entries(qtds).filter(([,v])=>v>0).map(([id,q])=>{
+      const a=ATIVIDADES[user.nivel].find(x=>x.id===id);return{...a,quantidade:q};
+    });
+    if(!ativs.length){alert("Registre pelo menos uma atividade!");return;}
+    setSaving(true);
+    const novoReg={data:dt,estagiario:user.nome,nivel:user.nivel,atividades:ativs,comportamento:comp,obs,created_at:new Date().toISOString()};
+    try {
+      const {data,error} = await sb.from('registros').insert([novoReg]).select();
+      if(error) throw error;
+      setRegs([data[0],...regs]);
+      setQtds({});setComp({});setObs("");
+      alert("✅ Registro salvo!");
+    } catch(err) {
+      alert('Erro ao salvar');
+    }
+    setSaving(false);
+  };
+
+  const regsF=regs.filter(r=>{const d=new Date(r.data);return d.getMonth()===fM&&d.getFullYear()===fA&&(!fE||r.estagiario===fE);});
+  const stats=(rr)=>{const tot=rr.reduce((a,r)=>a+r.atividades.reduce((s,x)=>s+x.quantidade,0),0);const dias=new Set(rr.map(r=>r.data)).size;return{tot,dias,med:dias?(tot/dias).toFixed(1):0,n:rr.length};};
+
+  if(loading && !user) return <div className="loading"><div className="spinner"></div><p style={{marginTop:20}}>Carregando...</p></div>;
+
+  // TELA DE LOGIN
+  if(tela==="login") return(
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}>
+      <div style={{width:"100%",maxWidth:"420px"}}>
+        <img src={LOGO_HOC} alt="HOC" className="logo-hoc"/>
+        <div style={{textAlign:"center",marginBottom:"32px"}}>
+          <h1 style={{fontSize:"28px",fontWeight:"700",marginBottom:"8px"}}>Sistema de Estagiários</h1>
+          <p style={{color:"rgba(255,255,255,0.6)",fontSize:"14px"}}>Hospital Odontológico</p>
+        </div>
+        <div className="hoc-card">
+          <div style={{marginBottom:"20px"}}>
+            <label className="hoc-label">Email</label>
+            <input className="hoc-input" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&fazerLogin()} placeholder="seu@email.com" type="email"/>
+          </div>
+          <div style={{marginBottom:"24px"}}>
+            <label className="hoc-label">Senha</label>
+            <input className="hoc-input" value={senha} onChange={e=>setSenha(e.target.value)} onKeyDown={e=>e.key==="Enter"&&fazerLogin()} placeholder="Digite sua senha" type="password"/>
+          </div>
+          {suportaBiometria() && <div style={{marginBottom:"20px"}}>
+            <label style={{display:"flex",alignItems:"center",gap:"8px",color:"rgba(255,255,255,0.7)",fontSize:"14px",cursor:"pointer"}}>
+              <input type="checkbox" checked={usaBio} onChange={e=>setUsaBio(e.target.checked)}/>
+              Ativar login por biometria
+            </label>
+          </div>}
+          <button className="hoc-btn-primary" onClick={fazerLogin} disabled={loading}>
+            {loading?"Entrando...":"Entrar"}
+          </button>
+          {suportaBiometria() && localStorage.getItem('hoc_bio_'+email) && <div style={{marginTop:"16px"}}>
+            <button onClick={loginBiometria} style={{width:"100%",padding:"14px",background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:"8px",color:"#fff",cursor:"pointer"}}>
+              <div className="biometric-icon">🔐</div>
+              Login com Biometria
+            </button>
+          </div>}
+        </div>
+        <div className="hoc-footer">HOC Hospital Odontológico - v4.0 (Biometria + Gestão)</div>
+      </div>
+    </div>
+  );
+
+  // TELA ESTAGIÁRIO
+  if(tela==="est"){
+    const st=stats(regs.filter(r=>r.estagiario===user.nome));
+    const cor=NIVEIS[user.nivel].cor;
+    const porCat=ATIVIDADES[user.nivel].reduce((acc,a)=>{if(!acc[a.cat])acc[a.cat]=[];acc[a.cat].push(a);return acc},{});
+    const mesesNoNivel = tempoNoNivel(user.id);
+    const prontoParaPromo = mesesNoNivel >= NIVEIS[user.nivel].duracao && user.nivel < 7;
+    
+    return(
+      <div style={{minHeight:"100vh"}}>
+        <div className="hoc-header">
+          <div style={{maxWidth:"900px",margin:"0 auto",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <h2 style={{fontSize:"18px",fontWeight:"600"}}>Olá, {user.nome}!</h2>
+              <div style={{marginTop:"4px"}}>
+                <span className="nivel-badge" style={{background:cor,color:"#fff"}}>{NIVEIS[user.nivel].emoji} Nível {user.nivel}</span>
+                <span style={{marginLeft:"10px",color:"rgba(255,255,255,0.6)",fontSize:"13px"}}>{mesesNoNivel} meses no nível</span>
+              </div>
+            </div>
+            <button className="hoc-btn-secondary" onClick={()=>setTela("login")}>Sair</button>
+          </div>
+        </div>
+        <div style={{maxWidth:"900px",margin:"0 auto",padding:"24px 20px"}}>
+          {prontoParaPromo && <div className="alert-promo">
+            <div style={{fontSize:"24px"}}>🎉</div>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:"600",color:"#f59e0b",marginBottom:"4px"}}>Parabéns!</div>
+              <div style={{fontSize:"14px",color:"rgba(255,255,255,0.8)"}}>Você completou {mesesNoNivel} meses no Nível {user.nivel}. Aguarde aprovação do gestor para promoção!</div>
+            </div>
+          </div>}
+          
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"12px",marginBottom:"24px"}}>
+            {[["📋","Registros",st.n],["📅","Dias",st.dias],["⚡","Média/Dia",st.med]].map(([e,l,v])=>(
+              <div key={l} className="stat-card">
+                <div style={{fontSize:"28px",marginBottom:"4px"}}>{e}</div>
+                <div style={{fontSize:"24px",fontWeight:"700",color:cor,marginBottom:"2px"}}>{v}</div>
+                <div style={{fontSize:"11px",color:"rgba(255,255,255,0.5)"}}>{l}</div>
+              </div>
+            ))}
+          </div>
+          
+          <div style={{display:"flex",gap:"8px",marginBottom:"24px",background:"rgba(0,0,0,0.2)",padding:"6px",borderRadius:"12px"}}>
+            <button onClick={()=>setAba("reg")} className={`tab-btn ${aba==="reg"?"active":""}`}>📝 Registrar</button>
+            <button onClick={()=>setAba("hist")} className={`tab-btn ${aba==="hist"?"active":""}`}>📊 Histórico</button>
+          </div>
+
+          {aba==="reg"&&<>
+            <div style={{marginBottom:"16px"}}>
+              <label className="hoc-label">Data</label>
+              <input type="date" className="hoc-input" value={dt} onChange={e=>setDt(e.target.value)} style={{width:"auto"}}/>
+            </div>
+            {Object.entries(porCat).map(([cat,ativs])=>(
+              <div key={cat} style={{marginBottom:"18px"}}>
+                <h3 style={{fontSize:"13px",color:cor,fontWeight:"700",textTransform:"uppercase",letterSpacing:"1px",marginBottom:"10px",display:"flex",alignItems:"center",gap:"8px"}}>
+                  <div style={{width:"20px",height:"3px",background:cor,borderRadius:"2px"}}/>{cat}
+                </h3>
+                <div style={{display:"grid",gap:"8px"}}>
+                  {ativs.map(a=>(
+                    <div key={a.id} className="hoc-card" style={{padding:"11px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:"13px",fontWeight:"500"}}>{a.nome}</div>
+                        <div style={{fontSize:"10px",color:"#475569",marginTop:"2px"}}>Meta: {a.meta}/mês</div>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+                        <button onClick={()=>setQtds(p=>({...p,[a.id]:Math.max(0,(p[a.id]||0)-1)}))} style={{width:"30px",height:"30px",borderRadius:"8px",border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.05)",color:"white",fontSize:"18px",cursor:"pointer"}}>−</button>
+                        <span style={{width:"26px",textAlign:"center",fontSize:"16px",fontWeight:"800",color:(qtds[a.id]||0)>0?cor:"#475569"}}>{qtds[a.id]||0}</span>
+                        <button onClick={()=>setQtds(p=>({...p,[a.id]:(p[a.id]||0)+1}))} style={{width:"30px",height:"30px",borderRadius:"8px",border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.05)",color:"white",fontSize:"18px",cursor:"pointer"}}>+</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <div style={{marginBottom:"18px"}}>
+              <h3 style={{fontSize:"13px",color:"#f59e0b",fontWeight:"700",textTransform:"uppercase",letterSpacing:"1px",marginBottom:"10px",display:"flex",alignItems:"center",gap:"8px"}}>
+                <div style={{width:"20px",height:"3px",background:"#f59e0b",borderRadius:"2px"}}/>Comportamento (1-5)
+              </h3>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}}>
+                {COMPORTAMENTO.map(c=>(
+                  <div key={c.id} className="hoc-card" style={{padding:"10px 12px"}}>
+                    <div style={{fontSize:"12px",color:"#94a3b8",marginBottom:"6px"}}>{c.nome}</div>
+                    <div style={{display:"flex",gap:"5px"}}>
+                      {[1,2,3,4,5].map(n=>(
+                        <button key={n} onClick={()=>setComp(p=>({...p,[c.id]:n}))} style={{width:"27px",height:"27px",borderRadius:"6px",border:"none",background:(comp[c.id]||0)>=n?"#f59e0b":"rgba(255,255,255,0.1)",cursor:"pointer",fontSize:"11px",fontWeight:"700",color:(comp[c.id]||0)>=n?"#000":"#64748b"}}>{n}</button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{marginBottom:"20px"}}>
+              <label className="hoc-label">Observações do Dia</label>
+              <textarea className="hoc-input" value={obs} onChange={e=>setObs(e.target.value)} rows={3} placeholder="Aprendizados, dificuldades, ideias..." style={{resize:"vertical"}}/>
+            </div>
+            <button className="hoc-btn-primary" onClick={salvar} disabled={saving}>
+              {saving?"Salvando...":"💾 Salvar Registro do Dia"}
+            </button>
+          </>}
+
+          {aba==="hist"&&(
+            regs.filter(r=>r.estagiario===user.nome).length===0
+            ?<div style={{textAlign:"center",padding:"60px 20px",color:"rgba(255,255,255,0.4)"}}><div style={{fontSize:"48px",marginBottom:"12px"}}>📋</div><div>Nenhum registro ainda</div></div>
+            :regs.filter(r=>r.estagiario===user.nome).sort((a,b)=>new Date(b.data)-new Date(a.data)).map(r=>(
+              <div key={r.id} className="hoc-card" style={{marginBottom:"12px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:"10px"}}>
+                  <div style={{fontWeight:"600",fontSize:"15px"}}>{new Date(r.data+"T12:00").toLocaleDateString("pt-BR")}</div>
+                  <span className="hoc-tag" style={{background:NIVEIS[r.nivel].cor,color:"#fff"}}>{NIVEIS[r.nivel].emoji} N{r.nivel}</span>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:"8px"}}>
+                  {r.atividades.map((a,i)=>(
+                    <div key={i} style={{background:"rgba(255,255,255,0.05)",borderRadius:"8px",padding:"8px 10px",fontSize:"13px"}}>
+                      <span style={{color:"rgba(255,255,255,0.6)"}}>{a.nome}: </span>
+                      <span style={{color:NIVEIS[r.nivel].cor,fontWeight:"700"}}>{a.quantidade}</span>
+                    </div>
+                  ))}
+                </div>
+                {r.obs&&<div style={{marginTop:"10px",fontSize:"13px",color:"rgba(255,255,255,0.6)",background:"rgba(255,255,255,0.03)",padding:"10px",borderRadius:"8px"}}>💬 {r.obs}</div>}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // TELA ADMIN
+  if(tela==="admin"){
+    return(
+      <div style={{minHeight:"100vh"}}>
+        <div className="hoc-header">
+          <div style={{maxWidth:"1100px",margin:"0 auto",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <h2 style={{fontSize:"18px",fontWeight:"600"}}>Painel Administrativo 🏥</h2>
+              <p style={{fontSize:"13px",color:"rgba(255,255,255,0.5)",marginTop:"2px"}}>Gestão de Estagiários HOC</p>
+            </div>
+            <div style={{display:"flex",gap:"10px"}}>
+              <button className="hoc-btn-secondary" onClick={carregarDados}>🔄 Atualizar</button>
+              <button className="hoc-btn-secondary" onClick={()=>setTela("login")}>Sair</button>
+            </div>
+          </div>
+        </div>
+        <div style={{maxWidth:"1100px",margin:"0 auto",padding:"24px 20px"}}>
+          <div style={{display:"flex",gap:"8px",marginBottom:"24px",background:"rgba(0,0,0,0.2)",padding:"6px",borderRadius:"12px"}}>
+            <button onClick={()=>setAbaA("usuarios")} className={`tab-btn ${abaA==="usuarios"?"active":""}`}>👥 Estagiários</button>
+            <button onClick={()=>setAbaA("dash")} className={`tab-btn ${abaA==="dash"?"active":""}`}>📊 Dashboard</button>
+            <button onClick={()=>setAbaA("hist")} className={`tab-btn ${abaA==="hist"?"active":""}`}>📋 Histórico</button>
+          </div>
+
+          {abaA==="usuarios"&&<>
+            <div style={{marginBottom:"20px"}}>
+              <button className="hoc-btn-success" onClick={()=>setModal("cadastro")}>+ Cadastrar Estagiário</button>
+            </div>
+            {usuarios.length===0?<div style={{textAlign:"center",padding:"60px 20px",color:"rgba(255,255,255,0.4)"}}><div style={{fontSize:"48px",marginBottom:"12px"}}>👥</div><div>Nenhum estagiário cadastrado</div></div>
+            :usuarios.map(u=>{
+              const meses = tempoNoNivel(u.id);
+              const pronto = meses >= NIVEIS[u.nivel].duracao && u.nivel < 7;
+              const cor = NIVEIS[u.nivel].cor;
+              const userRegs = regs.filter(r=>r.estagiario===u.nome);
+              const st = stats(userRegs);
+              return(
+                <div key={u.id} className="user-item">
+                  {pronto && <div style={{background:"rgba(245,158,11,0.15)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:"8px",padding:"8px 12px",marginBottom:"12px",fontSize:"13px",color:"#f59e0b"}}>
+                    ⚠️ Pronto para promoção ({meses} meses no Nível {u.nivel})
+                  </div>}
+                  <div style={{display:"flex",alignItems:"center",gap:"16px",marginBottom:"12px"}}>
+                    <div style={{width:"48px",height:"48px",borderRadius:"12px",background:`${cor}25`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"20px",fontWeight:"800",color:cor}}>{u.nome.charAt(0).toUpperCase()}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:"600",fontSize:"16px",marginBottom:"4px"}}>{u.nome}</div>
+                      <div style={{fontSize:"13px",color:"rgba(255,255,255,0.6)"}}>{u.email}</div>
+                      <div style={{marginTop:"6px"}}>
+                        <span className="nivel-badge" style={{background:cor,color:"#fff",fontSize:"12px"}}>{NIVEIS[u.nivel].emoji} Nível {u.nivel} ({meses} meses)</span>
+                      </div>
+                    </div>
+                    <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
+                      {u.nivel < 7 && <button className="hoc-btn-warning hoc-btn-sm" onClick={()=>promoverNivel(u.id,u.nivel)}>↑ Promover</button>}
+                      <button className="hoc-btn-danger hoc-btn-sm" onClick={()=>desativarEstagiario(u.id)}>✕ Desativar</button>
+                    </div>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"8px"}}>
+                    {[["Registros",st.n],["Atividades",st.tot],["Dias",st.dias]].map(([l,v])=>(
+                      <div key={l} style={{background:"rgba(0,0,0,0.2)",borderRadius:"8px",padding:"8px",textAlign:"center"}}>
+                        <div style={{fontSize:"18px",fontWeight:"700",color:"#4a9eff"}}>{v}</div>
+                        <div style={{fontSize:"10px",color:"rgba(255,255,255,0.5)"}}>{l}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </>}
+
+          {abaA==="dash"&&<div style={{textAlign:"center",padding:"60px",color:"rgba(255,255,255,0.5)"}}>Dashboard em desenvolvimento...</div>}
+          {abaA==="hist"&&<div style={{textAlign:"center",padding:"60px",color:"rgba(255,255,255,0.5)"}}>Histórico em desenvolvimento...</div>}
+        </div>
+
+        {modal==="cadastro"&&<div className="modal-overlay" onClick={()=>setModal(null)}>
+          <div className="modal-content" onClick={e=>e.stopPropagation()}>
+            <h2 style={{fontSize:"20px",fontWeight:"700",marginBottom:"24px"}}>Cadastrar Novo Estagiário</h2>
+            <div style={{marginBottom:"16px"}}>
+              <label className="hoc-label">Nome Completo</label>
+              <input className="hoc-input" value={novoNome} onChange={e=>setNovoNome(e.target.value)} placeholder="João Silva"/>
+            </div>
+            <div style={{marginBottom:"16px"}}>
+              <label className="hoc-label">Email</label>
+              <input className="hoc-input" type="email" value={novoEmail} onChange={e=>setNovoEmail(e.target.value)} placeholder="joao@hoc.com.br"/>
+            </div>
+            <div style={{marginBottom:"16px"}}>
+              <label className="hoc-label">Senha Temporária</label>
+              <input className="hoc-input" type="password" value={novoSenha} onChange={e=>setNovoSenha(e.target.value)} placeholder="Senha inicial"/>
+            </div>
+            <div style={{marginBottom:"24px"}}>
+              <label className="hoc-label">Nível Inicial</label>
+              <select className="hoc-input" value={novoNivel} onChange={e=>setNovoNivel(+e.target.value)} style={{cursor:"pointer"}}>
+                {Object.entries(NIVEIS).map(([k,v])=><option key={k} value={k}>Nível {k} - {v.nome}</option>)}
+              </select>
+            </div>
+            <div style={{display:"flex",gap:"12px"}}>
+              <button className="hoc-btn-secondary" onClick={()=>setModal(null)} style={{flex:1}}>Cancelar</button>
+              <button className="hoc-btn-success" onClick={cadastrarEstagiario} disabled={loading} style={{flex:1}}>{loading?"Cadastrando...":"Cadastrar"}</button>
+            </div>
+          </div>
+        </div>}
+      </div>
+    );
+  }
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
