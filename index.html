@@ -228,8 +228,8 @@ const ATIVIDADES = {
 
 const COMP_ITEMS = ["Pontualidade","Uniforme/EPI","Postura profissional","Dedicação","Relacionamento equipe","Postura c/ pacientes","Iniciativa"];
 
-const hash = s => CryptoJS.SHA256(s).toString();
-
+const hash = s => CryptoJS.SHA256(s).toString().toUpperCase();
+     
 // ─── Utilitários ─────────────────────────────────────────────
 const fmtDate = d => new Date(d + 'T12:00').toLocaleDateString('pt-BR');
 const statsOf = regs => {
