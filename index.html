@@ -319,7 +319,8 @@ function App() {
     if (!email || !senha) { setErr('Preencha e-mail e senha'); return; }
     if (!sb) { setErr('Configuração do banco não encontrada. Veja DEPLOY.md'); return; }
     setErr(''); setBusy(true);
-    const {data} = await sb.from('usuarios').select('*').eq('email',email).eq('senha_hash',hash(senha)).single();
+    const {data:arr} = await sb.from('usuarios').select('*').eq('email',email).eq('senha_hash',hash(senha));
+    const data = arr && arr[0];
     if (data) {
       setUser(data);
       setTela(data.tipo === 'admin' ? 'admin' : 'est');
