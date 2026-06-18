@@ -417,6 +417,141 @@ const ProgBar = ({val, max, color='var(--accent)'}) => {
   return <div className="prog-wrap"><div className="prog-bar" style={{width:pct+'%',background:color}}/></div>;
 };
 
+function GuiaTab({user}) {
+  const [nivelGuia, setNivelGuia] = useState(user.nivel);
+  const ng = GUIA_NIVEIS[nivelGuia];
+  const nv2 = NIVEIS[nivelGuia];
+  const porCatGuia = ATIVIDADES[nivelGuia].reduce((acc,a) => {
+    if (!acc[a.cat]) acc[a.cat]=[];
+    acc[a.cat].push(a); return acc;
+  }, {});
+  return (
+    <>
+                {/* Seletor de nível */}
+                <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:20}}>
+                  {Object.entries(NIVEIS).map(([k,v]) => {
+                    const isCur = +k === user.nivel;
+                    const isSel = +k === nivelGuia;
+                    return (
+                      <button key={k} onClick={()=>setNivelGuia(+k)} style={{
+                        padding:'7px 12px',borderRadius:8,border:'1px solid',cursor:'pointer',
+                        fontSize:12,fontWeight:700,transition:'all .15s',
+                        background: isSel ? v.cor.replace('var(','').replace(')','') : 'var(--bg-card2)',
+                        borderColor: isSel ? 'transparent' : 'var(--border)',
+                        color: isSel ? '#fff' : isCur ? 'var(--accent)' : 'var(--text-muted)',
+                        boxShadow: isSel ? '0 2px 8px rgba(0,0,0,.3)' : 'none',
+                      }}>
+                        {v.emoji} N{k} {isCur ? '← você' : ''}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Header do nível selecionado */}
+                <div className="card" style={{marginBottom:16,borderColor: nv2.cor.replace('var(','').replace(')','') + '55'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:14}}>
+                    <div style={{fontSize:36}}>{nv2.emoji}</div>
+                    <div>
+                      <div style={{fontWeight:800,fontSize:17}}>Nível {nivelGuia} — {nv2.nome}</div>
+                      <div style={{fontSize:12,color:'var(--text-muted)',marginTop:4}}>Duração estimada: {nv2.dur} meses · {ATIVIDADES[nivelGuia].length} atividades</div>
+                    </div>
+                    {nivelGuia === user.nivel && (
+                      <span style={{marginLeft:'auto',background:'var(--accent)',color:'#fff',borderRadius:8,padding:'4px 10px',fontSize:11,fontWeight:700}}>Seu nível atual</span>
+                    )}
+                    {nivelGuia < user.nivel && (
+                      <span style={{marginLeft:'auto',background:'var(--green)',color:'#fff',borderRadius:8,padding:'4px 10px',fontSize:11,fontWeight:700}}>✓ Concluído</span>
+                    )}
+                    {nivelGuia > user.nivel && (
+                      <span style={{marginLeft:'auto',background:'var(--border)',color:'var(--text-muted)',borderRadius:8,padding:'4px 10px',fontSize:11,fontWeight:700}}>Próximo</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Objetivos */}
+                <div className="card" style={{marginBottom:12}}>
+                  <div className="sec-label" style={{marginBottom:12}}>
+                    <div style={{width:18,height:3,background:'var(--accent)',borderRadius:2}}/>
+                    🎯 Objetivos de Aprendizado
+                  </div>
+                  {ng.objetivos.map((o,i) => (
+                    <div key={i} style={{display:'flex',gap:10,padding:'8px 0',borderBottom:i<ng.objetivos.length-1?'1px solid var(--border)':'none'}}>
+                      <span style={{color:'var(--accent)',fontWeight:800,fontSize:13,flexShrink:0}}>{i+1}.</span>
+                      <span style={{fontSize:13,lineHeight:1.5}}>{o}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Cuidados */}
+                <div className="card" style={{marginBottom:12,borderColor:'#ef444430'}}>
+                  <div className="sec-label" style={{marginBottom:12}}>
+                    <div style={{width:18,height:3,background:'var(--red)',borderRadius:2}}/>
+                    🛡️ Cuidados e Biossegurança
+                  </div>
+                  {ng.cuidados.map((c,i) => (
+                    <div key={i} style={{background:'#ef444410',border:'1px solid #ef444425',borderRadius:8,padding:'9px 12px',marginBottom:6,fontSize:13,lineHeight:1.5}}>
+                      {c}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Atividades por categoria */}
+                <div className="card" style={{marginBottom:12}}>
+                  <div className="sec-label" style={{marginBottom:12}}>
+                    <div style={{width:18,height:3,background:'var(--purple)',borderRadius:2}}/>
+                    📋 Atividades por Categoria
+                  </div>
+                  {Object.entries(porCatGuia).map(([cat,ativs]) => (
+                    <div key={cat} style={{marginBottom:14}}>
+                      <div style={{fontSize:11,fontWeight:700,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.8px',marginBottom:6}}>{cat}</div>
+                      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:5}}>
+                        {ativs.map(a => (
+                          <div key={a.id} style={{background:'var(--bg-card2)',border:'1px solid var(--border)',borderRadius:7,padding:'7px 10px'}}>
+                            <div style={{fontSize:12,fontWeight:600}}>{a.n}</div>
+                            <div style={{fontSize:10,color:'var(--text-dim)',marginTop:2}}>Meta: {a.meta}/mês</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Dicas */}
+                <div className="card" style={{marginBottom:12,borderColor:'#f59e0b30'}}>
+                  <div className="sec-label" style={{marginBottom:12}}>
+                    <div style={{width:18,height:3,background:'var(--yellow)',borderRadius:2}}/>
+                    💡 Dicas Práticas HOC
+                  </div>
+                  {ng.dicas.map((d,i) => (
+                    <div key={i} style={{background:'#f59e0b10',border:'1px solid #f59e0b25',borderRadius:8,padding:'9px 12px',marginBottom:6,fontSize:13,lineHeight:1.5}}>
+                      {d}
+                    </div>
+                  ))}
+                </div>
+
+                {/* RDC 1.002/2025 */}
+                <div className="card" style={{marginBottom:12,borderColor:'#8b5cf630'}}>
+                  <div className="sec-label" style={{marginBottom:12}}>
+                    <div style={{width:18,height:3,background:'var(--purple)',borderRadius:2}}/>
+                    📋 RDC ANVISA 1.002/2025 — Alertas deste Nível
+                  </div>
+                  <div style={{background:'#8b5cf608',border:'1px solid #8b5cf620',borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:11,color:'var(--text-muted)'}}>
+                    Resolução da Diretoria Colegiada nº 1.002, de 15/12/2025 — Boas Práticas de Funcionamento para Serviços Odontológicos. Os artigos abaixo são os mais relevantes para suas atividades neste nível.
+                  </div>
+                  {ng.rdc.map((r,i) => (
+                    <div key={i} style={{marginBottom:10,borderRadius:8,overflow:'hidden',border:'1px solid #8b5cf630'}}>
+                      <div style={{background:'#8b5cf618',padding:'7px 12px',fontSize:11,fontWeight:700,color:'#a78bfa',letterSpacing:'0.3px'}}>
+                        📌 {r.art}
+                      </div>
+                      <div style={{padding:'9px 12px',fontSize:13,lineHeight:1.6,color:'var(--text)'}}>
+                        {r.texto}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+    </>
+  );
+}
+
 function App() {
   const [tela, setTela]     = useState('login');
   const [user, setUser]     = useState(null);
@@ -435,6 +570,7 @@ function App() {
   const [cEmail, setCEmail] = useState('');
   const [cSenha, setCSenha] = useState('');
   const [cSenha2, setCSenha2] = useState('');
+  const [cNivel, setCNivel] = useState(1);
   const [cErr, setCErr]     = useState('');
 
   const [qtds, setQtds]     = useState({});
@@ -501,7 +637,7 @@ function App() {
       nome: cNome.trim(),
       email: emailNorm,
       senha_hash: hash(cSenha),
-      nivel: 1,
+      nivel: +cNivel,
       tipo: 'estagiario',
       ativo: true
     }]).select();
@@ -509,7 +645,7 @@ function App() {
     if (!error && data && data[0]) {
       setUser(data[0]);
       setTela('est');
-      setCNome(''); setCEmail(''); setCSenha(''); setCSenha2('');
+      setCNome(''); setCEmail(''); setCSenha(''); setCSenha2(''); setCNivel(1);
       carregar();
     } else {
       setCErr('Erro ao cadastrar: ' + (error?.message || 'tente novamente'));
@@ -606,7 +742,16 @@ function App() {
               <Inp label="Nome Completo" value={cNome} onChange={e=>setCNome(e.target.value)} placeholder="João Silva"/>
               <Inp label="E-mail" type="email" value={cEmail} onChange={e=>setCEmail(e.target.value)} placeholder="joao@email.com"/>
               <Inp label="Senha" type="password" value={cSenha} onChange={e=>setCSenha(e.target.value)} placeholder="Mínimo 8 caracteres"/>
-              <Inp label="Confirmar Senha" type="password" value={cSenha2} onChange={e=>setCSenha2(e.target.value)} placeholder="Repita a senha" onKeyDown={e=>e.key==='Enter'&&autocadastrar()}/>
+              <Inp label="Confirmar Senha" type="password" value={cSenha2} onChange={e=>setCSenha2(e.target.value)} placeholder="Repita a senha"/>
+              <div style={{marginBottom:16}}>
+                <label className="inp-label">Nível de entrada</label>
+                <select className="inp" value={cNivel} onChange={e=>setCNivel(e.target.value)} style={{cursor:'pointer'}}>
+                  {Object.entries(NIVEIS).map(([k,v])=>(
+                    <option key={k} value={k}>Nível {k} — {v.emoji} {v.nome}</option>
+                  ))}
+                </select>
+                <div style={{fontSize:11,color:'var(--text-dim)',marginTop:5}}>Se tiver dúvida, escolha Nível 1. O gestor pode alterar depois.</div>
+              </div>
               {cErr && <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#f87171',marginBottom:16}}>{cErr}</div>}
               <button className="btn btn-success btn-full" onClick={autocadastrar} disabled={busy}>
                 {busy ? <><span className="spinner" style={{width:16,height:16}}/> Criando conta...</> : '✓ Criar conta e entrar'}
@@ -621,7 +766,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v5.4
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v5.5
         </div>
       </div>
     </div>
@@ -829,140 +974,7 @@ function App() {
             );
           })()}
 
-          {aba==='guia' && (() => {
-            const [nivelGuia, setNivelGuia] = useState(user.nivel);
-            const ng = GUIA_NIVEIS[nivelGuia];
-            const nv2 = NIVEIS[nivelGuia];
-            const porCatGuia = ATIVIDADES[nivelGuia].reduce((acc,a) => {
-              if (!acc[a.cat]) acc[a.cat]=[];
-              acc[a.cat].push(a); return acc;
-            }, {});
-            return (
-              <>
-                {/* Seletor de nível */}
-                <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:20}}>
-                  {Object.entries(NIVEIS).map(([k,v]) => {
-                    const isCur = +k === user.nivel;
-                    const isSel = +k === nivelGuia;
-                    return (
-                      <button key={k} onClick={()=>setNivelGuia(+k)} style={{
-                        padding:'7px 12px',borderRadius:8,border:'1px solid',cursor:'pointer',
-                        fontSize:12,fontWeight:700,transition:'all .15s',
-                        background: isSel ? v.cor.replace('var(','').replace(')','') : 'var(--bg-card2)',
-                        borderColor: isSel ? 'transparent' : 'var(--border)',
-                        color: isSel ? '#fff' : isCur ? 'var(--accent)' : 'var(--text-muted)',
-                        boxShadow: isSel ? '0 2px 8px rgba(0,0,0,.3)' : 'none',
-                      }}>
-                        {v.emoji} N{k} {isCur ? '← você' : ''}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Header do nível selecionado */}
-                <div className="card" style={{marginBottom:16,borderColor: nv2.cor.replace('var(','').replace(')','') + '55'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:14}}>
-                    <div style={{fontSize:36}}>{nv2.emoji}</div>
-                    <div>
-                      <div style={{fontWeight:800,fontSize:17}}>Nível {nivelGuia} — {nv2.nome}</div>
-                      <div style={{fontSize:12,color:'var(--text-muted)',marginTop:4}}>Duração estimada: {nv2.dur} meses · {ATIVIDADES[nivelGuia].length} atividades</div>
-                    </div>
-                    {nivelGuia === user.nivel && (
-                      <span style={{marginLeft:'auto',background:'var(--accent)',color:'#fff',borderRadius:8,padding:'4px 10px',fontSize:11,fontWeight:700}}>Seu nível atual</span>
-                    )}
-                    {nivelGuia < user.nivel && (
-                      <span style={{marginLeft:'auto',background:'var(--green)',color:'#fff',borderRadius:8,padding:'4px 10px',fontSize:11,fontWeight:700}}>✓ Concluído</span>
-                    )}
-                    {nivelGuia > user.nivel && (
-                      <span style={{marginLeft:'auto',background:'var(--border)',color:'var(--text-muted)',borderRadius:8,padding:'4px 10px',fontSize:11,fontWeight:700}}>Próximo</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Objetivos */}
-                <div className="card" style={{marginBottom:12}}>
-                  <div className="sec-label" style={{marginBottom:12}}>
-                    <div style={{width:18,height:3,background:'var(--accent)',borderRadius:2}}/>
-                    🎯 Objetivos de Aprendizado
-                  </div>
-                  {ng.objetivos.map((o,i) => (
-                    <div key={i} style={{display:'flex',gap:10,padding:'8px 0',borderBottom:i<ng.objetivos.length-1?'1px solid var(--border)':'none'}}>
-                      <span style={{color:'var(--accent)',fontWeight:800,fontSize:13,flexShrink:0}}>{i+1}.</span>
-                      <span style={{fontSize:13,lineHeight:1.5}}>{o}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Cuidados */}
-                <div className="card" style={{marginBottom:12,borderColor:'#ef444430'}}>
-                  <div className="sec-label" style={{marginBottom:12}}>
-                    <div style={{width:18,height:3,background:'var(--red)',borderRadius:2}}/>
-                    🛡️ Cuidados e Biossegurança
-                  </div>
-                  {ng.cuidados.map((c,i) => (
-                    <div key={i} style={{background:'#ef444410',border:'1px solid #ef444425',borderRadius:8,padding:'9px 12px',marginBottom:6,fontSize:13,lineHeight:1.5}}>
-                      {c}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Atividades por categoria */}
-                <div className="card" style={{marginBottom:12}}>
-                  <div className="sec-label" style={{marginBottom:12}}>
-                    <div style={{width:18,height:3,background:'var(--purple)',borderRadius:2}}/>
-                    📋 Atividades por Categoria
-                  </div>
-                  {Object.entries(porCatGuia).map(([cat,ativs]) => (
-                    <div key={cat} style={{marginBottom:14}}>
-                      <div style={{fontSize:11,fontWeight:700,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.8px',marginBottom:6}}>{cat}</div>
-                      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:5}}>
-                        {ativs.map(a => (
-                          <div key={a.id} style={{background:'var(--bg-card2)',border:'1px solid var(--border)',borderRadius:7,padding:'7px 10px'}}>
-                            <div style={{fontSize:12,fontWeight:600}}>{a.n}</div>
-                            <div style={{fontSize:10,color:'var(--text-dim)',marginTop:2}}>Meta: {a.meta}/mês</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Dicas */}
-                <div className="card" style={{marginBottom:12,borderColor:'#f59e0b30'}}>
-                  <div className="sec-label" style={{marginBottom:12}}>
-                    <div style={{width:18,height:3,background:'var(--yellow)',borderRadius:2}}/>
-                    💡 Dicas Práticas HOC
-                  </div>
-                  {ng.dicas.map((d,i) => (
-                    <div key={i} style={{background:'#f59e0b10',border:'1px solid #f59e0b25',borderRadius:8,padding:'9px 12px',marginBottom:6,fontSize:13,lineHeight:1.5}}>
-                      {d}
-                    </div>
-                  ))}
-                </div>
-
-                {/* RDC 1.002/2025 */}
-                <div className="card" style={{marginBottom:12,borderColor:'#8b5cf630'}}>
-                  <div className="sec-label" style={{marginBottom:12}}>
-                    <div style={{width:18,height:3,background:'var(--purple)',borderRadius:2}}/>
-                    📋 RDC ANVISA 1.002/2025 — Alertas deste Nível
-                  </div>
-                  <div style={{background:'#8b5cf608',border:'1px solid #8b5cf620',borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:11,color:'var(--text-muted)'}}>
-                    Resolução da Diretoria Colegiada nº 1.002, de 15/12/2025 — Boas Práticas de Funcionamento para Serviços Odontológicos. Os artigos abaixo são os mais relevantes para suas atividades neste nível.
-                  </div>
-                  {ng.rdc.map((r,i) => (
-                    <div key={i} style={{marginBottom:10,borderRadius:8,overflow:'hidden',border:'1px solid #8b5cf630'}}>
-                      <div style={{background:'#8b5cf618',padding:'7px 12px',fontSize:11,fontWeight:700,color:'#a78bfa',letterSpacing:'0.3px'}}>
-                        📌 {r.art}
-                      </div>
-                      <div style={{padding:'9px 12px',fontSize:13,lineHeight:1.6,color:'var(--text)'}}>
-                        {r.texto}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            );
-          })()}
+          {aba==='guia' && <GuiaTab user={user}/>}
         </div>
       </div>
     );
