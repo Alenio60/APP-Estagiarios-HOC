@@ -1142,7 +1142,7 @@ function App() {
     doc.line(xL,y,xL+60,y); doc.line(xR,y,xR+60,y); y+=5;
     doc.setTextColor(40,40,40); doc.setFontSize(8.5); doc.setFont('helvetica','bold');
     doc.text('Dr. Alenio Calil Mathias',xL+30,y,{align:'center'});
-    doc.text(u.nome.split(' ').slice(0,2).join(' '),xR+30,y,{align:'center'}); y+=4;
+    doc.text(u.nome,xR+30,y,{align:'center'}); y+=4;
     doc.setFont('helvetica','normal'); doc.setTextColor(...CINZA); doc.setFontSize(7.5);
     doc.text('Diretor Clínico · CRO-SP 36117',xL+30,y,{align:'center'});
     doc.text('Estagiário(a)',xR+30,y,{align:'center'});
@@ -1266,7 +1266,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v6.0
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v6.1
         </div>
       </div>
     </div>
