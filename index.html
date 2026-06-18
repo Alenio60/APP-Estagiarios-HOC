@@ -182,6 +182,163 @@ const ATIVIDADES = {
 
 const COMP_ITEMS = ["Pontualidade","Uniforme/EPI","Postura profissional","Dedicação","Relacionamento equipe","Postura c/ pacientes","Iniciativa"];
 
+const GUIA_NIVEIS = {
+  1:{
+    objetivos:[
+      "Compreender o fluxo completo de esterilização e biossegurança do HOC",
+      "Dominar os processos de laboratório de gesso e moldagens básicas",
+      "Conhecer as normas internas, código de conduta e RDC 1.002/2025",
+      "Estudar a Apostila HOC e assimilar a cultura clínica do hospital",
+    ],
+    cuidados:[
+      "⚠️ Usar jaleco, máscara, óculos e luvas em TODO contato com instrumental — sem exceção",
+      "⚠️ Nunca reencapar agulha com as duas mãos — técnica de uma mão apenas",
+      "⚠️ Autoclave: conferir indicadores biológicos e físicos antes de liberar materiais",
+      "⚠️ Separação correta de resíduos: Grupo A (infectante), Grupo E (perfurocortante)",
+      "⚠️ Nunca manusear instrumental pontiagudo sem proteção",
+      "⚠️ Lavar as mãos antes e depois de cada etapa, mesmo usando luvas",
+    ],
+    dicas:[
+      "💡 O HOC faz RX panorâmico em TODA primeira consulta — entenda esse protocolo logo no início",
+      "💡 Pergunte ao supervisor antes de descartar qualquer material — reprocessamento tem regras específicas",
+      "💡 Chegue 15 min antes para montar a esterilização do dia — é o primeiro sinal de proatividade",
+      "💡 A apostila HOC é sua bíblia neste nível — leia com atenção e anote dúvidas",
+    ],
+  },
+  2:{
+    objetivos:[
+      "Operar equipamentos de radiologia digital com segurança e qualidade de imagem",
+      "Integrar a plataforma DIO para gestão de exames e documentação digital",
+      "Preparar pacientes e montar mesas clínicas com autonomia",
+      "Apoiar controle de agenda e comunicação pré/pós-operatória via WhatsApp",
+    ],
+    cuidados:[
+      "⚠️ RX: usar avental de chumbo no paciente e afastar-se da zona de radiação",
+      "⚠️ Conferir validade e integridade do filme/sensor antes de cada exame",
+      "⚠️ Não movimentar paciente durante o disparo — imagem comprometida = retrabalho e dose extra",
+      "⚠️ Mesa clínica: nunca montar sem conferir esterilização de cada instrumento",
+      "⚠️ WhatsApp pré/pós-op: não compartilhar dados do paciente em grupos ou sem autorização (LGPD)",
+      "⚠️ Plataforma DIO: nunca incluir dados pessoais sem consentimento registrado",
+    ],
+    dicas:[
+      "💡 RX panorâmico de qualidade exige posicionamento correto da cabeça — treine até ser automático",
+      "💡 No DIO, a padronização dos laudos é fundamental — siga exatamente o template definido",
+      "💡 Monte a mesa clínica sempre na mesma ordem — reduz erro e agiliza o atendimento",
+      "💡 Anote observações do paciente antes que ele saia — memória falha, prontuário não",
+    ],
+  },
+  3:{
+    objetivos:[
+      "Apoiar procedimentos de ortodontia fixa e removível com segurança",
+      "Dominar o ciclo completo de fabricação de placas: moldagem → vazamento → acabamento",
+      "Compreender o funcionamento de alinhadores e placas de clareamento",
+      "Registrar e controlar aparelhos e placas no sistema do HOC",
+    ],
+    cuidados:[
+      "⚠️ Alginato: proporção água/pó incorreta compromete o modelo — use balança e medidor",
+      "⚠️ Vazamento de gesso: bolhas invalidam o modelo — vibrar a base corretamente",
+      "⚠️ Placas termoformadas: temperatura incorreta deforma o material — seguir tabela do fabricante",
+      "⚠️ Aparelhos fixos: fios e bráquetes são pontiagudos — manusear com cuidado e EPI",
+      "⚠️ Controle de placas: registrar SEMPRE entrada e saída para evitar extravios",
+      "⚠️ Clareamento: gel é irritante — sem contato com mucosa ou olhos",
+    ],
+    dicas:[
+      "💡 Modelos de gesso vazados com pressa viram lixo — respeite o tempo de presa",
+      "💡 Identifique SEMPRE o modelo com nome e data antes de colocar para secar",
+      "💡 Placa miorrelaxante mal adaptada pode machucar o paciente — cheque com o especialista",
+      "💡 Alinhadores exigem higiene rigorosa do molde — qualquer resíduo compromete o ajuste",
+    ],
+  },
+  4:{
+    objetivos:[
+      "Apoiar atendimentos de odontopediatria com comunicação adequada para crianças",
+      "Montar mesa cirúrgica e assistir exodontias simples e cirurgias complexas",
+      "Compreender protocolos de CAPE (Centro de Apoio Psicológico e Emocional)",
+      "Operar e fazer manutenção básica de equipos e bombas de vácuo/compressor",
+    ],
+    cuidados:[
+      "⚠️ Odontopediatria: nunca imobilizar criança sem protocolo e autorização dos pais",
+      "⚠️ Mesa cirúrgica: sequência de montagem deve ser estéril — não tocar na área estéril sem luva cirúrgica",
+      "⚠️ Exodontia: material perfurocortante (lâminas, agulhas) em descarte imediato no coletor",
+      "⚠️ Compressor/vácuo: vazamentos de ar ou líquido → parar imediatamente e acionar manutenção",
+      "⚠️ Anestésico: nunca aplicar sem prescrição e orientação do cirurgião-dentista responsável",
+      "⚠️ CAPE: sigilo absoluto — nenhuma informação do paciente fora do ambiente clínico",
+    ],
+    dicas:[
+      "💡 Com crianças, fale sempre em linguagem lúdica — 'spray de água', não 'seringa'",
+      "💡 Mesa cirúrgica montada com antecedência = cirurgião focado = menos tempo de boca aberta",
+      "💡 Após cirurgia, confira se TODOS os instrumentos voltaram — conta antes e depois",
+      "💡 Manutenção preventiva dos equipos evita pane no meio do atendimento — faça o checklist diário",
+    ],
+  },
+  5:{
+    objetivos:[
+      "Dominar componentes e materiais de implantodontia e prótese sobre implante",
+      "Gerenciar o fluxo de próteses: controle, planilha e agenda de protesistas",
+      "Montar materiais para reaberturas e moldagens avançadas",
+      "Controlar estoque e fazer solicitações de compras com critério",
+    ],
+    cuidados:[
+      "⚠️ Componentes de implante: são personalizados por paciente — NUNCA misturar ou trocar",
+      "⚠️ Moldagem de transferência: técnica incorreta invalida o trabalho do laboratório inteiro",
+      "⚠️ Próteses entregues pelo laboratório: conferir acabamento antes de mostrar ao paciente",
+      "⚠️ Estoque: PEPS (Primeiro que entra, primeiro que sai) — evita vencimento de materiais",
+      "⚠️ Reabertura de implante: campo cirúrgico estéril — mesmas regras do centro cirúrgico",
+      "⚠️ Solicitação de compras: não fazer pedidos sem conferir estoque atual — desperdício de verba",
+    ],
+    dicas:[
+      "💡 Etiquete cada componente com o nome do paciente assim que sair do kit — confusão custa caro",
+      "💡 A planilha de próteses é o espelho do laboratório — mantenha sempre atualizada",
+      "💡 Relate ao supervisor qualquer atraso do laboratório antes que o paciente ligue reclamando",
+      "💡 Estoque organizado por categoria e validade poupa 20 minutos todo dia — invista no sistema",
+    ],
+  },
+  6:{
+    objetivos:[
+      "Gerenciar inventário completo do HOC com controle de validade e reposição",
+      "Estabelecer comunicação eficiente com fornecedores e fiscalizar entregas",
+      "Verificar e propor melhorias nos fluxos operacionais das clínicas",
+      "Produzir relatórios administrativos e padronizar protocolos internos",
+    ],
+    cuidados:[
+      "⚠️ Inventário: divergência entre sistema e estoque físico deve ser reportada imediatamente",
+      "⚠️ Validade vencida: segregar e descartar conforme RDC 1.002/2025 — não devolver à prateleira",
+      "⚠️ Fornecedores: toda negociação e promessa verbal deve ser confirmada por escrito (e-mail/WhatsApp)",
+      "⚠️ Relatórios: dados de pacientes só em documentos internos com acesso controlado (LGPD)",
+      "⚠️ Fluxos: mudança de protocolo só após aprovação da Direção Clínica — nunca unilateral",
+      "⚠️ Entrega de materiais: conferir nota fiscal x pedido x material físico antes de assinar",
+    ],
+    dicas:[
+      "💡 Um bom relatório administrativo antecipa problemas — olhe tendências, não só números do dia",
+      "💡 Fornecedor novo? Peça referências e comece com pedido pequeno antes de escalar",
+      "💡 Protocolo documentado vale mais que memória de qualquer profissional — escreva tudo",
+      "💡 Identifique gargalos de fluxo antes de propor soluções — dados primeiro, opinião depois",
+    ],
+  },
+  7:{
+    objetivos:[
+      "Operar scanner intraoral Medit com qualidade diagnóstica e protética",
+      "Trabalhar com software Exocad para design de coroas e próteses digitais",
+      "Operar impressora 3D e fazer acabamento de peças com precisão",
+      "Integrar fluxo digital completo: scan → design → impressão/fresagem → entrega",
+    ],
+    cuidados:[
+      "⚠️ Scanner Medit: calibrar antes de cada uso — arquivo descalibrado invalida o scan",
+      "⚠️ Exocad: salvar versões intermediárias — perda de arquivo significa refazer do zero",
+      "⚠️ Impressora 3D: resina é tóxica — luvas de nitrilo, óculos e ventilação obrigatórios",
+      "⚠️ Peças impressas: lavar em IPA e fotopolimerizar no tempo correto — atalhos comprometem a biocompatibilidade",
+      "⚠️ Arquivos de pacientes: nunca salvar em dispositivo pessoal — apenas servidores/nuvem do HOC",
+      "⚠️ Manutenção da impressora: resina cristalizada no FEP destrói a placa de impressão — limpeza após cada uso",
+    ],
+    dicas:[
+      "💡 Um scan bem feito economiza horas de ajuste no consultório — não tenha pressa nessa etapa",
+      "💡 No Exocad, domine os atalhos de teclado — a diferença entre 2h e 30min de design",
+      "💡 Imprima sempre um teste antes de uma peça definitiva — resina e parâmetros variam por lote",
+      "💡 Documente cada fluxo digital com fotos — o HOC está construindo banco de casos para o DIO",
+    ],
+  },
+};
+
 const hash = s => CryptoJS.SHA256(s).toString().toUpperCase();
 
 const fmtDate = d => new Date(d + 'T12:00').toLocaleDateString('pt-BR');
@@ -422,7 +579,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v5.1
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v5.2
         </div>
       </div>
     </div>
@@ -506,7 +663,7 @@ function App() {
           </div>
 
           <div className="tabs" style={{marginBottom:20}}>
-            {[['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas']].map(([k,l]) => (
+            {[['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas'],['guia','📚 Guia']].map(([k,l]) => (
               <button key={k} className={`tab ${aba===k?'active':''}`} onClick={()=>setAba(k)}>{l}</button>
             ))}
           </div>
@@ -626,6 +783,120 @@ function App() {
                     })}
                   </div>
                 ))}
+              </>
+            );
+          })()}
+
+          {aba==='guia' && (() => {
+            const [nivelGuia, setNivelGuia] = useState(user.nivel);
+            const ng = GUIA_NIVEIS[nivelGuia];
+            const nv2 = NIVEIS[nivelGuia];
+            const porCatGuia = ATIVIDADES[nivelGuia].reduce((acc,a) => {
+              if (!acc[a.cat]) acc[a.cat]=[];
+              acc[a.cat].push(a); return acc;
+            }, {});
+            return (
+              <>
+                {/* Seletor de nível */}
+                <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:20}}>
+                  {Object.entries(NIVEIS).map(([k,v]) => {
+                    const isCur = +k === user.nivel;
+                    const isSel = +k === nivelGuia;
+                    return (
+                      <button key={k} onClick={()=>setNivelGuia(+k)} style={{
+                        padding:'7px 12px',borderRadius:8,border:'1px solid',cursor:'pointer',
+                        fontSize:12,fontWeight:700,transition:'all .15s',
+                        background: isSel ? v.cor.replace('var(','').replace(')','') : 'var(--bg-card2)',
+                        borderColor: isSel ? 'transparent' : 'var(--border)',
+                        color: isSel ? '#fff' : isCur ? 'var(--accent)' : 'var(--text-muted)',
+                        boxShadow: isSel ? '0 2px 8px rgba(0,0,0,.3)' : 'none',
+                      }}>
+                        {v.emoji} N{k} {isCur ? '← você' : ''}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Header do nível selecionado */}
+                <div className="card" style={{marginBottom:16,borderColor: nv2.cor.replace('var(','').replace(')','') + '55'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:14}}>
+                    <div style={{fontSize:36}}>{nv2.emoji}</div>
+                    <div>
+                      <div style={{fontWeight:800,fontSize:17}}>Nível {nivelGuia} — {nv2.nome}</div>
+                      <div style={{fontSize:12,color:'var(--text-muted)',marginTop:4}}>Duração estimada: {nv2.dur} meses · {ATIVIDADES[nivelGuia].length} atividades</div>
+                    </div>
+                    {nivelGuia === user.nivel && (
+                      <span style={{marginLeft:'auto',background:'var(--accent)',color:'#fff',borderRadius:8,padding:'4px 10px',fontSize:11,fontWeight:700}}>Seu nível atual</span>
+                    )}
+                    {nivelGuia < user.nivel && (
+                      <span style={{marginLeft:'auto',background:'var(--green)',color:'#fff',borderRadius:8,padding:'4px 10px',fontSize:11,fontWeight:700}}>✓ Concluído</span>
+                    )}
+                    {nivelGuia > user.nivel && (
+                      <span style={{marginLeft:'auto',background:'var(--border)',color:'var(--text-muted)',borderRadius:8,padding:'4px 10px',fontSize:11,fontWeight:700}}>Próximo</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Objetivos */}
+                <div className="card" style={{marginBottom:12}}>
+                  <div className="sec-label" style={{marginBottom:12}}>
+                    <div style={{width:18,height:3,background:'var(--accent)',borderRadius:2}}/>
+                    🎯 Objetivos de Aprendizado
+                  </div>
+                  {ng.objetivos.map((o,i) => (
+                    <div key={i} style={{display:'flex',gap:10,padding:'8px 0',borderBottom:i<ng.objetivos.length-1?'1px solid var(--border)':'none'}}>
+                      <span style={{color:'var(--accent)',fontWeight:800,fontSize:13,flexShrink:0}}>{i+1}.</span>
+                      <span style={{fontSize:13,lineHeight:1.5}}>{o}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Cuidados */}
+                <div className="card" style={{marginBottom:12,borderColor:'#ef444430'}}>
+                  <div className="sec-label" style={{marginBottom:12}}>
+                    <div style={{width:18,height:3,background:'var(--red)',borderRadius:2}}/>
+                    🛡️ Cuidados e Biossegurança
+                  </div>
+                  {ng.cuidados.map((c,i) => (
+                    <div key={i} style={{background:'#ef444410',border:'1px solid #ef444425',borderRadius:8,padding:'9px 12px',marginBottom:6,fontSize:13,lineHeight:1.5}}>
+                      {c}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Atividades por categoria */}
+                <div className="card" style={{marginBottom:12}}>
+                  <div className="sec-label" style={{marginBottom:12}}>
+                    <div style={{width:18,height:3,background:'var(--purple)',borderRadius:2}}/>
+                    📋 Atividades por Categoria
+                  </div>
+                  {Object.entries(porCatGuia).map(([cat,ativs]) => (
+                    <div key={cat} style={{marginBottom:14}}>
+                      <div style={{fontSize:11,fontWeight:700,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.8px',marginBottom:6}}>{cat}</div>
+                      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:5}}>
+                        {ativs.map(a => (
+                          <div key={a.id} style={{background:'var(--bg-card2)',border:'1px solid var(--border)',borderRadius:7,padding:'7px 10px'}}>
+                            <div style={{fontSize:12,fontWeight:600}}>{a.n}</div>
+                            <div style={{fontSize:10,color:'var(--text-dim)',marginTop:2}}>Meta: {a.meta}/mês</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Dicas */}
+                <div className="card" style={{marginBottom:12,borderColor:'#f59e0b30'}}>
+                  <div className="sec-label" style={{marginBottom:12}}>
+                    <div style={{width:18,height:3,background:'var(--yellow)',borderRadius:2}}/>
+                    💡 Dicas Práticas HOC
+                  </div>
+                  {ng.dicas.map((d,i) => (
+                    <div key={i} style={{background:'#f59e0b10',border:'1px solid #f59e0b25',borderRadius:8,padding:'9px 12px',marginBottom:6,fontSize:13,lineHeight:1.5}}>
+                      {d}
+                    </div>
+                  ))}
+                </div>
               </>
             );
           })()}
