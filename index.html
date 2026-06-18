@@ -853,6 +853,8 @@ function App() {
   const [cSenha, setCSenha] = useState('');
   const [cSenha2, setCSenha2] = useState('');
   const [cNivel, setCNivel] = useState(1);
+  const [cTurnoI, setCTurnoI] = useState('08:00');
+  const [cTurnoF, setCTurnoF] = useState('17:00');
   const [cErr, setCErr]     = useState('');
 
   const [qtds, setQtds]     = useState({});
@@ -872,6 +874,8 @@ function App() {
   const [nEmail, setNE]     = useState('');
   const [nSenha, setNS]     = useState('');
   const [nNivel, setNNv]    = useState(1);
+  const [nTurnoI, setNTI]   = useState('08:00');
+  const [nTurnoF, setNTF]   = useState('17:00');
 
   const carregar = async () => {
     if (!sb) return;
@@ -898,8 +902,37 @@ function App() {
     if (data) {
       setUser(data);
       setTela(data.tipo === 'admin' ? 'admin' : 'est');
+      if (data.tipo === 'estagiario') agendarAlertas(data);
     } else setErr('E-mail ou senha incorretos');
     setBusy(false);
+  };
+
+  // ── Notificações de turno ──
+  const agendarAlertas = (u) => {
+    if (!u.turno_inicio || !u.turno_fim) return;
+    if (!('Notification' in window)) return;
+    const pedir = async () => {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') return;
+      const agendar = (horaStr, msg, anteciparMin=0) => {
+        const [h,m] = horaStr.split(':').map(Number);
+        const agora = new Date();
+        const alvo = new Date();
+        alvo.setHours(h, m - anteciparMin, 0, 0);
+        if (alvo <= agora) alvo.setDate(alvo.getDate() + 1);
+        const diff = alvo - agora;
+        setTimeout(() => {
+          new Notification('HOC — Hospital Odontológico', {
+            body: msg,
+            icon: '/icons/icon-192.png',
+            badge: '/icons/icon-72.png',
+          });
+        }, diff);
+      };
+      agendar(u.turno_inicio, `⏰ Seu estágio começa em 10 minutos! (${u.turno_inicio})`, 10);
+      agendar(u.turno_fim,    `✅ Hora de registrar sua saída! (${u.turno_fim})`);
+    };
+    pedir();
   };
 
   // ── Autocadastro de estagiário (entra ativo direto) ──
@@ -925,13 +958,16 @@ function App() {
       senha_hash: hash(cSenha),
       nivel: +cNivel,
       tipo: 'estagiario',
+      turno_inicio: cTurnoI,
+      turno_fim: cTurnoF,
       ativo: true
     }]).select();
 
     if (!error && data && data[0]) {
       setUser(data[0]);
       setTela('est');
-      setCNome(''); setCEmail(''); setCSenha(''); setCSenha2(''); setCNivel(1);
+      agendarAlertas(data[0]);
+      setCNome(''); setCEmail(''); setCSenha(''); setCSenha2(''); setCNivel(1); setCTurnoI('08:00'); setCTurnoF('17:00');
       carregar();
     } else {
       setCErr('Erro ao cadastrar: ' + (error?.message || 'tente novamente'));
@@ -942,8 +978,8 @@ function App() {
   const cadastrar = async () => {
     if (!nNome || !nEmail || !nSenha) { alert('Preencha todos os campos'); return; }
     setBusy(true);
-    const {error} = await sb.from('usuarios').insert([{nome:nNome,email:nEmail,senha_hash:hash(nSenha),nivel:+nNivel,tipo:'estagiario',ativo:true}]);
-    if (!error) { alert('✅ Estagiário cadastrado!'); setNN(''); setNE(''); setNS(''); setNNv(1); setModal(null); carregar(); }
+    const {error} = await sb.from('usuarios').insert([{nome:nNome,email:nEmail,senha_hash:hash(nSenha),nivel:+nNivel,turno_inicio:nTurnoI,turno_fim:nTurnoF,tipo:'estagiario',ativo:true}]);
+    if (!error) { alert('✅ Estagiário cadastrado!'); setNN(''); setNE(''); setNS(''); setNNv(1); setNTI('08:00'); setNTF('17:00'); setModal(null); carregar(); }
     else alert('Erro: ' + error.message);
     setBusy(false);
   };
@@ -1015,12 +1051,13 @@ function App() {
     const ur = regs.filter(r=>r.estagiario===u.nome);
     const ord = [...ur].sort((a,b)=>new Date(a.data)-new Date(b.data));
     const dtI = ord.length ? new Date(ord[0].data+'T12:00').toLocaleDateString('pt-BR') : 'Sem registros';
+    const turnoStr = (u.turno_inicio && u.turno_fim) ? `${u.turno_inicio} → ${u.turno_fim}` : 'Não informado';
     const dtF = ord.length ? new Date(ord[ord.length-1].data+'T12:00').toLocaleDateString('pt-BR') : 'Sem registros';
     const nvNome = NIVEIS[u.nivel]?.nome||'';
 
     doc.setTextColor(30,30,30); doc.setFontSize(9);
     [['Nome completo:',u.nome],['E-mail:',u.email],['Nível atual:',`Nível ${u.nivel} — ${nvNome}`],
-     ['Período:',`${dtI} a ${dtF}`],['Total de registros:',`${ur.length} dia(s) registrado(s)`]
+     ['Período:',`${dtI} a ${dtF}`],['Turno:',turnoStr],['Total de registros:',`${ur.length} dia(s) registrado(s)`]
     ].forEach(([lb,vl])=>{
       doc.setFont('helvetica','bold'); doc.text(lb,MARGIN,y);
       doc.setFont('helvetica','normal'); doc.text(vl,MARGIN+42,y); y+=6;
@@ -1200,6 +1237,21 @@ function App() {
                 </select>
                 <div style={{fontSize:11,color:'var(--text-dim)',marginTop:5}}>Se tiver dúvida, escolha Nível 1. O gestor pode alterar depois.</div>
               </div>
+              <div style={{marginBottom:16}}>
+                <label className="inp-label">Horário do Turno</label>
+                <div style={{display:'flex',gap:10,alignItems:'center'}}>
+                  <div style={{flex:1}}>
+                    <label style={{fontSize:11,color:'var(--text-muted)',display:'block',marginBottom:4}}>INÍCIO</label>
+                    <input type="time" className="inp" value={cTurnoI} onChange={e=>setCTurnoI(e.target.value)}/>
+                  </div>
+                  <div style={{color:'var(--text-dim)',paddingTop:20}}>→</div>
+                  <div style={{flex:1}}>
+                    <label style={{fontSize:11,color:'var(--text-muted)',display:'block',marginBottom:4}}>FIM</label>
+                    <input type="time" className="inp" value={cTurnoF} onChange={e=>setCTurnoF(e.target.value)}/>
+                  </div>
+                </div>
+                <div style={{fontSize:11,color:'var(--text-dim)',marginTop:5}}>Você receberá alertas 10 min antes de entrar e na hora de sair.</div>
+              </div>
               {cErr && <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#f87171',marginBottom:16}}>{cErr}</div>}
               <button className="btn btn-success btn-full" onClick={autocadastrar} disabled={busy}>
                 {busy ? <><span className="spinner" style={{width:16,height:16}}/> Criando conta...</> : '✓ Criar conta e entrar'}
@@ -1214,7 +1266,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v5.9
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v6.0
         </div>
       </div>
     </div>
@@ -1244,6 +1296,7 @@ function App() {
           </div>
           <div style={{display:'flex',alignItems:'center',gap:12}}>
             <NivelBadge n={user.nivel}/>
+            {(user.turno_inicio||user.turno_fim) && <span style={{fontSize:12,color:'var(--cyan)'}}>🕐 {user.turno_inicio||'?'}→{user.turno_fim||'?'}</span>}
             <span style={{fontSize:13,color:'var(--text-muted)'}}>{user.nome.split(' ')[0]}</span>
             <button className="btn btn-ghost btn-sm" onClick={()=>{setTela('login'); setModoTela('login');}}>Sair</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>gerarRelatorio(user)}>📄 Relatório</button>
@@ -1484,6 +1537,7 @@ function App() {
                       <div style={{fontWeight:700,fontSize:15}}>{u.nome}</div>
                       <div style={{fontSize:12,color:'var(--text-muted)',margin:'3px 0'}}>{u.email}</div>
                       <NivelBadge n={u.nivel}/> <span style={{fontSize:11,color:'var(--text-dim)',marginLeft:8}}>{meses} meses no nível</span>
+              {(u.turno_inicio||u.turno_fim) && <span style={{fontSize:11,color:'var(--cyan)',marginLeft:8}}>🕐 {u.turno_inicio||'?'} → {u.turno_fim||'?'}</span>}
                     </div>
                     <div style={{display:'flex',flexDirection:'column',gap:6}}>
                       <button className="btn btn-sm" style={{background:'var(--purple)',color:'#fff'}} onClick={()=>{setModalAval(u);setAvalComp({});setAvalObs('');setAvalRec('manter');setAvalMes(new Date().getMonth());setAvalAno(new Date().getFullYear());}}>⭐ Avaliar</button>
@@ -1688,6 +1742,20 @@ function App() {
               <Sel label="Nível Inicial"
                 value={nNivel} onChange={e=>setNNv(e.target.value)}
                 options={Object.entries(NIVEIS).map(([k,v])=>[k,`Nível ${k} — ${v.nome}`])}/>
+              <div style={{marginBottom:16}}>
+                <label className="inp-label">Horário do Turno</label>
+                <div style={{display:'flex',gap:10,alignItems:'center'}}>
+                  <div style={{flex:1}}>
+                    <label style={{fontSize:11,color:'var(--text-muted)',display:'block',marginBottom:4}}>INÍCIO</label>
+                    <input type="time" className="inp" value={nTurnoI} onChange={e=>setNTI(e.target.value)}/>
+                  </div>
+                  <div style={{color:'var(--text-dim)',paddingTop:20}}>→</div>
+                  <div style={{flex:1}}>
+                    <label style={{fontSize:11,color:'var(--text-muted)',display:'block',marginBottom:4}}>FIM</label>
+                    <input type="time" className="inp" value={nTurnoF} onChange={e=>setNTF(e.target.value)}/>
+                  </div>
+                </div>
+              </div>
               <div style={{display:'flex',gap:10,marginTop:4}}>
                 <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModal(null)}>Cancelar</button>
                 <button className="btn btn-success" style={{flex:1}} onClick={cadastrar} disabled={busy}>
