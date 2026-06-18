@@ -621,7 +621,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v5.3
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v5.4
         </div>
       </div>
     </div>
@@ -1053,30 +1053,84 @@ function App() {
               const ur = regsF.filter(r => r.estagiario===u.nome);
               return {nome:u.nome, nivel:u.nivel, ...statsOf(ur)};
             }).sort((a,b)=>b.tot-a.tot);
+
+            // ── Dados para gráficos ──────────────────────────────
+            const MESES_LABEL = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+            const ultimos6 = Array.from({length:6},(_,i)=>{
+              const d = new Date(fAno, fMes - (5-i), 1);
+              return {mes: d.getMonth(), ano: d.getFullYear(), label: MESES_LABEL[d.getMonth()]};
+            });
+
+            // Atividades por estagiário por mês (barras comparativas)
+            const dadosBarras = ultimos6.map(({mes,ano,label}) => {
+              const entry = {label, total:0, porEst:{}};
+              usuarios.forEach(u => {
+                const tot = regs.filter(r => {
+                  const d = new Date(r.data);
+                  return d.getMonth()===mes && d.getFullYear()===ano && r.estagiario===u.nome;
+                }).reduce((s,r)=>s+(r.atividades||[]).reduce((a,x)=>a+x.quantidade,0),0);
+                entry.porEst[u.nome] = tot;
+                entry.total += tot;
+              });
+              return entry;
+            });
+            const maxBarra = Math.max(...dadosBarras.map(d=>d.total), 1);
+
+            // Avaliação mensal por estagiário
+            const avaliacaoMensal = usuarios.map(u => {
+              const mesesAval = ultimos6.map(({mes,ano,label}) => {
+                const rMes = regs.filter(r => {
+                  const d = new Date(r.data);
+                  return d.getMonth()===mes && d.getFullYear()===ano && r.estagiario===u.nome;
+                });
+                // % metas atingidas
+                const totAtivs = {};
+                rMes.forEach(r=>(r.atividades||[]).forEach(a=>{totAtivs[a.id]=(totAtivs[a.id]||0)+a.quantidade;}));
+                const nivel = u.nivel;
+                const metas = ATIVIDADES[nivel]||[];
+                const metasAtingidas = metas.filter(a=>(totAtivs[a.id]||0)>=a.meta).length;
+                const pctMetas = metas.length ? Math.round((metasAtingidas/metas.length)*100) : 0;
+                // Nota comportamento média
+                const comps = rMes.filter(r=>r.comportamento && Object.keys(r.comportamento).length>0);
+                let notaComp = 0;
+                if (comps.length>0) {
+                  const soma = comps.reduce((s,r)=>{
+                    const vals = Object.values(r.comportamento).map(Number).filter(v=>v>0);
+                    return s + (vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0);
+                  },0);
+                  notaComp = +(soma/comps.length).toFixed(1);
+                }
+                const status = pctMetas>=80 && notaComp>=4 ? 'ok' : pctMetas>=50 && notaComp>=3 ? 'atencao' : rMes.length===0 ? 'sem' : 'critico';
+                return {label, pctMetas, notaComp, regs:rMes.length, status};
+              });
+              return {nome:u.nome, nivel:u.nivel, meses:mesesAval};
+            });
+
+            // Estagiário selecionado para gráfico de linha
+            const [estSel, setEstSel] = useState(usuarios[0]?.nome||'');
+            const dadosLinha = avaliacaoMensal.find(a=>a.nome===estSel);
+
+            const COR_NIVEL = ['','#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#ef4444','#06b6d4'];
+
             return (
               <>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:24}}>
-                  <div>
-                    <label className="inp-label">Estagiário</label>
-                    <select className="inp" value={fEst} onChange={e=>setFEst(e.target.value)}>
-                      <option value=''>Todos</option>
-                      {allNames.map(n=><option key={n} value={n}>{n}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="inp-label">Mês</label>
-                    <select className="inp" value={fMes} onChange={e=>setFMes(+e.target.value)}>
-                      {['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'].map((m,i)=><option key={i} value={i}>{m}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="inp-label">Ano</label>
+                {/* Filtro de Ano */}
+                <div style={{display:'flex',gap:12,marginBottom:24,alignItems:'flex-end'}}>
+                  <div style={{flex:1}}>
+                    <label className="inp-label">Ano de referência</label>
                     <select className="inp" value={fAno} onChange={e=>setFAno(+e.target.value)}>
                       {[2024,2025,2026].map(y=><option key={y} value={y}>{y}</option>)}
                     </select>
                   </div>
+                  <div style={{flex:1}}>
+                    <label className="inp-label">Mês atual</label>
+                    <select className="inp" value={fMes} onChange={e=>setFMes(+e.target.value)}>
+                      {MESES_LABEL.map((m,i)=><option key={i} value={i}>{m}</option>)}
+                    </select>
+                  </div>
                 </div>
 
+                {/* KPIs */}
                 <div className="stat-grid" style={{marginBottom:24}}>
                   {[['Registros',st.n,'📋'],['Atividades',st.tot,'⚡'],['Dias Ativos',st.dias,'📅'],['Média/Dia',st.med,'📈']].map(([l,v,e])=>(
                     <div key={l} className="stat-box">
@@ -1087,8 +1141,168 @@ function App() {
                   ))}
                 </div>
 
+                {/* ── GRÁFICO DE BARRAS COMPARATIVO ── */}
                 <div className="card" style={{marginBottom:20}}>
-                  <div className="sec-label"><div style={{width:18,height:3,background:'var(--green)',borderRadius:2}}/>Ranking por Atividades</div>
+                  <div className="sec-label" style={{marginBottom:16}}>
+                    <div style={{width:18,height:3,background:'var(--green)',borderRadius:2}}/>
+                    📊 Atividades por Mês — Comparativo (últimos 6 meses)
+                  </div>
+                  {dadosBarras.every(d=>d.total===0)
+                    ? <div style={{textAlign:'center',color:'var(--text-dim)',padding:20,fontSize:13}}>Sem dados nos últimos 6 meses</div>
+                    : <div style={{overflowX:'auto'}}>
+                        <svg viewBox={`0 0 ${Math.max(400, dadosBarras.length*80)} 180`} style={{width:'100%',minWidth:320}}>
+                          {dadosBarras.map((d,i) => {
+                            const x = i * (700/6) + 20;
+                            const barW = 60;
+                            const h = maxBarra > 0 ? (d.total/maxBarra)*120 : 0;
+                            const y = 140 - h;
+                            const nomes = Object.entries(d.porEst).filter(([,v])=>v>0);
+                            // Barras empilhadas por estagiário
+                            let yOff = 140;
+                            return (
+                              <g key={i}>
+                                {nomes.map(([nome,val],j) => {
+                                  const bh = maxBarra>0?(val/maxBarra)*120:0;
+                                  yOff -= bh;
+                                  const u = usuarios.find(u=>u.nome===nome);
+                                  const cor = u ? COR_NIVEL[u.nivel] : '#3b82f6';
+                                  return <rect key={j} x={x} y={yOff} width={barW} height={bh} fill={cor} opacity={0.85} rx={3}/>;
+                                })}
+                                <text x={x+barW/2} y={155} textAnchor="middle" fontSize={10} fill="#6b8aaa">{d.label}</text>
+                                {d.total>0 && <text x={x+barW/2} y={y-4} textAnchor="middle" fontSize={10} fill="#e8f0fe" fontWeight="700">{d.total}</text>}
+                              </g>
+                            );
+                          })}
+                          <line x1={10} y1={140} x2={690} y2={140} stroke="#1c3352" strokeWidth={1}/>
+                        </svg>
+                        {/* Legenda */}
+                        <div style={{display:'flex',flexWrap:'wrap',gap:10,marginTop:8}}>
+                          {usuarios.map(u=>(
+                            <div key={u.nome} style={{display:'flex',alignItems:'center',gap:5,fontSize:11}}>
+                              <div style={{width:10,height:10,borderRadius:3,background:COR_NIVEL[u.nivel],flexShrink:0}}/>
+                              <span style={{color:'var(--text-muted)'}}>{u.nome.split(' ')[0]} (N{u.nivel})</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                  }
+                </div>
+
+                {/* ── GRÁFICO DE LINHA — EVOLUÇÃO INDIVIDUAL ── */}
+                <div className="card" style={{marginBottom:20}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+                    <div className="sec-label" style={{margin:0}}>
+                      <div style={{width:18,height:3,background:'var(--accent)',borderRadius:2}}/>
+                      📈 Evolução Individual — % Metas
+                    </div>
+                    <select className="inp" value={estSel} onChange={e=>setEstSel(e.target.value)} style={{width:'auto',fontSize:12,padding:'6px 10px'}}>
+                      {usuarios.map(u=><option key={u.nome} value={u.nome}>{u.nome.split(' ')[0]}</option>)}
+                    </select>
+                  </div>
+                  {!dadosLinha
+                    ? <div style={{textAlign:'center',color:'var(--text-dim)',padding:20,fontSize:13}}>Selecione um estagiário</div>
+                    : <svg viewBox="0 0 400 140" style={{width:'100%'}}>
+                        {/* Grid */}
+                        {[0,25,50,75,100].map(v=>(
+                          <g key={v}>
+                            <line x1={40} y1={110-(v*0.9)} x2={390} y2={110-(v*0.9)} stroke="#1c3352" strokeWidth={0.5}/>
+                            <text x={35} y={114-(v*0.9)} textAnchor="end" fontSize={9} fill="#3d5a78">{v}%</text>
+                          </g>
+                        ))}
+                        {/* Linha % metas */}
+                        {dadosLinha.meses.map((m,i)=>{
+                          const x = 40 + i*(350/5);
+                          const y = 110 - (m.pctMetas*0.9);
+                          const px = i>0 ? 40+(i-1)*(350/5) : x;
+                          const py = i>0 ? 110-(dadosLinha.meses[i-1].pctMetas*0.9) : y;
+                          return (
+                            <g key={i}>
+                              {i>0 && <line x1={px} y1={py} x2={x} y2={y} stroke="#3b82f6" strokeWidth={2}/>}
+                              <circle cx={x} cy={y} r={4} fill={m.pctMetas>=80?'#10b981':m.pctMetas>=50?'#f59e0b':'#ef4444'} stroke="#0d1f35" strokeWidth={1.5}/>
+                              <text x={x} y={126} textAnchor="middle" fontSize={9} fill="#6b8aaa">{m.label}</text>
+                              <text x={x} y={y-7} textAnchor="middle" fontSize={9} fill="#e8f0fe" fontWeight="700">{m.pctMetas}%</text>
+                            </g>
+                          );
+                        })}
+                        {/* Linha nota comportamento (escala 0-5 → 0-100) */}
+                        {dadosLinha.meses.map((m,i)=>{
+                          if(!m.notaComp) return null;
+                          const x = 40 + i*(350/5);
+                          const y = 110 - (m.notaComp/5*90);
+                          const px = i>0 ? 40+(i-1)*(350/5) : x;
+                          const pm = dadosLinha.meses[i-1];
+                          const py = i>0&&pm.notaComp ? 110-(pm.notaComp/5*90) : y;
+                          return (
+                            <g key={'c'+i}>
+                              {i>0&&pm.notaComp && <line x1={px} y1={py} x2={x} y2={y} stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="4,2"/>}
+                              <circle cx={x} cy={y} r={3} fill="#f59e0b" stroke="#0d1f35" strokeWidth={1}/>
+                            </g>
+                          );
+                        })}
+                        {/* Legenda */}
+                        <g>
+                          <line x1={45} y1={12} x2={65} y2={12} stroke="#3b82f6" strokeWidth={2}/>
+                          <text x={68} y={16} fontSize={9} fill="#6b8aaa">% Metas</text>
+                          <line x1={130} y1={12} x2={150} y2={12} stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="4,2"/>
+                          <text x={153} y={16} fontSize={9} fill="#6b8aaa">Comportamento</text>
+                        </g>
+                      </svg>
+                  }
+                </div>
+
+                {/* ── AVALIAÇÃO MENSAL CONSOLIDADA ── */}
+                <div className="card" style={{marginBottom:20}}>
+                  <div className="sec-label" style={{marginBottom:16}}>
+                    <div style={{width:18,height:3,background:'var(--purple)',borderRadius:2}}/>
+                    🏅 Avaliação Mensal de KPIs — Todos os Estagiários
+                  </div>
+                  <div style={{overflowX:'auto'}}>
+                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                      <thead>
+                        <tr>
+                          <th style={{textAlign:'left',padding:'6px 8px',color:'var(--text-muted)',fontWeight:600,borderBottom:'1px solid var(--border)',minWidth:100}}>Estagiário</th>
+                          {ultimos6.map((m,i)=>(
+                            <th key={i} style={{textAlign:'center',padding:'6px 8px',color:'var(--text-muted)',fontWeight:600,borderBottom:'1px solid var(--border)',minWidth:60}}>{m.label}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {avaliacaoMensal.map((a,i)=>(
+                          <tr key={i} style={{borderBottom:'1px solid var(--border)'}}>
+                            <td style={{padding:'8px 8px'}}>
+                              <div style={{fontWeight:600}}>{a.nome.split(' ')[0]}</div>
+                              <NivelBadge n={a.nivel}/>
+                            </td>
+                            {a.meses.map((m,j)=>{
+                              const bg = m.status==='ok'?'#10b98120':m.status==='atencao'?'#f59e0b20':m.status==='critico'?'#ef444420':'transparent';
+                              const cor = m.status==='ok'?'#10b981':m.status==='atencao'?'#f59e0b':m.status==='critico'?'#ef4444':'var(--text-dim)';
+                              const emoji = m.status==='ok'?'✅':m.status==='atencao'?'⚠️':m.status==='critico'?'❌':'—';
+                              return (
+                                <td key={j} style={{textAlign:'center',padding:'8px 6px',background:bg,borderRadius:4}}>
+                                  <div style={{fontSize:14}}>{emoji}</div>
+                                  {m.regs>0 && <>
+                                    <div style={{fontSize:10,color:cor,fontWeight:700}}>{m.pctMetas}%</div>
+                                    <div style={{fontSize:10,color:'var(--text-dim)'}}>{m.notaComp>0?`★${m.notaComp}`:''}</div>
+                                  </>}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{display:'flex',gap:16,marginTop:12,fontSize:11,color:'var(--text-muted)'}}>
+                    <span>✅ Ótimo (metas ≥80% e comp ≥4)</span>
+                    <span>⚠️ Atenção (metas ≥50% e comp ≥3)</span>
+                    <span>❌ Crítico</span>
+                    <span>— Sem registros</span>
+                  </div>
+                </div>
+
+                {/* Ranking e top atividades originais */}
+                <div className="card" style={{marginBottom:20}}>
+                  <div className="sec-label"><div style={{width:18,height:3,background:'var(--green)',borderRadius:2}}/>Ranking do Mês Selecionado</div>
                   {porEst.filter(e=>e.tot>0).length===0
                     ? <div style={{color:'var(--text-dim)',fontSize:13,textAlign:'center',padding:20}}>Sem dados no período</div>
                     : porEst.filter(e=>e.tot>0).map((e,i) => (
