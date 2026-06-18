@@ -833,6 +833,13 @@ function App() {
   const [regs, setRegs]     = useState([]);
   const [busy, setBusy]     = useState(false);
   const [modal, setModal]   = useState(null);
+  const [avaliacoes, setAvaliacoes] = useState([]);
+  const [modalAval, setModalAval] = useState(null); // {usuario}
+  const [avalComp, setAvalComp]   = useState({});
+  const [avalObs, setAvalObs]     = useState('');
+  const [avalRec, setAvalRec]     = useState('manter');
+  const [avalMes, setAvalMes]     = useState(new Date().getMonth());
+  const [avalAno, setAvalAno]     = useState(new Date().getFullYear());
 
   const [email, setEmail]   = useState('');
   const [senha, setSenha]   = useState('');
@@ -866,12 +873,14 @@ function App() {
   const carregar = async () => {
     if (!sb) return;
     setBusy(true);
-    const [u, r] = await Promise.all([
+    const [u, r, av] = await Promise.all([
       sb.from('usuarios').select('*').eq('ativo',true).order('nome'),
-      sb.from('registros').select('*').order('data',{ascending:false})
+      sb.from('registros').select('*').order('data',{ascending:false}),
+      sb.from('avaliacoes').select('*').order('ano',{ascending:false}).order('mes',{ascending:false})
     ]);
     if (u.data) setUsr(u.data);
     if (r.data) setRegs(r.data);
+    if (av.data) setAvaliacoes(av.data);
     setBusy(false);
   };
 
@@ -944,6 +953,31 @@ function App() {
     carregar();
   };
 
+  const salvarAvaliacao = async () => {
+    if (Object.keys(avalComp).length < 7) { alert('Avalie todos os 7 critérios antes de salvar'); return; }
+    setBusy(true);
+    const u = modalAval;
+    const payload = {
+      estagiario: u.nome,
+      estagiario_id: u.id,
+      mes: avalMes,
+      ano: avalAno,
+      comportamento: avalComp,
+      obs: avalObs,
+      recomendacao: avalRec,
+      gestor: user.nome,
+    };
+    // upsert: atualiza se já existe avaliação deste estagiário neste mês/ano
+    const {error} = await sb.from('avaliacoes').upsert(payload, {onConflict:'estagiario,mes,ano'});
+    if (!error) {
+      alert('✅ Avaliação salva!');
+      setModalAval(null);
+      setAvalComp({}); setAvalObs(''); setAvalRec('manter');
+      carregar();
+    } else alert('Erro: ' + error.message);
+    setBusy(false);
+  };
+
   const desativar = async id => {
     if (!confirm('Desativar este estagiário?')) return;
     await sb.from('usuarios').update({ativo:false}).eq('id',id);
@@ -959,11 +993,11 @@ function App() {
     setBusy(true);
     const {data,error} = await sb.from('registros').insert([{
       data:dt, estagiario:user.nome, nivel:user.nivel, atividades:ativs,
-      comportamento:comp, obs:obsD, created_at:new Date().toISOString()
+      obs:obsD, created_at:new Date().toISOString()
     }]).select();
     if (!error) {
       setRegs([data[0],...regs]);
-      setQtds({}); setComp({}); setObs('');
+      setQtds({}); setObs('');
       alert('✅ Registro salvo!');
     } else alert('Erro ao salvar: ' + error.message);
     setBusy(false);
@@ -1040,7 +1074,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v5.6
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v5.7
         </div>
       </div>
     </div>
@@ -1157,23 +1191,8 @@ function App() {
               </div>
             ))}
 
-            <div style={{marginBottom:20}}>
-              <div className="sec-label">
-                <div style={{width:18,height:3,background:'var(--yellow)',borderRadius:2}}/>
-                Comportamento (1–5)
-              </div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:8}}>
-                {COMP_ITEMS.map((item,i) => (
-                  <div key={i} className="card-sm">
-                    <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:8}}>{item}</div>
-                    <div className="stars">
-                      {[1,2,3,4,5].map(n => (
-                        <button key={n} className={`star ${(comp[i]||0)>=n?'on':''}`} onClick={()=>setComp(p=>({...p,[i]:n}))}>{n}</button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div className="alert alert-info" style={{marginBottom:20}}>
+              ℹ️ A avaliação de comportamento é realizada mensalmente pelo gestor. Você pode ver os critérios na aba 📚 Guia.
             </div>
 
             <div style={{marginBottom:20}}>
@@ -1287,7 +1306,7 @@ function App() {
 
         <div className="content">
           <div className="tabs" style={{marginBottom:24}}>
-            {[['usuarios','👥 Estagiários'],['dash','📊 Dashboard'],['hist','📋 Histórico']].map(([k,l])=>(
+            {[['usuarios','👥 Estagiários'],['dash','📊 Dashboard'],['aval','⭐ Avaliações'],['hist','📋 Histórico']].map(([k,l])=>(
               <button key={k} className={`tab ${abaA===k?'active':''}`} onClick={()=>setAbaA(k)}>{l}</button>
             ))}
           </div>
@@ -1319,6 +1338,7 @@ function App() {
                       <NivelBadge n={u.nivel}/> <span style={{fontSize:11,color:'var(--text-dim)',marginLeft:8}}>{meses} meses no nível</span>
                     </div>
                     <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                      <button className="btn btn-sm" style={{background:'var(--purple)',color:'#fff'}} onClick={()=>{setModalAval(u);setAvalComp({});setAvalObs('');setAvalRec('manter');setAvalMes(new Date().getMonth());setAvalAno(new Date().getFullYear());}}>⭐ Avaliar</button>
                       {u.nivel < 7 && <button className="btn btn-warn btn-sm" onClick={()=>promover(u.id,u.nivel)}>↑ Promover</button>}
                       <button className="btn btn-danger btn-sm" onClick={()=>desativar(u.id)}>✕ Desativar</button>
                     </div>
@@ -1334,6 +1354,60 @@ function App() {
           </>}
 
           {abaA==='dash' && <DashTab regs={regs} usuarios={usuarios} regsF={regsF} fMes={fMes} fAno={fAno} setFMes={setFMes} setFAno={setFAno} rankAtivs={rankAtivs} maxRank={maxRank} statsOf={statsOf}/>}
+
+          {abaA==='aval' && (() => {
+            const MESES_LABEL = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+            return (
+              <>
+                <div style={{marginBottom:20}}>
+                  <button className="btn" style={{background:'var(--purple)',color:'#fff'}} onClick={()=>{
+                    if(!usuarios.length){alert('Nenhum estagiário cadastrado');return;}
+                    setModalAval(usuarios[0]);setAvalComp({});setAvalObs('');setAvalRec('manter');
+                    setAvalMes(new Date().getMonth());setAvalAno(new Date().getFullYear());
+                  }}>⭐ Nova Avaliação Mensal</button>
+                </div>
+                {avaliacoes.length===0
+                  ? <div style={{textAlign:'center',padding:'60px 20px',color:'var(--text-dim)'}}>
+                      <div style={{fontSize:48,marginBottom:12}}>⭐</div>
+                      <div>Nenhuma avaliação registrada ainda</div>
+                    </div>
+                  : avaliacoes.map(av => {
+                      const mediaComp = av.comportamento ? +(Object.values(av.comportamento).reduce((s,v)=>s+(+v),0)/Object.values(av.comportamento).length).toFixed(1) : 0;
+                      const recCor = av.recomendacao==='promover'?'var(--green)':av.recomendacao==='atencao'?'var(--yellow)':'var(--accent)';
+                      const recLabel = av.recomendacao==='promover'?'↑ Promover':av.recomendacao==='atencao'?'⚠️ Atenção':'✓ Manter Nível';
+                      return (
+                        <div key={av.id} className="card card-hover" style={{marginBottom:10}}>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                            <div>
+                              <span style={{fontWeight:700,fontSize:14}}>{av.estagiario}</span>
+                              <span style={{fontSize:12,color:'var(--text-muted)',marginLeft:10}}>{MESES_LABEL[av.mes]}/{av.ano}</span>
+                            </div>
+                            <span style={{background:recCor,color:'#fff',borderRadius:8,padding:'3px 10px',fontSize:11,fontWeight:700}}>{recLabel}</span>
+                          </div>
+                          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:6,marginBottom:10}}>
+                            {COMP_ITEMS.map((item,i)=>(
+                              <div key={i} style={{background:'var(--bg-card2)',border:'1px solid var(--border)',borderRadius:6,padding:'6px 10px'}}>
+                                <div style={{fontSize:10,color:'var(--text-muted)',marginBottom:4}}>{item}</div>
+                                <div style={{display:'flex',gap:2}}>
+                                  {[1,2,3,4,5].map(n=>(
+                                    <span key={n} style={{fontSize:12,color:(av.comportamento?.[i]||0)>=n?'var(--yellow)':'var(--border)'}}>★</span>
+                                  ))}
+                                  <span style={{fontSize:11,fontWeight:700,marginLeft:4,color:'var(--text)'}}>{av.comportamento?.[i]||0}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                            <div style={{fontSize:12,color:'var(--text-muted)'}}>Média: <strong style={{color:'var(--yellow)'}}>{mediaComp} ★</strong> · Gestor: {av.gestor}</div>
+                          </div>
+                          {av.obs && <div className="obs-box" style={{marginTop:8}}>💬 {av.obs}</div>}
+                        </div>
+                      );
+                    })
+                }
+              </>
+            );
+          })()}
 
           {abaA==='hist' && (() => {
             return (
@@ -1386,6 +1460,73 @@ function App() {
             );
           })()}
         </div>
+
+        {modalAval && (
+          <div className="overlay" onClick={()=>setModalAval(null)}>
+            <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:520}}>
+              <div className="modal-title">⭐ Avaliar — {modalAval.nome.split(' ')[0]}</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginBottom:16}}>
+                <div>
+                  <label className="inp-label">Estagiário</label>
+                  <select className="inp" value={modalAval.id} onChange={e=>setModalAval(usuarios.find(u=>u.id===e.target.value))}>
+                    {usuarios.map(u=><option key={u.id} value={u.id}>{u.nome.split(' ')[0]}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="inp-label">Mês</label>
+                  <select className="inp" value={avalMes} onChange={e=>setAvalMes(+e.target.value)}>
+                    {['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'].map((m,i)=><option key={i} value={i}>{m}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="inp-label">Ano</label>
+                  <select className="inp" value={avalAno} onChange={e=>setAvalAno(+e.target.value)}>
+                    {[2024,2025,2026].map(y=><option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="sec-label" style={{marginBottom:10}}>
+                <div style={{width:18,height:3,background:'var(--yellow)',borderRadius:2}}/>
+                Comportamento (1–5 estrelas)
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(210px,1fr))',gap:8,marginBottom:16}}>
+                {COMP_ITEMS.map((item,i)=>(
+                  <div key={i} className="card-sm">
+                    <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:8}}>{item}</div>
+                    <div className="stars">
+                      {[1,2,3,4,5].map(n=>(
+                        <button key={n} className={`star ${(avalComp[i]||0)>=n?'on':''}`} onClick={()=>setAvalComp(p=>({...p,[i]:n}))}>{n}</button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{marginBottom:14}}>
+                <label className="inp-label">Observação geral</label>
+                <textarea className="inp" value={avalObs} onChange={e=>setAvalObs(e.target.value)} rows={3} placeholder="Pontos fortes, áreas de melhoria, comportamento geral..." style={{resize:'vertical'}}/>
+              </div>
+              <div style={{marginBottom:20}}>
+                <label className="inp-label">Recomendação</label>
+                <div style={{display:'flex',gap:8}}>
+                  {[['manter','✓ Manter Nível','var(--accent)'],['promover','↑ Promover','var(--green)'],['atencao','⚠️ Atenção','var(--yellow)']].map(([v,l,c])=>(
+                    <button key={v} onClick={()=>setAvalRec(v)} style={{
+                      flex:1,padding:'10px 8px',borderRadius:8,border:'2px solid',cursor:'pointer',fontSize:12,fontWeight:700,
+                      borderColor: avalRec===v ? c : 'var(--border)',
+                      background: avalRec===v ? c+'22' : 'var(--bg-card2)',
+                      color: avalRec===v ? c : 'var(--text-muted)',
+                    }}>{l}</button>
+                  ))}
+                </div>
+              </div>
+              <div style={{display:'flex',gap:10}}>
+                <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModalAval(null)}>Cancelar</button>
+                <button className="btn" style={{flex:2,background:'var(--purple)',color:'#fff'}} onClick={salvarAvaliacao} disabled={busy}>
+                  {busy?'Salvando...':'⭐ Salvar Avaliação'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {modal==='cadastro' && (
           <div className="overlay" onClick={()=>setModal(null)}>
