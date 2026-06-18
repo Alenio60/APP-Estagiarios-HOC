@@ -18,14 +18,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
-<!-- ═══════════════════════════════════════════════════════
-     CONFIGURAÇÃO DE AMBIENTE (Vercel injeta automaticamente)
-     Não coloque a chave real aqui — use Vercel Environment Variables
-     Veja: DEPLOY.md para instruções
-     ═══════════════════════════════════════════════════════ -->
 <script>
-  // Vercel injeta __SUPABASE_URL__ e __SUPABASE_KEY__ no build
-  // Para desenvolvimento local, crie config-local.js (ignorado pelo git)
   window.__ENV__ = {
    SUPABASE_URL: 'https://jxqrntxwwxjkupvalyan.supabase.co',
       SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4cXJudHh3d3hqa3VwdmFseWFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0ODExOTMsImV4cCI6MjA5MTA1NzE5M30.xYTfRyPCr6Jb-ltIJyH4LFW1g6W_s-huVAHQtfASyLI'
@@ -59,32 +52,22 @@
 }
 body{font-family:'Inter',system-ui,sans-serif;background:var(--bg-base);min-height:100vh;color:var(--text);-webkit-font-smoothing:antialiased}
 input,select,textarea,button{font-family:inherit;outline:none}
-
-/* Scrollbar */
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:var(--bg-base)}
 ::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:4px}
-
-/* Layout */
 .page{min-height:100vh;display:flex;flex-direction:column}
 .header{background:var(--bg-card);border-bottom:1px solid var(--border);padding:0 28px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(8px)}
 .logo-text{font-size:22px;font-weight:800;letter-spacing:-0.5px;background:linear-gradient(135deg,#60a5fa,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .logo-sub{font-size:11px;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin-top:1px}
 .content{flex:1;max-width:960px;margin:0 auto;width:100%;padding:28px 20px}
-
-/* Cards */
 .card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:24px}
 .card-sm{background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px}
 .card-hover{transition:border-color .2s,transform .1s}
 .card-hover:hover{border-color:var(--border-light);transform:translateY(-1px)}
-
-/* Inputs */
 .inp{width:100%;padding:12px 14px;background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;transition:border-color .2s}
 .inp:focus{border-color:var(--accent)}
 .inp::placeholder{color:var(--text-dim)}
 .inp-label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:block}
-
-/* Buttons */
 .btn{padding:10px 18px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
 .btn-primary{background:var(--accent);color:#fff;box-shadow:0 2px 12px var(--accent-glow)}
 .btn-primary:hover{background:var(--accent-dark)}
@@ -99,98 +82,64 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .btn-danger{background:var(--red);color:#fff}
 .btn-danger:hover{background:#dc2626}
 .btn-sm{padding:6px 12px;font-size:12px}
-
-/* Tabs */
+.btn-link{background:none;border:none;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;padding:0}
+.btn-link:hover{text-decoration:underline}
 .tabs{display:flex;gap:4px;background:var(--bg-card2);padding:4px;border-radius:var(--radius-sm);border:1px solid var(--border)}
 .tab{flex:1;padding:9px 12px;border:none;border-radius:6px;background:transparent;color:var(--text-muted);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;text-align:center}
 .tab.active{background:var(--accent);color:#fff;box-shadow:0 2px 8px var(--accent-glow)}
-
-/* Badges & Tags */
 .badge{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700}
 .tag{display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600}
-
-/* Stat grid */
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
 .stat-box{background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px 14px;text-align:center}
 .stat-num{font-size:26px;font-weight:800;margin-bottom:2px}
 .stat-lbl{font-size:11px;color:var(--text-muted);font-weight:500}
-
-/* Nível cores */
 .n1{color:#3b82f6} .n2{color:#8b5cf6} .n3{color:#ec4899}
 .n4{color:#f59e0b} .n5{color:#10b981} .n6{color:#ef4444} .n7{color:#06b6d4}
 .bg1{background:#3b82f620} .bg2{background:#8b5cf620} .bg3{background:#ec489920}
 .bg4{background:#f59e0b20} .bg5{background:#10b98120} .bg6{background:#ef444420} .bg7{background:#06b6d420}
-
-/* Counter */
 .counter{display:flex;align-items:center;gap:8px}
 .counter-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border-light);background:var(--bg-card2);color:var(--text);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .counter-btn:hover{border-color:var(--accent);color:var(--accent)}
 .counter-val{width:28px;text-align:center;font-size:15px;font-weight:800}
-
-/* Stars */
 .stars{display:flex;gap:4px}
 .star{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card2);color:var(--text-dim);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .star.on{background:var(--yellow);border-color:var(--yellow);color:#000}
-
-/* Activity row */
 .act-row{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:var(--bg-card2);border:1px solid var(--border)}
 .act-row+.act-row{margin-top:6px}
 .act-name{font-size:13px;font-weight:500}
 .act-meta{font-size:10px;color:var(--text-dim);margin-top:2px}
-
-/* Section label */
 .sec-label{font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
-
-/* User card */
 .user-card{background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:10px;transition:border-color .2s}
 .user-card:hover{border-color:var(--border-light)}
 .user-avatar{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;flex-shrink:0}
-
-/* Modal */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px;backdrop-filter:blur(4px)}
 .modal{background:var(--bg-card);border:1px solid var(--border-light);border-radius:var(--radius);padding:28px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow)}
 .modal-title{font-size:18px;font-weight:700;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)}
-
-/* Alert */
 .alert{border-radius:var(--radius-sm);padding:12px 14px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500}
 .alert-promo{background:#f59e0b18;border:1px solid #f59e0b40;color:#fbbf24}
 .alert-success{background:#10b98118;border:1px solid #10b98140;color:#34d399}
 .alert-info{background:#3b82f618;border:1px solid #3b82f640;color:#93c5fd}
-
-/* Progress bar */
 .prog-wrap{background:var(--border);border-radius:4px;height:5px;overflow:hidden}
 .prog-bar{height:5px;border-radius:4px;transition:width .5s ease}
-
-/* Obs box */
 .obs-box{background:var(--bg-card2);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--text-muted);margin-top:10px;border-left:3px solid var(--border-light)}
-
-/* Login */
 .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(ellipse at 50% 0%,#0d2a4a 0%,var(--bg-base) 70%)}
 .login-box{width:100%;max-width:400px}
 .login-logo{text-align:center;margin-bottom:32px}
 .login-title{font-size:32px;font-weight:800;letter-spacing:-1px;background:linear-gradient(135deg,#93c5fd,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .login-sub{font-size:13px;color:var(--text-muted);margin-top:6px}
-
-/* Spinner */
 .spinner{border:2px solid var(--border);border-top:2px solid var(--accent);border-radius:50%;width:20px;height:20px;animation:spin 1s linear infinite;display:inline-block}
 @keyframes spin{to{transform:rotate(360deg)}}
 .loading-full{min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;color:var(--text-muted)}
-
-/* Rel chart bars */
 .bar-wrap{display:flex;align-items:center;gap:10px;margin-bottom:6px}
 .bar-label{font-size:12px;color:var(--text-muted);width:130px;flex-shrink:0;text-align:right}
 .bar-bg{flex:1;background:var(--border);border-radius:3px;height:8px;overflow:hidden}
 .bar-fill{height:8px;border-radius:3px;transition:width .6s}
 .bar-val{font-size:12px;font-weight:700;width:36px;text-align:right}
-
-/* Histórico timeline */
 .timeline-day{margin-bottom:20px}
 .timeline-date{font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px}
 .timeline-date::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent)}
 .ativs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px}
 .ativ-chip{background:var(--bg-card2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:12px}
-
-/* Responsivo */
 @media(max-width:600px){
   .header{padding:0 16px}
   .content{padding:16px 12px}
@@ -207,12 +156,10 @@ input,select,textarea,button{font-family:inherit;outline:none}
 const {useState, useEffect, useMemo} = React;
 const {createClient} = supabase;
 
-// ─── Supabase (chaves vêm de variáveis de ambiente Vercel) ───
 const SUPA_URL = window.__ENV__?.SUPABASE_URL || '';
 const SUPA_KEY = window.__ENV__?.SUPABASE_KEY || '';
 const sb = (SUPA_URL && SUPA_KEY) ? createClient(SUPA_URL, SUPA_KEY) : null;
 
-// ─── Dados estáticos ─────────────────────────────────────────
 const NIVEIS = {
   1:{nome:"Introdução e Formação Básica",      emoji:"🧼", cor:"var(--n1)",cls:"n1 bg1", dur:2},
   2:{nome:"Suporte Clínico e Radiologia",      emoji:"🦷", cor:"var(--n2)",cls:"n2 bg2", dur:2},
@@ -236,9 +183,7 @@ const ATIVIDADES = {
 const COMP_ITEMS = ["Pontualidade","Uniforme/EPI","Postura profissional","Dedicação","Relacionamento equipe","Postura c/ pacientes","Iniciativa"];
 
 const hash = s => CryptoJS.SHA256(s).toString().toUpperCase();
-     
-     
-// ─── Utilitários ─────────────────────────────────────────────
+
 const fmtDate = d => new Date(d + 'T12:00').toLocaleDateString('pt-BR');
 const statsOf = regs => {
   const tot = regs.reduce((a,r) => a + (r.atividades||[]).reduce((s,x) => s + x.quantidade, 0), 0);
@@ -246,7 +191,6 @@ const statsOf = regs => {
   return {tot, dias, n: regs.length, med: dias ? (tot/dias).toFixed(1) : 0};
 };
 
-// ─── Componentes base ─────────────────────────────────────────
 const Inp = ({label, ...p}) => (
   <div style={{marginBottom:16}}>
     {label && <label className="inp-label">{label}</label>}
@@ -274,7 +218,6 @@ const ProgBar = ({val, max, color='var(--accent)'}) => {
   return <div className="prog-wrap"><div className="prog-bar" style={{width:pct+'%',background:color}}/></div>;
 };
 
-// ─── App principal ─────────────────────────────────────────────
 function App() {
   const [tela, setTela]     = useState('login');
   const [user, setUser]     = useState(null);
@@ -283,25 +226,29 @@ function App() {
   const [busy, setBusy]     = useState(false);
   const [modal, setModal]   = useState(null);
 
-  // Login
   const [email, setEmail]   = useState('');
   const [senha, setSenha]   = useState('');
   const [errMsg, setErr]    = useState('');
 
-  // Registro
+  // Autocadastro (estagiário)
+  const [modoTela, setModoTela] = useState('login'); // 'login' | 'cadastro'
+  const [cNome, setCNome]   = useState('');
+  const [cEmail, setCEmail] = useState('');
+  const [cSenha, setCSenha] = useState('');
+  const [cSenha2, setCSenha2] = useState('');
+  const [cErr, setCErr]     = useState('');
+
   const [qtds, setQtds]     = useState({});
   const [comp, setComp]     = useState({});
   const [obsD, setObs]      = useState('');
   const [dt, setDt]         = useState(new Date().toISOString().split('T')[0]);
   const [aba, setAba]       = useState('reg');
 
-  // Admin
   const [abaA, setAbaA]     = useState('usuarios');
   const [fEst, setFEst]     = useState('');
   const [fMes, setFMes]     = useState(new Date().getMonth());
   const [fAno, setFAno]     = useState(new Date().getFullYear());
 
-  // Novo estagiário
   const [nNome,  setNN]     = useState('');
   const [nEmail, setNE]     = useState('');
   const [nSenha, setNS]     = useState('');
@@ -321,7 +268,6 @@ function App() {
 
   useEffect(() => { carregar(); }, []);
 
-  // ── Login ──
   const login = async () => {
     if (!email || !senha) { setErr('Preencha e-mail e senha'); return; }
     if (!sb) { setErr('Configuração do banco não encontrada. Veja DEPLOY.md'); return; }
@@ -335,7 +281,43 @@ function App() {
     setBusy(false);
   };
 
-  // ── Cadastrar estagiário ──
+  // ── Autocadastro de estagiário (entra ativo direto) ──
+  const autocadastrar = async () => {
+    setCErr('');
+    if (!cNome.trim() || !cEmail.trim() || !cSenha) { setCErr('Preencha todos os campos'); return; }
+    if (cSenha.length < 8) { setCErr('A senha deve ter no mínimo 8 caracteres'); return; }
+    if (cSenha !== cSenha2) { setCErr('As senhas não coincidem'); return; }
+    if (!sb) { setCErr('Configuração do banco não encontrada. Veja DEPLOY.md'); return; }
+
+    setBusy(true);
+    const emailNorm = cEmail.trim().toLowerCase();
+    const {data: existentes} = await sb.from('usuarios').select('id').eq('email', emailNorm);
+    if (existentes && existentes.length > 0) {
+      setCErr('Este e-mail já está cadastrado. Faça login ou use outro e-mail.');
+      setBusy(false);
+      return;
+    }
+
+    const {data, error} = await sb.from('usuarios').insert([{
+      nome: cNome.trim(),
+      email: emailNorm,
+      senha_hash: hash(cSenha),
+      nivel: 1,
+      tipo: 'estagiario',
+      ativo: true
+    }]).select();
+
+    if (!error && data && data[0]) {
+      setUser(data[0]);
+      setTela('est');
+      setCNome(''); setCEmail(''); setCSenha(''); setCSenha2('');
+      carregar();
+    } else {
+      setCErr('Erro ao cadastrar: ' + (error?.message || 'tente novamente'));
+    }
+    setBusy(false);
+  };
+
   const cadastrar = async () => {
     if (!nNome || !nEmail || !nSenha) { alert('Preencha todos os campos'); return; }
     setBusy(true);
@@ -345,7 +327,6 @@ function App() {
     setBusy(false);
   };
 
-  // ── Promover ──
   const promover = async (id, n) => {
     if (n >= 7) { alert('Nível máximo já atingido'); return; }
     if (!confirm(`Promover para Nível ${n+1}?`)) return;
@@ -354,14 +335,12 @@ function App() {
     carregar();
   };
 
-  // ── Desativar ──
   const desativar = async id => {
     if (!confirm('Desativar este estagiário?')) return;
     await sb.from('usuarios').update({ativo:false}).eq('id',id);
     carregar();
   };
 
-  // ── Salvar registro ──
   const salvar = async () => {
     const ativs = Object.entries(qtds).filter(([,v]) => v>0).map(([id,q]) => {
       const a = ATIVIDADES[user.nivel].find(x => x.id===id);
@@ -381,7 +360,6 @@ function App() {
     setBusy(false);
   };
 
-  // ── Meses no nível (approx) ──
   const mesesNoNivel = uid => {
     const nome = usuarios.find(u => u.id===uid)?.nome;
     const ur = regs.filter(r => r.estagiario===nome);
@@ -392,7 +370,7 @@ function App() {
   };
 
   // ─────────────────────────────────────────────────────────────
-  // TELA: LOGIN
+  // TELA: LOGIN / CADASTRO
   // ─────────────────────────────────────────────────────────────
   if (tela === 'login') return (
     <div className="login-wrap">
@@ -407,15 +385,44 @@ function App() {
               ⚠️ Banco de dados não configurado. Veja DEPLOY.md para configurar as variáveis de ambiente.
             </div>
           )}
-          <Inp label="E-mail" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="seu@email.com" onKeyDown={e=>e.key==='Enter'&&login()}/>
-          <Inp label="Senha" type="password" value={senha} onChange={e=>setSenha(e.target.value)} placeholder="••••••••" onKeyDown={e=>e.key==='Enter'&&login()}/>
-          {errMsg && <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#f87171',marginBottom:16}}>{errMsg}</div>}
-          <button className="btn btn-primary btn-full" onClick={login} disabled={busy}>
-            {busy ? <><span className="spinner" style={{width:16,height:16}}/> Entrando...</> : 'Entrar'}
-          </button>
+
+          {modoTela === 'login' ? (
+            <>
+              <Inp label="E-mail" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="seu@email.com" onKeyDown={e=>e.key==='Enter'&&login()}/>
+              <Inp label="Senha" type="password" value={senha} onChange={e=>setSenha(e.target.value)} placeholder="••••••••" onKeyDown={e=>e.key==='Enter'&&login()}/>
+              {errMsg && <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#f87171',marginBottom:16}}>{errMsg}</div>}
+              <button className="btn btn-primary btn-full" onClick={login} disabled={busy}>
+                {busy ? <><span className="spinner" style={{width:16,height:16}}/> Entrando...</> : 'Entrar'}
+              </button>
+              <div style={{textAlign:'center',marginTop:18,fontSize:13,color:'var(--text-muted)'}}>
+                Ainda não tem conta?{' '}
+                <button className="btn-link" onClick={()=>{setModoTela('cadastro'); setCErr(''); setErr('');}}>
+                  Criar conta de estagiário
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{fontWeight:700,fontSize:16,marginBottom:18}}>Criar conta de estagiário</div>
+              <Inp label="Nome Completo" value={cNome} onChange={e=>setCNome(e.target.value)} placeholder="João Silva"/>
+              <Inp label="E-mail" type="email" value={cEmail} onChange={e=>setCEmail(e.target.value)} placeholder="joao@email.com"/>
+              <Inp label="Senha" type="password" value={cSenha} onChange={e=>setCSenha(e.target.value)} placeholder="Mínimo 8 caracteres"/>
+              <Inp label="Confirmar Senha" type="password" value={cSenha2} onChange={e=>setCSenha2(e.target.value)} placeholder="Repita a senha" onKeyDown={e=>e.key==='Enter'&&autocadastrar()}/>
+              {cErr && <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#f87171',marginBottom:16}}>{cErr}</div>}
+              <button className="btn btn-success btn-full" onClick={autocadastrar} disabled={busy}>
+                {busy ? <><span className="spinner" style={{width:16,height:16}}/> Criando conta...</> : '✓ Criar conta e entrar'}
+              </button>
+              <div style={{textAlign:'center',marginTop:18,fontSize:13,color:'var(--text-muted)'}}>
+                Já tem conta?{' '}
+                <button className="btn-link" onClick={()=>{setModoTela('login'); setCErr(''); setErr('');}}>
+                  Fazer login
+                </button>
+              </div>
+            </>
+          )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v5.0
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v5.1
         </div>
       </div>
     </div>
@@ -438,7 +445,6 @@ function App() {
 
     return (
       <div className="page">
-        {/* Header */}
         <div className="header">
           <div>
             <div className="logo-text">HOC</div>
@@ -447,19 +453,17 @@ function App() {
           <div style={{display:'flex',alignItems:'center',gap:12}}>
             <NivelBadge n={user.nivel}/>
             <span style={{fontSize:13,color:'var(--text-muted)'}}>{user.nome.split(' ')[0]}</span>
-            <button className="btn btn-ghost btn-sm" onClick={()=>setTela('login')}>Sair</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{setTela('login'); setModoTela('login');}}>Sair</button>
           </div>
         </div>
 
         <div className="content">
-          {/* Alerta promoção */}
           {promo && (
             <div className="alert alert-promo" style={{marginBottom:20}}>
               🎉 Você completou {meses} meses no Nível {user.nivel}! Aguarde aprovação do gestor para promoção.
             </div>
           )}
 
-          {/* Stats */}
           <div className="stat-grid" style={{marginBottom:24}}>
             {[
               {l:'Registros',v:st.n,     s:'dias registrados'},
@@ -474,7 +478,6 @@ function App() {
             ))}
           </div>
 
-          {/* Progresso nível */}
           <div className="card" style={{marginBottom:24}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
               <div>
@@ -484,7 +487,6 @@ function App() {
               <span style={{fontSize:22,fontWeight:800,color:'var(--accent)'}}>{Math.min(100,Math.round((meses/nv.dur)*100))}%</span>
             </div>
             <ProgBar val={meses} max={nv.dur} color='var(--accent)'/>
-            {/* Mini mapa de níveis */}
             <div style={{display:'flex',justifyContent:'space-between',marginTop:14}}>
               {Object.entries(NIVEIS).map(([k,v]) => {
                 const done = +k < user.nivel, cur = +k === user.nivel;
@@ -503,14 +505,12 @@ function App() {
             </div>
           </div>
 
-          {/* Tabs */}
           <div className="tabs" style={{marginBottom:20}}>
             {[['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas']].map(([k,l]) => (
               <button key={k} className={`tab ${aba===k?'active':''}`} onClick={()=>setAba(k)}>{l}</button>
             ))}
           </div>
 
-          {/* ── ABA: REGISTRAR ── */}
           {aba==='reg' && <>
             <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
               <label className="inp-label" style={{margin:0}}>Data:</label>
@@ -539,7 +539,6 @@ function App() {
               </div>
             ))}
 
-            {/* Comportamento */}
             <div style={{marginBottom:20}}>
               <div className="sec-label">
                 <div style={{width:18,height:3,background:'var(--yellow)',borderRadius:2}}/>
@@ -559,7 +558,6 @@ function App() {
               </div>
             </div>
 
-            {/* Observações */}
             <div style={{marginBottom:20}}>
               <label className="inp-label">Observações do dia</label>
               <textarea className="inp" value={obsD} onChange={e=>setObs(e.target.value)} rows={3} placeholder="Aprendizados, dificuldades, sugestões..." style={{resize:'vertical'}}/>
@@ -570,7 +568,6 @@ function App() {
             </button>
           </>}
 
-          {/* ── ABA: HISTÓRICO ── */}
           {aba==='hist' && (
             mReg.length === 0
             ? <div style={{textAlign:'center',padding:'60px 20px',color:'var(--text-dim)'}}>
@@ -597,7 +594,6 @@ function App() {
             ))
           )}
 
-          {/* ── ABA: METAS ── */}
           {aba==='metas' && (() => {
             const mesAtual = new Date().getMonth();
             const anoAtual = new Date().getFullYear();
@@ -649,7 +645,6 @@ function App() {
 
     const allNames = [...new Set(regs.map(r => r.estagiario))].sort();
 
-    // Ranking de atividades para o dashboard
     const rankAtivs = (() => {
       const totais = {};
       regsF.forEach(r => (r.atividades||[]).forEach(a => {totais[a.nome]=(totais[a.nome]||0)+a.quantidade;}));
@@ -659,7 +654,6 @@ function App() {
 
     return (
       <div className="page">
-        {/* Header */}
         <div className="header">
           <div>
             <div className="logo-text">HOC</div>
@@ -667,7 +661,7 @@ function App() {
           </div>
           <div style={{display:'flex',gap:10}}>
             <button className="btn btn-ghost btn-sm" onClick={carregar}>🔄</button>
-            <button className="btn btn-ghost btn-sm" onClick={()=>setTela('login')}>Sair</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{setTela('login'); setModoTela('login');}}>Sair</button>
           </div>
         </div>
 
@@ -678,7 +672,6 @@ function App() {
             ))}
           </div>
 
-          {/* ── ESTAGIÁRIOS ── */}
           {abaA==='usuarios' && <>
             <div style={{marginBottom:20}}>
               <button className="btn btn-success" onClick={()=>setModal('cadastro')}>+ Cadastrar Estagiário</button>
@@ -720,7 +713,6 @@ function App() {
             })}
           </>}
 
-          {/* ── DASHBOARD ── */}
           {abaA==='dash' && (() => {
             const st = statsOf(regsF);
             const porEst = usuarios.map(u => {
@@ -729,7 +721,6 @@ function App() {
             }).sort((a,b)=>b.tot-a.tot);
             return (
               <>
-                {/* Filtros */}
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:24}}>
                   <div>
                     <label className="inp-label">Estagiário</label>
@@ -746,13 +737,12 @@ function App() {
                   </div>
                   <div>
                     <label className="inp-label">Ano</label>
-                    <select className="inp" value={fAno} onChange={e=>setFA(+e.target.value)}>
+                    <select className="inp" value={fAno} onChange={e=>setFAno(+e.target.value)}>
                       {[2024,2025,2026].map(y=><option key={y} value={y}>{y}</option>)}
                     </select>
                   </div>
                 </div>
 
-                {/* KPIs */}
                 <div className="stat-grid" style={{marginBottom:24}}>
                   {[['Registros',st.n,'📋'],['Atividades',st.tot,'⚡'],['Dias Ativos',st.dias,'📅'],['Média/Dia',st.med,'📈']].map(([l,v,e])=>(
                     <div key={l} className="stat-box">
@@ -763,7 +753,6 @@ function App() {
                   ))}
                 </div>
 
-                {/* Ranking estagiários */}
                 <div className="card" style={{marginBottom:20}}>
                   <div className="sec-label"><div style={{width:18,height:3,background:'var(--green)',borderRadius:2}}/>Ranking por Atividades</div>
                   {porEst.filter(e=>e.tot>0).length===0
@@ -782,7 +771,6 @@ function App() {
                   ))}
                 </div>
 
-                {/* Atividades mais realizadas */}
                 {rankAtivs.length > 0 && (
                   <div className="card">
                     <div className="sec-label"><div style={{width:18,height:3,background:'var(--purple)',borderRadius:2}}/>Top Atividades do Período</div>
@@ -799,9 +787,7 @@ function App() {
             );
           })()}
 
-          {/* ── HISTÓRICO ── */}
           {abaA==='hist' && (() => {
-            // Mesmos filtros do dashboard
             return (
               <>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:20}}>
@@ -820,7 +806,7 @@ function App() {
                   </div>
                   <div>
                     <label className="inp-label">Ano</label>
-                    <select className="inp" value={fAno} onChange={e=>setFA(+e.target.value)}>
+                    <select className="inp" value={fAno} onChange={e=>setFAno(+e.target.value)}>
                       {[2024,2025,2026].map(y=><option key={y} value={y}>{y}</option>)}
                     </select>
                   </div>
@@ -853,7 +839,6 @@ function App() {
           })()}
         </div>
 
-        {/* Modal cadastro */}
         {modal==='cadastro' && (
           <div className="overlay" onClick={()=>setModal(null)}>
             <div className="modal" onClick={e=>e.stopPropagation()}>
