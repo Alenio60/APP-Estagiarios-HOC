@@ -1264,7 +1264,8 @@ function App() {
                   <option value="comercial">💼 Comercial</option>
                 </select>
               </div>
-              {cArea==='clinico' && <div style={{marginBottom:16}}>
+              {cArea==='clinico' && <>
+              <div style={{marginBottom:16}}>
                 <label className="inp-label">Nível de entrada</label>
                 <select className="inp" value={cNivel} onChange={e=>setCNivel(e.target.value)} style={{cursor:'pointer'}}>
                   {Object.entries(NIVEIS).map(([k,v])=>(
@@ -1302,7 +1303,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v6.3
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v6.4
         </div>
       </div>
     </div>
@@ -1806,7 +1807,7 @@ function App() {
               </div>
               {nArea==='clinico' && <Sel label="Nível Inicial"
                 value={nNivel} onChange={e=>setNNv(e.target.value)}
-                options={Object.entries(NIVEIS).map(([k,v])=>[k,`Nível ${k} — ${v.nome}`])}/>
+                options={Object.entries(NIVEIS).map(([k,v])=>[k,`Nível ${k} — ${v.nome}`])}/>}
               <div style={{marginBottom:16}}>
                 <label className="inp-label">Horário do Turno</label>
                 <div style={{display:'flex',gap:10,alignItems:'center'}}>
