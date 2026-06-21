@@ -10,94 +10,27 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Inter',sans-serif;background:linear-gradient(135deg,#0a1628,#1a2942);min-height:100vh;color:#fff}.hoc-card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:32px}.hoc-input{width:100%;padding:12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;margin-bottom:12px}.hoc-btn-primary{width:100%;padding:12px;background:#4a9eff;border:none;border-radius:8px;color:#fff;font-weight:600;cursor:pointer}.hoc-header{background:rgba(0,0,0,0.3);padding:16px 24px;border-bottom:1px solid rgba(255,255,255,0.1)}.dept-badge{display:inline-block;padding:4px 10px;border-radius:16px;font-size:11px;font-weight:700;margin-right:8px}.tab-btn{padding:10px 16px;background:transparent;border:none;color:rgba(255,255,255,0.6);font-weight:600;cursor:pointer;margin-right:8px}.tab-btn.active{background:#4a9eff;color:#fff;border-radius:8px}.loading{text-align:center;padding:40px}.spinner{border:3px solid rgba(255,255,255,0.1);border-top:3px solid #4a9eff;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:20px auto}@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000}.modal-content{background:#1a2942;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:32px;max-width:500px;width:90%}.stat-card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;text-align:center;margin-bottom:12px}</style>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:linear-gradient(135deg,#0a1628,#1a2942);min-height:100vh;color:#fff}
+.container{max-width:900px;margin:0 auto;padding:20px}
+.hoc-card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:32px;margin-bottom:16px}
+.hoc-input{width:100%;padding:12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;margin-bottom:12px}
+.hoc-btn{width:100%;padding:12px;background:#4a9eff;border:none;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;margin-bottom:12px}
+.hoc-btn:hover{background:#2d7ad4}
+.hoc-btn-sm{width:auto;padding:6px 12px;font-size:12px;margin:4px}
+.hoc-header{background:rgba(0,0,0,0.3);padding:16px 24px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center}
+.dept-badge{display:inline-block;padding:4px 10px;border-radius:16px;font-size:11px;font-weight:700;color:#fff}
+.tab-btn{padding:10px 16px;background:transparent;border:none;color:rgba(255,255,255,0.6);font-weight:600;cursor:pointer;margin-right:8px;border-radius:8px}
+.tab-btn.active{background:#4a9eff;color:#fff}
+.loading{text-align:center;padding:40px}
+.spinner{border:3px solid rgba(255,255,255,0.1);border-top:3px solid #4a9eff;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:20px auto}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+.atividade-item{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.atividade-counter{display:flex;gap:8px;align-items:center}
+</style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const {useState,useEffect}=React;
-const {createClient}=supabase;
-const supabaseUrl='https://jxqrntxwwxjkupvalyan.supabase.co';
-const supabaseKey='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4cXJudHh3d3hqa3VwdmFseWFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0ODExOTMsImV4cCI6MjA5MTA1NzE5M30.xYTfRyPCr6Jb-ltIJyH4LFW1g6W_s-huVAHQtfASyLI';
-const sb=createClient(supabaseUrl,supabaseKey);
-const DEPARTAMENTOS={clinica:{nome:"Clínica",emoji:"🦷",cor:"#4a9eff"},marketing:{nome:"Marketing",emoji:"📱",cor:"#ec4899"},comercial:{nome:"Comercial",emoji:"💼",cor:"#f59e0b"}};
-const NIVEIS={1:{nome:"Nível 1",cor:"#4a9eff"},2:{nome:"Nível 2",cor:"#8b5cf6"},3:{nome:"Nível 3",cor:"#ec4899"},4:{nome:"Nível 4",cor:"#f59e0b"},5:{nome:"Nível 5",cor:"#10b981"},6:{nome:"Nível 6",cor:"#ef4444"},7:{nome:"Nível 7",cor:"#06b6d4"}};
-const MESES=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-const hashSenha=(s)=>CryptoJS.SHA256(s).toString();
-
-function App(){
-  const [tela,setTela]=useState("login");
-  const [user,setUser]=useState(null);
-  const [email,setEmail]=useState("");
-  const [senha,setSenha]=useState("");
-  const [loading,setLoading]=useState(false);
-
-  const fazerLogin=async()=>{
-    if(!email||!senha){alert("Preencha email e senha");return;}
-    setLoading(true);
-    try{
-      const hash=hashSenha(senha);
-      const{data}=await sb.from('usuarios').select('*').eq('email',email).eq('senha_hash',hash).eq('ativo',true).single();
-      if(data){
-        setUser(data);
-        setTela(data.tipo==='admin'?'admin':'est');
-      }else{
-        alert("Email ou senha incorretos");
-      }
-    }catch(err){
-      alert("Erro ao fazer login");
-    }
-    setLoading(false);
-  };
-
-  if(loading&&!user)return<div className="loading"><div className="spinner"></div></div>;
-
-  if(tela==="login"){
-    return(
-      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}>
-        <div style={{width:"100%",maxWidth:"420px"}}>
-          <div style={{textAlign:"center",marginBottom:"32px"}}>
-            <h1 style={{fontSize:"28px",fontWeight:"700"}}>🏥 HOC Estagiários</h1>
-            <p style={{color:"rgba(255,255,255,0.6)"}}>v7.0 - Clínica | Marketing | Comercial</p>
-          </div>
-          <div className="hoc-card">
-            <input className="hoc-input" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email" type="email"/>
-            <input className="hoc-input" value={senha} onChange={e=>setSenha(e.target.value)} placeholder="Senha" type="password" onKeyDown={e=>e.key==="Enter"&&fazerLogin()}/>
-            <button className="hoc-btn-primary" onClick={fazerLogin} disabled={loading}>{loading?"Entrando...":"Entrar"}</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if(tela==="est"&&user){
-    const dept=DEPARTAMENTOS[user.departamento];
-    return(
-      <div style={{minHeight:"100vh"}}>
-        <div className="hoc-header">
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div>
-              <h2>Olá, {user.nome}!</h2>
-              <span className="dept-badge" style={{background:dept.cor,color:"#fff"}}>{dept.emoji} {dept.nome}</span>
-              {user.departamento==="clinica"&&<span style={{color:"rgba(255,255,255,0.6)"}}>Nível {user.nivel}</span>}
-            </div>
-            <button style={{padding:"8px 16px",background:"rgba(255,255,255,0.1)",border:"none",color:"#fff",borderRadius:"8px",cursor:"pointer"}} onClick={()=>{setUser(null);setTela("login");}}>Sair</button>
-          </div>
-        </div>
-        <div style={{maxWidth:"900px",margin:"0 auto",padding:"24px 20px"}}>
-          <div className="stat-card">
-            <div>✅ Sistema carregado com sucesso!</div>
-            <div style={{fontSize:"13px",color:"rgba(255,255,255,0.6)",marginTop:"8px"}}>Tipo: {dept.nome}</div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return null;
-}
-
-ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
-</script>
-</body>
-</html>
+const
