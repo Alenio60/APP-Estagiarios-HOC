@@ -889,6 +889,7 @@ function App() {
 
   const [abaA, setAbaA]     = useState('usuarios');
   const [fEst, setFEst]     = useState('');
+  const [fArea, setFArea]   = useState('');
   const [fMes, setFMes]     = useState(new Date().getMonth());
   const [fAno, setFAno]     = useState(new Date().getFullYear());
 
@@ -1303,7 +1304,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v6.6
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v6.7
         </div>
       </div>
     </div>
@@ -1526,7 +1527,11 @@ function App() {
   if (tela === 'admin') {
     const regsF = regs.filter(r => {
       const d = new Date(r.data);
-      return d.getMonth()===fMes && d.getFullYear()===fAno && (!fEst || r.estagiario===fEst);
+      const u = usuarios.find(u => u.nome === r.estagiario);
+      const areaReg = r.area || u?.area || 'clinico';
+      return d.getMonth()===fMes && d.getFullYear()===fAno
+        && (!fEst || r.estagiario===fEst)
+        && (!fArea || areaReg===fArea);
     });
 
     const allNames = [...new Set(regs.map(r => r.estagiario))].sort();
@@ -1558,8 +1563,17 @@ function App() {
           </div>
 
           {abaA==='usuarios' && <>
-            <div style={{marginBottom:20}}>
-              <button className="btn btn-success" onClick={()=>setModal('cadastro')}>+ Cadastrar Estagiário</button>
+            <div style={{display:'flex',gap:12,marginBottom:20,alignItems:'flex-end',flexWrap:'wrap'}}>
+              <button className="btn btn-success" onClick={()=>setModal('cadastro')}>+ Cadastrar</button>
+              <div style={{display:'flex',gap:6}}>
+                {[['','Todos'],['clinico','🦷 Clínico'],['marketing','📱 Marketing'],['comercial','💼 Comercial']].map(([v,l])=>(
+                  <button key={v} onClick={()=>setFArea(v)} className="btn btn-sm" style={{
+                    background: fArea===v ? 'var(--accent)' : 'var(--bg-card2)',
+                    color: fArea===v ? '#fff' : 'var(--text-muted)',
+                    border: `1px solid ${fArea===v ? 'var(--accent)' : 'var(--border)'}`,
+                  }}>{l}</button>
+                ))}
+              </div>
             </div>
             {busy && <div style={{textAlign:'center',padding:40,color:'var(--text-muted)'}}><div className="spinner" style={{margin:'0 auto 12px'}}/></div>}
             {usuarios.length===0 && !busy && (
@@ -1568,7 +1582,7 @@ function App() {
                 <div>Nenhum estagiário cadastrado</div>
               </div>
             )}
-            {usuarios.map(u => {
+            {usuarios.filter(u => !fArea || (u.area||'clinico')===fArea).map(u => {
               const meses = mesesNoNivel(u.id);
               const pronto = meses >= NIVEIS[u.nivel].dur && u.nivel < 7;
               const ur = regs.filter(r => r.estagiario===u.nome);
@@ -1663,12 +1677,25 @@ function App() {
           {abaA==='hist' && (() => {
             return (
               <>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:20}}>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:12,marginBottom:20}}>
+                  <div>
+                    <label className="inp-label">Área</label>
+                    <select className="inp" value={fArea} onChange={e=>{setFArea(e.target.value); setFEst('');}}>
+                      <option value=''>Todas</option>
+                      <option value='clinico'>🦷 Clínico</option>
+                      <option value='marketing'>📱 Marketing</option>
+                      <option value='comercial'>💼 Comercial</option>
+                    </select>
+                  </div>
                   <div>
                     <label className="inp-label">Estagiário</label>
                     <select className="inp" value={fEst} onChange={e=>setFEst(e.target.value)}>
                       <option value=''>Todos</option>
-                      {allNames.map(n=><option key={n} value={n}>{n}</option>)}
+                      {allNames.filter(n => {
+                        if (!fArea) return true;
+                        const u = usuarios.find(u=>u.nome===n);
+                        return (u?.area||'clinico') === fArea;
+                      }).map(n=><option key={n} value={n}>{n}</option>)}
                     </select>
                   </div>
                   <div>
@@ -1693,6 +1720,9 @@ function App() {
                           <span style={{fontWeight:700,fontSize:14}}>{r.estagiario}</span>
                           <span style={{fontSize:12,color:'var(--text-muted)',marginLeft:10}}>{fmtDate(r.data)}</span>
                           {(r.hora_entrada||r.hora_saida) && <span style={{fontSize:12,color:'var(--text-muted)',marginLeft:10}}>🕐 {r.hora_entrada||'--:--'} → {r.hora_saida||'--:--'}</span>}
+                          {(r.area==='marketing') && <span style={{fontSize:11,background:'#ec489920',color:'#ec4899',borderRadius:6,padding:'2px 7px',marginLeft:8}}>📱 Mkt</span>}
+                          {(r.area==='comercial') && <span style={{fontSize:11,background:'#f59e0b20',color:'#f59e0b',borderRadius:6,padding:'2px 7px',marginLeft:8}}>💼 Com</span>}
+                          {(!r.area||r.area==='clinico') && <span style={{fontSize:11,background:'#3b82f620',color:'#3b82f6',borderRadius:6,padding:'2px 7px',marginLeft:8}}>🦷 Clín</span>}
                         </div>
                         <NivelBadge n={r.nivel}/>
                       </div>
