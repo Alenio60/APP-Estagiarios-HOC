@@ -3,34 +3,163 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HOC - Sistema de Estagiários v7.0</title>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<title>HOC v7.0</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Inter',sans-serif;background:linear-gradient(135deg,#0a1628,#1a2942);min-height:100vh;color:#fff}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-gradient(135deg,#0a1628,#1a2942);min-height:100vh;color:#fff}
+.header{background:rgba(0,0,0,0.3);padding:20px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center}
 .container{max-width:900px;margin:0 auto;padding:20px}
-.hoc-card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:32px;margin-bottom:16px}
-.hoc-input{width:100%;padding:12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;margin-bottom:12px}
-.hoc-btn{width:100%;padding:12px;background:#4a9eff;border:none;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;margin-bottom:12px}
-.hoc-btn:hover{background:#2d7ad4}
-.hoc-btn-sm{width:auto;padding:6px 12px;font-size:12px;margin:4px}
-.hoc-header{background:rgba(0,0,0,0.3);padding:16px 24px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center}
-.dept-badge{display:inline-block;padding:4px 10px;border-radius:16px;font-size:11px;font-weight:700;color:#fff}
-.tab-btn{padding:10px 16px;background:transparent;border:none;color:rgba(255,255,255,0.6);font-weight:600;cursor:pointer;margin-right:8px;border-radius:8px}
-.tab-btn.active{background:#4a9eff;color:#fff}
-.loading{text-align:center;padding:40px}
-.spinner{border:3px solid rgba(255,255,255,0.1);border-top:3px solid #4a9eff;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:20px auto}
-@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
-.atividade-item{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
-.atividade-counter{display:flex;gap:8px;align-items:center}
+.card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;margin-bottom:16px}
+input,select,textarea{width:100%;padding:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;margin-bottom:12px;font-family:inherit}
+input:focus{border-color:#4a9eff;outline:none}
+button{padding:10px 16px;background:#4a9eff;border:none;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;margin-right:8px}
+button:hover{background:#2d7ad4}
+.tabs{display:flex;gap:8px;margin-bottom:16px}
+.tab-btn{padding:10px 16px;background:transparent;border:none;color:rgba(255,255,255,0.6);font-weight:600;cursor:pointer}
+.tab-btn.active{background:#4a9eff;color:#fff;border-radius:8px}
+.hidden{display:none}
+.badge{display:inline-block;padding:4px 10px;border-radius:16px;font-size:11px;font-weight:700;color:#fff;margin-top:8px}
+.ativ-item{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
 </style>
 </head>
 <body>
-<div id="root"></div>
-<script type="text/babel">
-const
+<div id="app"></div>
+
+<script>
+const DEPTS={clinica:{nome:"Clínica",emoji:"🦷",cor:"#4a9eff"},marketing:{nome:"Marketing",emoji:"📱",cor:"#ec4899"},comercial:{nome:"Comercial",emoji:"💼",cor:"#f59e0b"}};
+
+const NIVEIS={1:"Introdução",2:"Radiologia",3:"Ortodontia",4:"Odontopediatria",5:"Prótese",6:"Gestão",7:"Digital"};
+
+const ATIVS={
+clinica:{
+1:[{n:"Lavagem",m:20},{n:"Secagem",m:20},{n:"Embalagem",m:15},{n:"Autoclaves",m:5}],
+2:[{n:"Panorâmico",m:10},{n:"Periapical",m:8},{n:"Mesa clínica",m:15}],
+3:[{n:"Ortodontia",m:10},{n:"Moldagem",m:8}],
+4:[{n:"Odontopediatria",m:8},{n:"Exodontias",m:5}],
+5:[{n:"Componentes",m:8},{n:"Próteses",m:8}],
+6:[{n:"Inventário",m:8},{n:"Validade",m:6}],
+7:[{n:"Medit",m:8},{n:"Exocad",m:6}]
+},
+marketing:{1:[{n:"Campanhas",m:4},{n:"Posts",m:8},{n:"Vídeos",m:4}]},
+comercial:{1:[{n:"WhatsApp",m:20},{n:"Telefone",m:15},{n:"Agendamentos",m:10}]}
+};
+
+let user=null;
+let registros=[];
+
+function login(){
+const email=document.getElementById('email').value;
+const senha=document.getElementById('senha').value;
+if(!email||!senha){alert('Preencha tudo');return;}
+user={nome:email.split('@')[0],dept:email.includes('mark')?'marketing':email.includes('com')?'comercial':'clinica',nivel:1};
+render();
+}
+
+function logout(){
+user=null;
+render();
+}
+
+function saveReg(){
+const data=document.getElementById('data').value;
+const ativs=[];
+Object.keys(document.querySelectorAll('.qtd')).forEach(i=>{
+const val=document.querySelectorAll('.qtd')[i].value;
+if(val>0)ativs.push({n:'Atividade '+i,q:val});
+});
+if(ativs.length>0){
+registros.push({data,ativs,user:user.nome});
+alert('✅ Salvo!');
+render();
+}
+}
+
+function render(){
+const app=document.getElementById('app');
+if(!user){
+app.innerHTML=`
+<div style="display:flex;align-items:center;justify-content:center;min-height:100vh">
+<div style="width:100%;max-width:400px">
+<div style="text-align:center;margin-bottom:32px">
+<h1 style="font-size:28px;font-weight:700">🏥 HOC v7.0</h1>
+<p style="color:rgba(255,255,255,0.6)">Clínica | Marketing | Comercial</p>
+</div>
+<div class="card">
+<input id="email" type="email" placeholder="Email">
+<input id="senha" type="password" placeholder="Senha">
+<button onclick="login()" style="width:100%">Entrar</button>
+</div>
+</div>
+</div>`;
+return;}
+
+const dept=DEPTS[user.dept];
+const ativs=ATIVS[user.dept][user.nivel]||ATIVS[user.dept][1];
+
+app.innerHTML=`
+<div class="header">
+<div>
+<h2>Olá, ${user.nome}!</h2>
+<span class="badge" style="background:${dept.cor}">${dept.emoji} ${dept.nome}</span>
+${user.dept==='clinica'?`<span style="margin-left:8px;color:rgba(255,255,255,0.6)">Nível ${user.nivel}</span>`:''}
+</div>
+<button onclick="logout()">Sair</button>
+</div>
+
+<div class="container">
+<div class="tabs">
+<button class="tab-btn active" onclick="mudarAba('reg')">📝 Registrar</button>
+<button class="tab-btn" onclick="mudarAba('hist')">📊 Histórico</button>
+</div>
+
+<div id="tab-reg" class="card">
+<h3 style="margin-bottom:16px">Registrar Atividades</h3>
+<label>Data</label>
+<input id="data" type="date">
+<label>Atividades (quantidade)</label>
+${ativs.map((a,i)=>`
+<div class="ativ-item">
+<div>
+<div style="font-weight:500">${a.n}</div>
+<div style="font-size:11px;color:rgba(255,255,255,0.5)">Meta: ${a.m}/mês</div>
+</div>
+<div style="display:flex;gap:4px">
+<button style="width:30px;padding:4px" onclick="altQtd(${i},-1)">−</button>
+<input class="qtd" type="number" value="0" min="0" style="width:40px;margin:0">
+<button style="width:30px;padding:4px" onclick="altQtd(${i},1)">+</button>
+</div>
+</div>
+`).join('')}
+<button onclick="saveReg()" style="width:100%;margin-top:16px">💾 Salvar</button>
+</div>
+
+<div id="tab-hist" class="card hidden">
+<h3>Histórico</h3>
+${registros.length===0?'<p style="color:rgba(255,255,255,0.6);margin-top:16px">Sem registros</p>':registros.map(r=>`
+<div style="background:rgba(255,255,255,0.05);padding:12px;border-radius:8px;margin-top:8px">
+<div style="font-weight:600">${r.data}</div>
+<div style="font-size:12px;color:rgba(255,255,255,0.6)">${r.user} - ${r.ativs.length} atividades</div>
+</div>
+`).join('')}
+</div>
+</div>`;
+
+document.getElementById('data').valueAsDate=new Date();
+}
+
+function mudarAba(aba){
+document.querySelectorAll('.card').forEach(e=>e.classList.add('hidden'));
+document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active'));
+if(aba==='reg'){document.getElementById('tab-reg').classList.remove('hidden');document.querySelectorAll('.tab-btn')[0].classList.add('active');}
+else{document.getElementById('tab-hist').classList.remove('hidden');document.querySelectorAll('.tab-btn')[1].classList.add('active');}
+}
+
+function altQtd(i,d){
+const inp=document.querySelectorAll('.qtd')[i];
+inp.value=Math.max(0,parseInt(inp.value)+d);
+}
+
+render();
+</script>
+</body>
+</html>
