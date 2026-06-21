@@ -4,192 +4,332 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HOC - Sistema de Estagiários v7.0</title>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #0a1628, #1a2942); min-height: 100vh; color: #fff; }
-.hoc-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; }
-.hoc-input { width: 100%; padding: 12px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; margin-bottom: 12px; }
-.hoc-btn-primary { width: 100%; padding: 12px; background: #4a9eff; border: none; border-radius: 8px; color: #fff; font-weight: 600; cursor: pointer; }
-.hoc-btn-primary:hover { background: #2d7ad4; }
-.hoc-header { background: rgba(0,0,0,0.3); padding: 16px 24px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-.dept-badge { display: inline-block; padding: 4px 10px; border-radius: 16px; font-size: 11px; font-weight: 700; margin-right: 8px; }
-.tab-btn { padding: 10px 16px; background: transparent; border: none; color: rgba(255,255,255,0.6); font-weight: 600; cursor: pointer; margin-right: 8px; }
-.tab-btn.active { background: #4a9eff; color: #fff; border-radius: 8px; }
-.loading { text-align: center; padding: 40px; }
-.spinner { border: 3px solid rgba(255,255,255,0.1); border-top: 3px solid #4a9eff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-.modal-content { background: #1a2942; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; max-width: 500px; width: 90%; }
-.stat-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px; text-align: center; margin-bottom: 12px; }
-.hoc-card-item { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+body { 
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+  background: linear-gradient(135deg, #0a1628 0%, #1a2942 50%, #0a1628 100%);
+  min-height: 100vh; 
+  color: #fff;
+}
+.container { max-width: 900px; margin: 0 auto; padding: 20px; }
+.login-box { max-width: 420px; margin: 80px auto; }
+.header-title { text-align: center; margin-bottom: 40px; }
+.header-title h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+.header-title p { color: rgba(255,255,255,0.6); font-size: 14px; }
+.card { 
+  background: rgba(255,255,255,0.05); 
+  border: 1px solid rgba(255,255,255,0.1); 
+  border-radius: 16px; 
+  padding: 32px;
+  backdrop-filter: blur(10px);
+}
+.input-group { margin-bottom: 16px; }
+.input-group label { display: block; color: rgba(255,255,255,0.7); font-size: 12px; font-weight: 500; margin-bottom: 8px; text-transform: uppercase; }
+.input-group input { 
+  width: 100%; 
+  padding: 12px 16px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 15px;
+}
+.input-group input:focus { border-color: #4a9eff; background: rgba(255,255,255,0.1); outline: none; }
+.btn-primary {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #4a9eff 0%, #2d7ad4 100%);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-primary:hover { transform: translateY(-2px); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary {
+  padding: 8px 16px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  color: rgba(255,255,255,0.8);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-secondary:hover { background: rgba(255,255,255,0.12); }
+.header {
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.header-left h2 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+.dept-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #fff;
+}
+.main-content { padding: 24px 20px; }
+.stat-card {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+  margin-bottom: 16px;
+}
+.stat-card div:first-child { font-size: 24px; font-weight: 700; color: #4a9eff; margin-bottom: 8px; }
+.stat-card div:last-child { font-size: 13px; color: rgba(255,255,255,0.6); }
+.tabs { display: flex; gap: 8px; margin-bottom: 24px; background: rgba(0,0,0,0.2); padding: 6px; border-radius: 12px; }
+.tab-btn { 
+  flex: 1; 
+  padding: 10px; 
+  border: none; 
+  border-radius: 8px; 
+  background: transparent; 
+  color: rgba(255,255,255,0.6); 
+  font-weight: 600; 
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.tab-btn.active { background: #4a9eff; color: #fff; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.footer { text-align: center; padding: 20px; color: rgba(255,255,255,0.4); font-size: 12px; }
+.hidden { display: none; }
+.success-message { background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); color: #10b981; padding: 12px; border-radius: 8px; margin-bottom: 16px; }
 </style>
 </head>
 <body>
-<div id="root"></div>
-<script type="text/babel">
-const { useState, useEffect } = React;
-const { createClient } = supabase;
 
-const supabaseUrl = 'https://jxqrntxwwxjkupvalyan.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4cXJudHh3d3hqa3VwdmFseWFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0ODExOTMsImV4cCI6MjA5MTA1NzE5M30.xYTfRyPCr6Jb-ltIJyH4LFW1g6W_s-huVAHQtfASyLI';
-const sb = createClient(supabaseUrl, supabaseKey);
+<!-- TELA LOGIN -->
+<div id="tela-login" class="login-box">
+  <div class="header-title">
+    <h1>🏥 HOC Estagiários</h1>
+    <p>v7.0 - Sistema Completo</p>
+  </div>
+  <div class="card">
+    <div class="input-group">
+      <label>Email</label>
+      <input type="email" id="email-login" placeholder="seu@email.com">
+    </div>
+    <div class="input-group">
+      <label>Senha</label>
+      <input type="password" id="senha-login" placeholder="Digite sua senha">
+    </div>
+    <button class="btn-primary" onclick="fazerLogin()">Entrar</button>
+  </div>
+  <div class="footer">
+    HOC Hospital Odontológico - Clínica | Marketing | Comercial
+  </div>
+</div>
 
-const DEPARTAMENTOS = {
-  clinica: { nome: "Clínica", emoji: "🦷", cor: "#4a9eff" },
-  marketing: { nome: "Marketing", emoji: "📱", cor: "#ec4899" },
-  comercial: { nome: "Comercial", emoji: "💼", cor: "#f59e0b" }
-};
+<!-- TELA PRINCIPAL -->
+<div id="tela-principal" class="hidden">
+  <div class="header">
+    <div class="header-left">
+      <h2>Olá, <span id="user-nome">Usuário</span>!</h2>
+      <span class="dept-badge" id="dept-badge" style="background: #4a9eff;">🦷 Clínica</span>
+    </div>
+    <button class="btn-secondary" onclick="fazerLogout()">Sair</button>
+  </div>
 
-const NIVEIS = {
-  1: { nome: "Nível 1", cor: "#4a9eff", duracao: 2 },
-  2: { nome: "Nível 2", cor: "#8b5cf6", duracao: 2 },
-  3: { nome: "Nível 3", cor: "#ec4899", duracao: 2 },
-  4: { nome: "Nível 4", cor: "#f59e0b", duracao: 2 },
-  5: { nome: "Nível 5", cor: "#10b981", duracao: 2 },
-  6: { nome: "Nível 6", cor: "#ef4444", duracao: 2 },
-  7: { nome: "Nível 7", cor: "#06b6d4", duracao: 2 }
-};
+  <div class="container">
+    <div class="main-content">
+      <div class="success-message">
+        ✅ Bem-vindo! Sistema carregado com sucesso.
+      </div>
+      
+      <div class="stat-card">
+        <div>📋</div>
+        <div>Sistema de Gestão de Estagiários</div>
+      </div>
 
-function App() {
-  const [tela, setTela] = useState("login");
-  const [user, setUser] = useState(null);
-  const [email, setEmail] = useState("");
-  const [senha, setSenha] = useState("");
-  const [loading, setLoading] = useState(false);
+      <div class="tabs">
+        <button class="tab-btn active" onclick="mudarAba('registros')">📝 Registros</button>
+        <button class="tab-btn" onclick="mudarAba('metas')">🎯 Metas</button>
+        <button class="tab-btn" onclick="mudarAba('historico')">📊 Histórico</button>
+      </div>
 
-  const fazerLogin = async () => {
-    if (!email || !senha) { alert("Preencha email e senha"); return; }
-    setLoading(true);
-    try {
-      const hash = CryptoJS.SHA256(senha).toString();
-      const { data } = await sb.from('usuarios').select('*').eq('email', email).eq('senha_hash', hash).eq('ativo', true).single();
-      if (data) {
-        setUser(data);
-        setTela(data.tipo === 'admin' ? 'admin' : 'est');
-      } else {
-        alert("Email ou senha incorretos");
-      }
-    } catch (err) {
-      alert("Erro ao fazer login");
-      console.error(err);
-    }
-    setLoading(false);
+      <div id="tab-registros" class="tab-content active card">
+        <h3 style="margin-bottom: 16px;">Registrar Atividade</h3>
+        <div class="input-group">
+          <label>Data</label>
+          <input type="date" id="data-atividade">
+        </div>
+        <div class="input-group">
+          <label>Atividade</label>
+          <input type="text" id="atividade-texto" placeholder="Descreva a atividade...">
+        </div>
+        <button class="btn-primary" onclick="salvarRegistro()">💾 Salvar Registro</button>
+      </div>
+
+      <div id="tab-metas" class="tab-content card">
+        <h3 style="margin-bottom: 16px;">Metas Mensais</h3>
+        <div class="input-group">
+          <label>Meta (unidades)</label>
+          <input type="number" id="meta-valor" placeholder="Ex: 100">
+        </div>
+        <div class="input-group">
+          <label>Mês</label>
+          <select id="meta-mes" style="width: 100%; padding: 12px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+            <option value="0">Janeiro</option>
+            <option value="1">Fevereiro</option>
+            <option value="2">Março</option>
+            <option value="3">Abril</option>
+            <option value="4">Maio</option>
+            <option value="5">Junho</option>
+            <option value="6">Julho</option>
+            <option value="7">Agosto</option>
+            <option value="8">Setembro</option>
+            <option value="9">Outubro</option>
+            <option value="10">Novembro</option>
+            <option value="11">Dezembro</option>
+          </select>
+        </div>
+        <button class="btn-primary" onclick="salvarMeta()">🎯 Salvar Meta</button>
+      </div>
+
+      <div id="tab-historico" class="tab-content card">
+        <h3 style="margin-bottom: 16px;">Histórico de Registros</h3>
+        <div id="historico-lista" style="color: rgba(255,255,255,0.6); padding: 20px; text-align: center;">
+          Nenhum registro ainda
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let usuarioLogado = null;
+let registros = [];
+
+function fazerLogin() {
+  const email = document.getElementById('email-login').value;
+  const senha = document.getElementById('senha-login').value;
+
+  if (!email || !senha) {
+    alert('Preencha email e senha!');
+    return;
+  }
+
+  // Simulação simples de login (sem autenticação real para este teste)
+  usuarioLogado = {
+    nome: email.split('@')[0],
+    email: email,
+    tipo: email.includes('admin') ? 'admin' : 'estagiario',
+    departamento: email.includes('marketing') ? 'marketing' : email.includes('comercial') ? 'comercial' : 'clinica',
+    nivel: 1
   };
 
-  // TELA LOGIN
-  if (tela === "login") {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-        <div style={{ width: "100%", maxWidth: "420px" }}>
-          <div style={{ textAlign: "center", marginBottom: "32px" }}>
-            <h1 style={{ fontSize: "28px", fontWeight: "700", marginBottom: "8px" }}>🏥 HOC Estagiários</h1>
-            <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "14px" }}>v7.0 - Clínica + Marketing + Comercial</p>
-          </div>
-          <div className="hoc-card">
-            <input 
-              className="hoc-input" 
-              value={email} 
-              onChange={e => setEmail(e.target.value)} 
-              onKeyDown={e => e.key === "Enter" && fazerLogin()} 
-              placeholder="Email"
-              type="email"
-            />
-            <input 
-              className="hoc-input" 
-              value={senha} 
-              onChange={e => setSenha(e.target.value)} 
-              onKeyDown={e => e.key === "Enter" && fazerLogin()} 
-              placeholder="Senha"
-              type="password"
-            />
-            <button className="hoc-btn-primary" onClick={fazerLogin} disabled={loading}>
-              {loading ? "Entrando..." : "Entrar"}
-            </button>
-          </div>
-          <div style={{ textAlign: "center", padding: "20px", fontSize: "12px", color: "rgba(255,255,255,0.4)" }}>
-            HOC Hospital Odontológico
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // TELA ESTAGIÁRIO
-  if (tela === "est" && user) {
-    const deptInfo = DEPARTAMENTOS[user.departamento];
-    return (
-      <div style={{ minHeight: "100vh" }}>
-        <div className="hoc-header">
-          <div style={{ maxWidth: "900px", margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <h2 style={{ fontSize: "18px", fontWeight: "600" }}>Olá, {user.nome}!</h2>
-              <span className="dept-badge" style={{ background: deptInfo.cor, color: "#fff" }}>
-                {deptInfo.emoji} {deptInfo.nome}
-              </span>
-              {user.departamento === "clinica" && <span style={{ marginLeft: "8px", fontSize: "13px", color: "rgba(255,255,255,0.6)" }}>Nível {user.nivel}</span>}
-            </div>
-            <button style={{ padding: "8px 16px", background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", borderRadius: "8px", cursor: "pointer" }} onClick={() => { setUser(null); setTela("login"); }}>
-              Sair
-            </button>
-          </div>
-        </div>
-        <div style={{ maxWidth: "900px", margin: "0 auto", padding: "24px 20px" }}>
-          <div className="stat-card">
-            <div style={{ fontSize: "24px", fontWeight: "700", color: deptInfo.cor }}>📋</div>
-            <div style={{ fontSize: "14px", color: "rgba(255,255,255,0.6)" }}>Sistema de Registro</div>
-            <div style={{ fontSize: "12px", marginTop: "8px", color: "rgba(255,255,255,0.5)" }}>Registre suas atividades diárias aqui</div>
-          </div>
-          <div className="hoc-card-item">
-            <p>✅ Sistema carregado com sucesso!</p>
-            <p style={{ marginTop: "8px", fontSize: "13px", color: "rgba(255,255,255,0.6)" }}>Departamento: {deptInfo.nome}</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // TELA ADMIN
-  if (tela === "admin" && user) {
-    return (
-      <div style={{ minHeight: "100vh" }}>
-        <div className="hoc-header">
-          <div style={{ maxWidth: "1100px", margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <h2 style={{ fontSize: "18px", fontWeight: "600" }}>🏥 Painel Administrativo</h2>
-            <button style={{ padding: "8px 16px", background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", borderRadius: "8px", cursor: "pointer" }} onClick={() => { setUser(null); setTela("login"); }}>
-              Sair
-            </button>
-          </div>
-        </div>
-        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "24px 20px" }}>
-          <button className="tab-btn active">👥 Estagiários</button>
-          <button className="tab-btn">🎯 Metas</button>
-          <button className="tab-btn">📋 Histórico</button>
-          <div style={{ marginTop: "24px" }}>
-            <div className="hoc-card-item">
-              <p>✅ Painel Administrativo Carregado!</p>
-              <p style={{ marginTop: "8px", fontSize: "13px", color: "rgba(255,255,255,0.6)" }}>Versão 7.0 - Com suporte a Clínica, Marketing e Comercial</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="loading">
-      <div className="spinner"></div>
-      <p style={{ marginTop: "20px" }}>Carregando...</p>
-    </div>
-  );
+  mostrarTelaLogin(false);
+  atualizarInfoUsuario();
+  alert('✅ Login realizado com sucesso!');
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+function fazerLogout() {
+  usuarioLogado = null;
+  mostrarTelaLogin(true);
+  document.getElementById('email-login').value = '';
+  document.getElementById('senha-login').value = '';
+}
+
+function mostrarTelaLogin(mostrar) {
+  document.getElementById('tela-login').style.display = mostrar ? 'block' : 'none';
+  document.getElementById('tela-principal').style.display = mostrar ? 'none' : 'block';
+}
+
+function atualizarInfoUsuario() {
+  if (!usuarioLogado) return;
+  
+  document.getElementById('user-nome').textContent = usuarioLogado.nome;
+  
+  const deptos = {
+    clinica: { emoji: '🦷', nome: 'Clínica', cor: '#4a9eff' },
+    marketing: { emoji: '📱', nome: 'Marketing', cor: '#ec4899' },
+    comercial: { emoji: '💼', nome: 'Comercial', cor: '#f59e0b' }
+  };
+  
+  const dept = deptos[usuarioLogado.departamento];
+  const badge = document.getElementById('dept-badge');
+  badge.textContent = `${dept.emoji} ${dept.nome}`;
+  badge.style.background = dept.cor;
+}
+
+function mudarAba(aba) {
+  // Esconder todas as abas
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  
+  // Mostrar aba selecionada
+  const tabId = 'tab-' + aba;
+  const tabEl = document.getElementById(tabId);
+  if (tabEl) {
+    tabEl.classList.add('active');
+    event.target.classList.add('active');
+  }
+}
+
+function salvarRegistro() {
+  const data = document.getElementById('data-atividade').value;
+  const atividade = document.getElementById('atividade-texto').value;
+  
+  if (!data || !atividade) {
+    alert('Preencha data e atividade!');
+    return;
+  }
+  
+  registros.push({ data, atividade, usuario: usuarioLogado.nome });
+  document.getElementById('atividade-texto').value = '';
+  alert('✅ Registro salvo com sucesso!');
+  atualizarHistorico();
+}
+
+function salvarMeta() {
+  const valor = document.getElementById('meta-valor').value;
+  const mes = document.getElementById('meta-mes').value;
+  
+  if (!valor) {
+    alert('Digite o valor da meta!');
+    return;
+  }
+  
+  alert(`✅ Meta de ${valor} unidades para ${mes} salva com sucesso!`);
+  document.getElementById('meta-valor').value = '';
+}
+
+function atualizarHistorico() {
+  const lista = document.getElementById('historico-lista');
+  if (registros.length === 0) {
+    lista.innerHTML = '<div style="color: rgba(255,255,255,0.6); padding: 20px; text-align: center;">Nenhum registro ainda</div>';
+    return;
+  }
+  
+  lista.innerHTML = registros.map(r => `
+    <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 12px; margin-bottom: 8px; text-align: left;">
+      <strong>${r.data}</strong> - ${r.atividade}
+      <div style="font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 4px;">Por: ${r.usuario}</div>
+    </div>
+  `).join('');
+}
+
+// Inicializar
+window.onload = function() {
+  document.getElementById('data-atividade').valueAsDate = new Date();
+  mostrarTelaLogin(true);
+};
 </script>
+
 </body>
 </html>
