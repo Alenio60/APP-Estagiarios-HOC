@@ -3,163 +3,1850 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HOC v7.0</title>
+<title>HOC — Sistema de Estagiários</title>
+     <link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/favicon.png">
+<meta name="theme-color" content="#07111f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HOC">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.24.0/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+<script>
+  window.__ENV__ = {
+   SUPABASE_URL: 'https://jxqrntxwwxjkupvalyan.supabase.co',
+      SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4cXJudHh3d3hqa3VwdmFseWFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0ODExOTMsImV4cCI6MjA5MTA1NzE5M30.xYTfRyPCr6Jb-ltIJyH4LFW1g6W_s-huVAHQtfASyLI'
+  };
+</script>
+
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-gradient(135deg,#0a1628,#1a2942);min-height:100vh;color:#fff}
-.header{background:rgba(0,0,0,0.3);padding:20px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center}
-.container{max-width:900px;margin:0 auto;padding:20px}
-.card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;margin-bottom:16px}
-input,select,textarea{width:100%;padding:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;margin-bottom:12px;font-family:inherit}
-input:focus{border-color:#4a9eff;outline:none}
-button{padding:10px 16px;background:#4a9eff;border:none;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;margin-right:8px}
-button:hover{background:#2d7ad4}
-.tabs{display:flex;gap:8px;margin-bottom:16px}
-.tab-btn{padding:10px 16px;background:transparent;border:none;color:rgba(255,255,255,0.6);font-weight:600;cursor:pointer}
-.tab-btn.active{background:#4a9eff;color:#fff;border-radius:8px}
-.hidden{display:none}
-.badge{display:inline-block;padding:4px 10px;border-radius:16px;font-size:11px;font-weight:700;color:#fff;margin-top:8px}
-.ativ-item{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg-base:#07111f;
+  --bg-card:#0d1f35;
+  --bg-card2:#0f2540;
+  --border:#1c3352;
+  --border-light:#244060;
+  --text:#e8f0fe;
+  --text-muted:#6b8aaa;
+  --text-dim:#3d5a78;
+  --accent:#3b82f6;
+  --accent-dark:#1d4ed8;
+  --accent-glow:rgba(59,130,246,0.25);
+  --green:#10b981;
+  --yellow:#f59e0b;
+  --red:#ef4444;
+  --purple:#8b5cf6;
+  --cyan:#06b6d4;
+  --pink:#ec4899;
+  --orange:#f97316;
+  --radius:14px;
+  --radius-sm:8px;
+  --shadow:0 4px 24px rgba(0,0,0,0.5);
+}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg-base);min-height:100vh;color:var(--text);-webkit-font-smoothing:antialiased;font-size:15px}
+input,select,textarea,button{font-family:inherit;outline:none}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg-base)}
+::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:4px}
+.page{min-height:100vh;display:flex;flex-direction:column}
+.header{background:var(--bg-card);border-bottom:1px solid var(--border);padding:0 28px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(8px)}
+.logo-text{font-size:22px;font-weight:800;letter-spacing:-0.5px;background:linear-gradient(135deg,#60a5fa,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-sub{font-size:11px;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin-top:1px}
+.content{flex:1;max-width:960px;margin:0 auto;width:100%;padding:28px 20px}
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:24px}
+.card-sm{background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px}
+.card-hover{transition:border-color .2s,transform .1s}
+.card-hover:hover{border-color:var(--border-light);transform:translateY(-1px)}
+.inp{width:100%;padding:13px 15px;background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:15px;transition:border-color .2s}
+.inp:focus{border-color:var(--accent)}
+.inp::placeholder{color:var(--text-dim)}
+.inp-label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:block}
+.btn{padding:11px 19px;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:0 2px 12px var(--accent-glow)}
+.btn-primary:hover{background:var(--accent-dark)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-full{width:100%;justify-content:center;padding:13px}
+.btn-ghost{background:transparent;border:1px solid var(--border-light);color:var(--text-muted)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-success{background:var(--green);color:#fff}
+.btn-success:hover{background:#059669}
+.btn-warn{background:var(--yellow);color:#000}
+.btn-warn:hover{background:#d97706}
+.btn-danger{background:var(--red);color:#fff}
+.btn-danger:hover{background:#dc2626}
+.btn-sm{padding:6px 12px;font-size:12px}
+.btn-link{background:none;border:none;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;padding:0}
+.btn-link:hover{text-decoration:underline}
+.tabs{display:flex;gap:4px;background:var(--bg-card2);padding:4px;border-radius:var(--radius-sm);border:1px solid var(--border)}
+.tab{flex:1;padding:10px 12px;border:none;border-radius:6px;background:transparent;color:var(--text-muted);font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;text-align:center}
+.tab.active{background:var(--accent);color:#fff;box-shadow:0 2px 8px var(--accent-glow)}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700}
+.tag{display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
+.stat-box{background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px 14px;text-align:center}
+.stat-num{font-size:26px;font-weight:800;margin-bottom:2px}
+.stat-lbl{font-size:11px;color:var(--text-muted);font-weight:500}
+.n1{color:#3b82f6} .n2{color:#8b5cf6} .n3{color:#ec4899}
+.n4{color:#f59e0b} .n5{color:#10b981} .n6{color:#ef4444} .n7{color:#06b6d4}
+.bg1{background:#3b82f620} .bg2{background:#8b5cf620} .bg3{background:#ec489920}
+.bg4{background:#f59e0b20} .bg5{background:#10b98120} .bg6{background:#ef444420} .bg7{background:#06b6d420}
+.counter{display:flex;align-items:center;gap:8px}
+.counter-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border-light);background:var(--bg-card2);color:var(--text);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.counter-btn:hover{border-color:var(--accent);color:var(--accent)}
+.counter-val{width:28px;text-align:center;font-size:15px;font-weight:800}
+.stars{display:flex;gap:4px}
+.star{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card2);color:var(--text-dim);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.star.on{background:var(--yellow);border-color:var(--yellow);color:#000}
+.act-row{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:var(--bg-card2);border:1px solid var(--border)}
+.act-row+.act-row{margin-top:6px}
+.act-name{font-size:14px;font-weight:500}
+.act-meta{font-size:11px;color:var(--text-dim);margin-top:2px}
+.sec-label{font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.user-card{background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:10px;transition:border-color .2s}
+.user-card:hover{border-color:var(--border-light)}
+.user-avatar{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;flex-shrink:0}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px;backdrop-filter:blur(4px)}
+.modal{background:var(--bg-card);border:1px solid var(--border-light);border-radius:var(--radius);padding:28px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow)}
+.modal-title{font-size:18px;font-weight:700;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.alert{border-radius:var(--radius-sm);padding:12px 14px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500}
+.alert-promo{background:#f59e0b18;border:1px solid #f59e0b40;color:#fbbf24}
+.alert-success{background:#10b98118;border:1px solid #10b98140;color:#34d399}
+.alert-info{background:#3b82f618;border:1px solid #3b82f640;color:#93c5fd}
+.prog-wrap{background:var(--border);border-radius:4px;height:5px;overflow:hidden}
+.prog-bar{height:5px;border-radius:4px;transition:width .5s ease}
+.obs-box{background:var(--bg-card2);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--text-muted);margin-top:10px;border-left:3px solid var(--border-light)}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(ellipse at 50% 0%,#0d2a4a 0%,var(--bg-base) 70%)}
+.login-box{width:100%;max-width:400px}
+.login-logo{text-align:center;margin-bottom:32px}
+.login-title{font-size:32px;font-weight:800;letter-spacing:-1px;background:linear-gradient(135deg,#93c5fd,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.login-sub{font-size:13px;color:var(--text-muted);margin-top:6px}
+.spinner{border:2px solid var(--border);border-top:2px solid var(--accent);border-radius:50%;width:20px;height:20px;animation:spin 1s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-full{min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;color:var(--text-muted)}
+.bar-wrap{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.bar-label{font-size:12px;color:var(--text-muted);width:130px;flex-shrink:0;text-align:right}
+.bar-bg{flex:1;background:var(--border);border-radius:3px;height:8px;overflow:hidden}
+.bar-fill{height:8px;border-radius:3px;transition:width .6s}
+.bar-val{font-size:12px;font-weight:700;width:36px;text-align:right}
+.timeline-day{margin-bottom:20px}
+.timeline-date{font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.timeline-date::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.ativs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px}
+.ativ-chip{background:var(--bg-card2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:12px}
+@media(max-width:600px){
+  .header{padding:0 16px}
+  .content{padding:16px 12px}
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .card{padding:16px}
+  .modal{padding:20px}
+}
 </style>
 </head>
 <body>
-<div id="app"></div>
+<div id="root"></div>
 
-<script>
-const DEPTS={clinica:{nome:"Clínica",emoji:"🦷",cor:"#4a9eff"},marketing:{nome:"Marketing",emoji:"📱",cor:"#ec4899"},comercial:{nome:"Comercial",emoji:"💼",cor:"#f59e0b"}};
+<script type="text/babel">
+const {useState, useEffect, useMemo} = React;
+const {createClient} = supabase;
 
-const NIVEIS={1:"Introdução",2:"Radiologia",3:"Ortodontia",4:"Odontopediatria",5:"Prótese",6:"Gestão",7:"Digital"};
+const SUPA_URL = window.__ENV__?.SUPABASE_URL || '';
+const SUPA_KEY = window.__ENV__?.SUPABASE_KEY || '';
+const sb = (SUPA_URL && SUPA_KEY) ? createClient(SUPA_URL, SUPA_KEY) : null;
 
-const ATIVS={
-clinica:{
-1:[{n:"Lavagem",m:20},{n:"Secagem",m:20},{n:"Embalagem",m:15},{n:"Autoclaves",m:5}],
-2:[{n:"Panorâmico",m:10},{n:"Periapical",m:8},{n:"Mesa clínica",m:15}],
-3:[{n:"Ortodontia",m:10},{n:"Moldagem",m:8}],
-4:[{n:"Odontopediatria",m:8},{n:"Exodontias",m:5}],
-5:[{n:"Componentes",m:8},{n:"Próteses",m:8}],
-6:[{n:"Inventário",m:8},{n:"Validade",m:6}],
-7:[{n:"Medit",m:8},{n:"Exocad",m:6}]
-},
-marketing:{1:[{n:"Campanhas",m:4},{n:"Posts",m:8},{n:"Vídeos",m:4}]},
-comercial:{1:[{n:"WhatsApp",m:20},{n:"Telefone",m:15},{n:"Agendamentos",m:10}]}
+const NIVEIS = {
+  1:{nome:"Introdução e Formação Básica",      emoji:"🧼", cor:"var(--n1)",cls:"n1 bg1", dur:2},
+  2:{nome:"Suporte Clínico e Radiologia",      emoji:"🦷", cor:"var(--n2)",cls:"n2 bg2", dur:2},
+  3:{nome:"Ortodontia, Alinhadores e Placas",  emoji:"😁", cor:"var(--n3)",cls:"n3 bg3", dur:2},
+  4:{nome:"Odontopediatria e Cirurgias",        emoji:"🔬", cor:"var(--n4)",cls:"n4 bg4", dur:2},
+  5:{nome:"Prótese e Gestão de Materiais",     emoji:"🦴", cor:"var(--n5)",cls:"n5 bg5", dur:2},
+  6:{nome:"Gestão Administrativa",             emoji:"📋", cor:"var(--n6)",cls:"n6 bg6", dur:2},
+  7:{nome:"Odontologia Digital",               emoji:"💻", cor:"var(--n7)",cls:"n7 bg7", dur:2},
 };
 
-let user=null;
-let registros=[];
+const ATIVIDADES = {
+  1:[{id:"lav",n:"Lavagem de materiais",cat:"Esterilização",meta:20},{id:"sec",n:"Secagem de materiais",cat:"Esterilização",meta:20},{id:"emb",n:"Embalagem de instrumentos",cat:"Esterilização",meta:15},{id:"aut",n:"Monitorização de autoclaves",cat:"Esterilização",meta:5},{id:"val",n:"Controle de validade",cat:"Esterilização",meta:10},{id:"limp",n:"Limpeza das clínicas",cat:"Organização",meta:10},{id:"gess",n:"Vazamento modelos gesso",cat:"Laboratório",meta:5},{id:"alg",n:"Moldagens com alginato",cat:"Laboratório",meta:5},{id:"cort",n:"Corte/acabamento modelos",cat:"Laboratório",meta:5},{id:"apos",n:"Estudo Apostila HOC",cat:"Conhecimento",meta:8}],
+  2:[{id:"pan",n:"RX Panorâmico",cat:"Radiologia",meta:10},{id:"peri",n:"Periapical digital/manual",cat:"Radiologia",meta:8},{id:"dio",n:"Plataforma DIO",cat:"Radiologia",meta:5},{id:"kit",n:"Montagem mesa clínica",cat:"Clínica",meta:15},{id:"inst",n:"Preparo de pacientes",cat:"Clínica",meta:10},{id:"ctrl",n:"Controle Odonto/agenda",cat:"Clínica",meta:8},{id:"rec",n:"Receitas e medicamentos",cat:"Clínica",meta:5},{id:"wpp",n:"WhatsApp pré/pós-op",cat:"Clínica",meta:8},{id:"obs2",n:"Observação procedimentos",cat:"Clínica",meta:8}],
+  3:[{id:"omat",n:"Materiais ortodontia",cat:"Ortodontia",meta:10},{id:"oaux",n:"Auxílio atendimentos",cat:"Ortodontia",meta:8},{id:"oapa",n:"Aparelhos fixos/removíveis",cat:"Ortodontia",meta:5},{id:"omol",n:"Moldagem para placas",cat:"Placas",meta:8},{id:"ovaz",n:"Vazamento modelos",cat:"Placas",meta:8},{id:"opla",n:"Fabricação placas",cat:"Placas",meta:6},{id:"ocon",n:"Controle placas",cat:"Placas",meta:5},{id:"oali",n:"Placas alinhadores",cat:"Placas",meta:4},{id:"ocla",n:"Placas clareamento",cat:"Placas",meta:4}],
+  4:[{id:"pedo",n:"Odontopediatria",cat:"Odontopediatria",meta:8},{id:"exde",n:"Exodontia decíduos",cat:"Odontopediatria",meta:5},{id:"ende",n:"Endodontia decíduos",cat:"Odontopediatria",meta:4},{id:"cape",n:"CAPE",cat:"CAPE",meta:6},{id:"cmon",n:"Montagem mesa cirúrgica",cat:"Cirurgia",meta:8},{id:"cexo",n:"Exodontias simples",cat:"Cirurgia",meta:6},{id:"crea",n:"Reaberturas implantes",cat:"Cirurgia",meta:4},{id:"ccom",n:"Cirurgias complexas",cat:"Cirurgia",meta:3},{id:"eqp",n:"Manutenção equipos",cat:"Equipamentos",meta:4},{id:"vac",n:"Bombas vácuo/compressor",cat:"Equipamentos",meta:4}],
+  5:[{id:"cuni",n:"Componentes unitários",cat:"Implantodontia",meta:8},{id:"cpro",n:"Protocolo/barra",cat:"Implantodontia",meta:5},{id:"cmol",n:"Moldagem avançada",cat:"Implantodontia",meta:5},{id:"crea2",n:"Materiais reaberturas",cat:"Implantodontia",meta:6},{id:"rout",n:"Controle próteses",cat:"Prótese",meta:8},{id:"rpla",n:"Planilha próteses",cat:"Prótese",meta:5},{id:"rage",n:"Agenda protesistas",cat:"Prótese",meta:5},{id:"estq",n:"Controle estoque",cat:"Gestão",meta:8},{id:"comp",n:"Solicitação compras",cat:"Gestão",meta:5}],
+  6:[{id:"ginv",n:"Atualização inventário",cat:"Estoque",meta:8},{id:"gval",n:"Controle validade",cat:"Estoque",meta:6},{id:"grep",n:"Reposição materiais",cat:"Estoque",meta:5},{id:"gfor",n:"Comunicação fornecedores",cat:"Fornecedores",meta:5},{id:"gqua",n:"Fiscalização entregas",cat:"Fornecedores",meta:4},{id:"gflu",n:"Verificação fluxos",cat:"Operacional",meta:6},{id:"gpro",n:"Padronização protocolos",cat:"Operacional",meta:4},{id:"grel",n:"Relatórios admin",cat:"Operacional",meta:4}],
+  7:[{id:"scan",n:"Escaneamento Medit",cat:"Digital",meta:8},{id:"exoc",n:"Design Exocad",cat:"Digital",meta:6},{id:"medt",n:"Planejamento Medit",cat:"Digital",meta:6},{id:"dcor",n:"Desenho coroas",cat:"Digital",meta:5},{id:"dpla",n:"Placas miorrelaxantes",cat:"Digital",meta:5},{id:"imp3",n:"Impressão 3D",cat:"Digital",meta:5},{id:"acab",n:"Acabamento trabalhos",cat:"Digital",meta:5},{id:"dent",n:"DentistaOn",cat:"Digital",meta:4}],
+};
 
-function login(){
-const email=document.getElementById('email').value;
-const senha=document.getElementById('senha').value;
-if(!email||!senha){alert('Preencha tudo');return;}
-user={nome:email.split('@')[0],dept:email.includes('mark')?'marketing':email.includes('com')?'comercial':'clinica',nivel:1};
-render();
+const ATIVIDADES_MARKETING = [
+  {id:"mpost",n:"Criação de posts",cat:"Conteúdo"},
+  {id:"mstory",n:"Criação de stories",cat:"Conteúdo"},
+  {id:"mfoto",n:"Fotos produzidas",cat:"Conteúdo"},
+  {id:"mreel",n:"Reels/vídeos",cat:"Conteúdo"},
+  {id:"marte",n:"Criação de artes/materiais gráficos",cat:"Conteúdo"},
+  {id:"mplan",n:"Planejamento de conteúdo",cat:"Estratégia"},
+  {id:"mrel",n:"Relatório de redes sociais",cat:"Estratégia"},
+  {id:"mdm",n:"Atendimento de mensagens (DM/comentários)",cat:"Relacionamento"},
+];
+
+const ATIVIDADES_COMERCIAL = [
+  {id:"clead",n:"Leads enviados",cat:"Prospecção"},
+  {id:"cmsg",n:"Mensagens respondidas",cat:"Atendimento"},
+  {id:"ctel",n:"Telefonemas feitos",cat:"Atendimento"},
+  {id:"cagc",n:"Agendamentos confirmados",cat:"Conversão"},
+  {id:"cagx",n:"Agendamentos cancelados",cat:"Conversão"},
+  {id:"cvie",n:"Pacientes que vieram",cat:"Conversão"},
+  {id:"cconv",n:"Conversão obtida",cat:"Conversão"},
+];
+
+const COMP_ITEMS = ["Pontualidade","Uniforme/EPI","Postura profissional","Dedicação","Relacionamento equipe","Postura c/ pacientes","Iniciativa"];
+
+const GUIA_NIVEIS = {
+  1:{
+    objetivos:[
+      "Compreender o fluxo completo de esterilização e biossegurança do HOC",
+      "Dominar os processos de laboratório de gesso e moldagens básicas",
+      "Conhecer as normas internas, código de conduta e RDC 1.002/2025",
+      "Estudar a Apostila HOC e assimilar a cultura clínica do hospital",
+    ],
+    cuidados:[
+      "⚠️ Usar jaleco, máscara, óculos e luvas em TODO contato com instrumental — sem exceção",
+      "⚠️ Nunca reencapar agulha com as duas mãos — técnica de uma mão apenas",
+      "⚠️ Autoclave: conferir indicadores biológicos e físicos antes de liberar materiais",
+      "⚠️ Separação correta de resíduos: Grupo A (infectante), Grupo E (perfurocortante)",
+      "⚠️ Nunca manusear instrumental pontiagudo sem proteção",
+      "⚠️ Lavar as mãos antes e depois de cada etapa, mesmo usando luvas",
+    ],
+    dicas:[
+      "💡 O HOC faz RX panorâmico em TODA primeira consulta — entenda esse protocolo logo no início",
+      "💡 Pergunte ao supervisor antes de descartar qualquer material — reprocessamento tem regras específicas",
+      "💡 Chegue 15 min antes para montar a esterilização do dia — é o primeiro sinal de proatividade",
+      "💡 A apostila HOC é sua bíblia neste nível — leia com atenção e anote dúvidas",
+    ],
+    rdc:[
+      {art:"Art. 52-58 · CME e Esterilização", texto:"Todo instrumental crítico e semicrítico DEVE passar pelo CME. É proibido o uso de estufa (forno de Pasteur) e aldeídos para esterilização. A autoclave deve ter ciclos registrados com indicadores químicos (classe 5 ou 6) e teste biológico semanal (POP-HOC-004)."},
+      {art:"Art. 61 · Validade da Esterilização", texto:"Materiais embalados e esterilizados têm validade máxima de 6 meses. A data de esterilização DEVE estar visível na embalagem. Pacotes sem data ou violados devem ser reprocessados."},
+      {art:"Art. 78 · Descarte de Resíduos (PGRSS)", texto:"Resíduos do Grupo E (perfurocortantes) devem ser descartados IMEDIATAMENTE após o uso em coletor rígido resistente a perfuração. Nunca reencapar agulha com as duas mãos (POP-HOC-003)."},
+      {art:"Art. 12 · EPI e Higienização das Mãos", texto:"O uso de EPI (jaleco, luva, máscara, óculos) é obrigatório em todos os procedimentos com risco de contato com material biológico. Higienização das mãos: mínimo 5 passos, álcool 70% ou água e sabão."},
+    ],
+  },
+  2:{
+    objetivos:[
+      "Operar equipamentos de radiologia digital com segurança e qualidade de imagem",
+      "Integrar a plataforma DIO para gestão de exames e documentação digital",
+      "Preparar pacientes e montar mesas clínicas com autonomia",
+      "Apoiar controle de agenda e comunicação pré/pós-operatória via WhatsApp",
+    ],
+    cuidados:[
+      "⚠️ RX: usar avental de chumbo no paciente e afastar-se da zona de radiação",
+      "⚠️ Conferir validade e integridade do filme/sensor antes de cada exame",
+      "⚠️ Não movimentar paciente durante o disparo — imagem comprometida = retrabalho e dose extra",
+      "⚠️ Mesa clínica: nunca montar sem conferir esterilização de cada instrumento",
+      "⚠️ WhatsApp pré/pós-op: não compartilhar dados do paciente em grupos ou sem autorização (LGPD)",
+      "⚠️ Plataforma DIO: nunca incluir dados pessoais sem consentimento registrado",
+    ],
+    dicas:[
+      "💡 RX panorâmico de qualidade exige posicionamento correto da cabeça — treine até ser automático",
+      "💡 No DIO, a padronização dos laudos é fundamental — siga exatamente o template definido",
+      "💡 Monte a mesa clínica sempre na mesma ordem — reduz erro e agiliza o atendimento",
+      "💡 Anote observações do paciente antes que ele saia — memória falha, prontuário não",
+    ],
+    rdc:[
+      {art:"Art. 63-67 · Radioproteção e RX", texto:"O equipamento de RX deve ter registro na ANVISA e o operador deve usar dosímetro individual. O paciente DEVE usar avental plumbífero e protetor de tireoide. Distância mínima de 2m do operador durante o disparo (POP-HOC-015)."},
+      {art:"Art. 68 · RX Portátil", texto:"Aparelhos portáteis de RX só podem ser usados em situações excepcionais justificadas. Em clínica fixa como o HOC, o uso de equipamento fixo é mandatório. Registrar todas as exposições no prontuário."},
+      {art:"Art. 30-35 · Prontuário do Paciente", texto:"Todo atendimento deve ser registrado no prontuário com data, procedimento, responsável e assinatura do CD. O estagiário pode APOIAR o preenchimento mas a responsabilidade é do CD supervisor (POP-HOC-001)."},
+      {art:"Art. 14 · LGPD e Dados do Paciente", texto:"Dados de pacientes (incluindo imagens RX e mensagens de WhatsApp pré/pós-op) são dados sensíveis de saúde. Proibido compartilhar sem consentimento. O HOC é responsável como controlador de dados (LGPD - Lei 13.709/2018)."},
+    ],
+  },
+  3:{
+    objetivos:[
+      "Apoiar procedimentos de ortodontia fixa e removível com segurança",
+      "Dominar o ciclo completo de fabricação de placas: moldagem → vazamento → acabamento",
+      "Compreender o funcionamento de alinhadores e placas de clareamento",
+      "Registrar e controlar aparelhos e placas no sistema do HOC",
+    ],
+    cuidados:[
+      "⚠️ Alginato: proporção água/pó incorreta compromete o modelo — use balança e medidor",
+      "⚠️ Vazamento de gesso: bolhas invalidam o modelo — vibrar a base corretamente",
+      "⚠️ Placas termoformadas: temperatura incorreta deforma o material — seguir tabela do fabricante",
+      "⚠️ Aparelhos fixos: fios e bráquetes são pontiagudos — manusear com cuidado e EPI",
+      "⚠️ Controle de placas: registrar SEMPRE entrada e saída para evitar extravios",
+      "⚠️ Clareamento: gel é irritante — sem contato com mucosa ou olhos",
+    ],
+    dicas:[
+      "💡 Modelos de gesso vazados com pressa viram lixo — respeite o tempo de presa",
+      "💡 Identifique SEMPRE o modelo com nome e data antes de colocar para secar",
+      "💡 Placa miorrelaxante mal adaptada pode machucar o paciente — cheque com o especialista",
+      "💡 Alinhadores exigem higiene rigorosa do molde — qualquer resíduo compromete o ajuste",
+    ],
+    rdc:[
+      {art:"Art. 52 · Artigos Semicríticos (Moldagem)", texto:"Moldeiras e materiais de moldagem reutilizáveis são artigos semicríticos — exigem desinfecção de alto nível ou esterilização. Moldeiras de alumínio: autoclave. Moldeiras plásticas: avaliar compatibilidade com o processo."},
+      {art:"Art. 29 · Consentimento Informado", texto:"Antes de qualquer moldagem para placa ou aparelho, o paciente deve ter assinado o Termo de Consentimento Informado. O estagiário NUNCA deve iniciar procedimento sem confirmar esse documento no prontuário."},
+      {art:"Art. 40 · Identificação de Materiais", texto:"Todo modelo de trabalho enviado ao laboratório deve ter identificação inequívoca do paciente. A rastreabilidade entre laboratório e clínica é exigência da RDC — o HOC usa registro de entrada/saída de próteses."},
+      {art:"Art. 78 · Resíduos Laboratoriais", texto:"Resíduos de gesso contaminado (com sangue ou saliva) são Grupo A (infectante). Gesso não contaminado pode ir para Grupo D (comum). O descarte incorreto sujeita o HOC a auto de infração da ANVISA/VISA."},
+    ],
+  },
+  4:{
+    objetivos:[
+      "Apoiar atendimentos de odontopediatria com comunicação adequada para crianças",
+      "Montar mesa cirúrgica e assistir exodontias simples e cirurgias complexas",
+      "Compreender protocolos de CAPE (Centro de Apoio Psicológico e Emocional)",
+      "Operar e fazer manutenção básica de equipos e bombas de vácuo/compressor",
+    ],
+    cuidados:[
+      "⚠️ Odontopediatria: nunca imobilizar criança sem protocolo e autorização dos pais",
+      "⚠️ Mesa cirúrgica: sequência de montagem deve ser estéril — não tocar na área estéril sem luva cirúrgica",
+      "⚠️ Exodontia: material perfurocortante (lâminas, agulhas) em descarte imediato no coletor",
+      "⚠️ Compressor/vácuo: vazamentos de ar ou líquido → parar imediatamente e acionar manutenção",
+      "⚠️ Anestésico: nunca aplicar sem prescrição e orientação do cirurgião-dentista responsável",
+      "⚠️ CAPE: sigilo absoluto — nenhuma informação do paciente fora do ambiente clínico",
+    ],
+    dicas:[
+      "💡 Com crianças, fale sempre em linguagem lúdica — 'spray de água', não 'seringa'",
+      "💡 Mesa cirúrgica montada com antecedência = cirurgião focado = menos tempo de boca aberta",
+      "💡 Após cirurgia, confira se TODOS os instrumentos voltaram — conta antes e depois",
+      "💡 Manutenção preventiva dos equipos evita pane no meio do atendimento — faça o checklist diário",
+    ],
+    rdc:[
+      {art:"Art. 72-76 · Centro Cirúrgico e Campo Estéril", texto:"A montagem da mesa cirúrgica deve seguir técnica estéril completa. O estagiário só pode tocar na área estéril com luva cirúrgica estéril. Qualquer contaminação do campo exige remontagem total (POP-HOC cirurgia)."},
+      {art:"Art. 69-71 · Sedação e Anestesia", texto:"Procedimentos com sedação consciente ou anestesia geral exigem estrutura específica de recuperação pós-anestésica e profissional habilitado. O estagiário NÃO pode aplicar anestésico — apenas preparar e auxiliar."},
+      {art:"Art. 78 · Perfurocortantes Cirúrgicos", texto:"Lâminas de bisturi e agulhas cirúrgicas são Grupo E — descarte IMEDIATO em coletor rígido após uso. A contagem de instrumentos antes e após cirurgia é exigência de segurança do paciente (POP-HOC-003)."},
+      {art:"Art. 20-22 · Manutenção de Equipamentos", texto:"Equipos odontológicos devem ter manutenção preventiva registrada (ficha de manutenção). Compressor e vácuo: limpeza de filtros mensalmente. Falha em equipamento durante atendimento deve ser registrada como evento adverso."},
+    ],
+  },
+  5:{
+    objetivos:[
+      "Dominar componentes e materiais de implantodontia e prótese sobre implante",
+      "Gerenciar o fluxo de próteses: controle, planilha e agenda de protesistas",
+      "Montar materiais para reaberturas e moldagens avançadas",
+      "Controlar estoque e fazer solicitações de compras com critério",
+    ],
+    cuidados:[
+      "⚠️ Componentes de implante: são personalizados por paciente — NUNCA misturar ou trocar",
+      "⚠️ Moldagem de transferência: técnica incorreta invalida o trabalho do laboratório inteiro",
+      "⚠️ Próteses entregues pelo laboratório: conferir acabamento antes de mostrar ao paciente",
+      "⚠️ Estoque: PEPS (Primeiro que entra, primeiro que sai) — evita vencimento de materiais",
+      "⚠️ Reabertura de implante: campo cirúrgico estéril — mesmas regras do centro cirúrgico",
+      "⚠️ Solicitação de compras: não fazer pedidos sem conferir estoque atual — desperdício de verba",
+    ],
+    dicas:[
+      "💡 Etiquete cada componente com o nome do paciente assim que sair do kit — confusão custa caro",
+      "💡 A planilha de próteses é o espelho do laboratório — mantenha sempre atualizada",
+      "💡 Relate ao supervisor qualquer atraso do laboratório antes que o paciente ligue reclamando",
+      "💡 Estoque organizado por categoria e validade poupa 20 minutos todo dia — invista no sistema",
+    ],
+    rdc:[
+      {art:"Art. 40-43 · Rastreabilidade de Próteses e Implantes", texto:"Todo componente de implante deve ter rastreabilidade completa: número de lote, fabricante e data de uso registrados no prontuário. O HOC mantém planilha de próteses exatamente para cumprir esta exigência da RDC."},
+      {art:"Art. 44 · Laboratório de Prótese Externo", texto:"O laboratório de prótese externo deve ter registro na ANVISA/VISA. O HOC é corresponsável pela qualidade do trabalho recebido — conferir acabamento e higienização antes de instalar no paciente (POP-HOC-013)."},
+      {art:"Art. 55 · Artigos Críticos (Componentes de Implante)", texto:"Componentes de implante são artigos críticos — devem ser estéreis no momento do uso. Componentes reprocessados pelo fabricante devem ter documentação de rastreabilidade. Nunca usar componente sem embalagem íntegra."},
+      {art:"Art. 80 · Controle de Estoque e Validade", texto:"Materiais com prazo de validade vencido NÃO podem ser utilizados. O controle deve seguir PEPS (Primeiro que entra, primeiro que sai). A identificação de vencidos deve resultar em segregação e descarte imediato com registro."},
+    ],
+  },
+  6:{
+    objetivos:[
+      "Gerenciar inventário completo do HOC com controle de validade e reposição",
+      "Estabelecer comunicação eficiente com fornecedores e fiscalizar entregas",
+      "Verificar e propor melhorias nos fluxos operacionais das clínicas",
+      "Produzir relatórios administrativos e padronizar protocolos internos",
+    ],
+    cuidados:[
+      "⚠️ Inventário: divergência entre sistema e estoque físico deve ser reportada imediatamente",
+      "⚠️ Validade vencida: segregar e descartar conforme RDC 1.002/2025 — não devolver à prateleira",
+      "⚠️ Fornecedores: toda negociação e promessa verbal deve ser confirmada por escrito (e-mail/WhatsApp)",
+      "⚠️ Relatórios: dados de pacientes só em documentos internos com acesso controlado (LGPD)",
+      "⚠️ Fluxos: mudança de protocolo só após aprovação da Direção Clínica — nunca unilateral",
+      "⚠️ Entrega de materiais: conferir nota fiscal x pedido x material físico antes de assinar",
+    ],
+    dicas:[
+      "💡 Um bom relatório administrativo antecipa problemas — olhe tendências, não só números do dia",
+      "💡 Fornecedor novo? Peça referências e comece com pedido pequano antes de escalar",
+      "💡 Protocolo documentado vale mais que memória de qualquer profissional — escreva tudo",
+      "💡 Identifique gargalos de fluxo antes de propor soluções — dados primeiro, opinião depois",
+    ],
+    rdc:[
+      {art:"Art. 82-88 · PGRSS (Plano de Gerenciamento de Resíduos)", texto:"O HOC deve ter PGRSS atualizado e aprovado pela VISA. O estagiário de gestão é responsável por monitorar o cumprimento do plano: segregação, acondicionamento, coleta, transporte e destinação final de resíduos de todos os grupos (A, B, D, E)."},
+      {art:"Art. 15-19 · Responsabilidade Técnica e NSP", texto:"O Núcleo de Segurança do Paciente (NSP) é obrigatório para estabelecimentos com 2 ou mais consultórios. O RT deve estar identificado e disponível. O estagiário de gestão apoia o RT na documentação e notificações ao sistema NOTIVISA."},
+      {art:"Art. 90-95 · SDBPF e Documentação", texto:"A Solicitação de Dados de Boas Práticas de Funcionamento (SDBPF) deve estar sempre atualizada com alvarás, licenças e registros. O estagiário de gestão deve manter esse arquivo organizado para inspeções sanitárias sem aviso prévio."},
+      {art:"Art. 96-100 · Fornecedores e Insumos", texto:"Fornecedores de produtos para saúde devem ter CNPJ e autorização ANVISA. O HOC só pode adquirir materiais odontológicos de distribuidores autorizados — verificar AFE (Autorização de Funcionamento de Empresa) antes de fechar qualquer pedido novo."},
+    ],
+  },
+  7:{
+    objetivos:[
+      "Operar scanner intraoral Medit com qualidade diagnóstica e protética",
+      "Trabalhar com software Exocad para design de coroas e próteses digitais",
+      "Operar impressora 3D e fazer acabamento de peças com precisão",
+      "Integrar fluxo digital completo: scan → design → impressão/fresagem → entrega",
+    ],
+    cuidados:[
+      "⚠️ Scanner Medit: calibrar antes de cada uso — arquivo descalibrado invalida o scan",
+      "⚠️ Exocad: salvar versões intermediárias — perda de arquivo significa refazer do zero",
+      "⚠️ Impressora 3D: resina é tóxica — luvas de nitrilo, óculos e ventilação obrigatórios",
+      "⚠️ Peças impressas: lavar em IPA e fotopolimerizar no tempo correto — atalhos comprometem a biocompatibilidade",
+      "⚠️ Arquivos de pacientes: nunca salvar em dispositivo pessoal — apenas servidores/nuvem do HOC",
+      "⚠️ Manutenção da impressora: resina cristalizada no FEP destrói a placa de impressão — limpeza após cada uso",
+    ],
+    dicas:[
+      "💡 Um scan bem feito economiza horas de ajuste no consultório — não tenha pressa nessa etapa",
+      "💡 No Exocad, domine os atalhos de teclado — a diferença entre 2h e 30min de design",
+      "💡 Imprima sempre um teste antes de uma peça definitiva — resina e parâmetros variam por lote",
+      "💡 Documente cada fluxo digital com fotos — o HOC está construindo banco de casos para o DIO",
+    ],
+    rdc:[
+      {art:"Art. 63 · Registro de Equipamentos de RX Digital", texto:"Scanners intraorais que emitem radiação e aparelhos de RX digital devem ter registro ANVISA e calibração periódica documentada. O Medit i700 é um scanner óptico (sem radiação) — mas o arquivo digital gerado integra o prontuário e tem exigências de guarda."},
+      {art:"Art. 46-48 · Dispositivos Médicos Impressos em 3D", texto:"Peças impressas em 3D para uso clínico (guias cirúrgicos, provisórios) devem usar resinas com registro ANVISA como dispositivo médico. A fotopolimerização no tempo correto é essencial para biocompatibilidade — atalhos comprometem a segurança do paciente."},
+      {art:"Art. 30 · Prontuário Digital e Guarda de Arquivos", texto:"Arquivos digitais de pacientes (STL, DICOM, imagens) integram o prontuário e devem ser guardados por no mínimo 20 anos (CFO). O HOC mantém servidor/nuvem institucional — salvar em dispositivo pessoal é vedado pela LGPD e pela RDC."},
+      {art:"Art. 92 · Rastreabilidade de Dispositivos Digitais", texto:"O número de série do scanner usado, versão do software Exocad e parâmetros da impressora 3D devem ser registrados no prontuário para rastreabilidade completa do fluxo digital. O DIO integra essa documentação como parte do protocolo ATLAS DIO."},
+    ],
+  },
+};
+
+const hash = s => CryptoJS.SHA256(s).toString().toUpperCase();
+
+const fmtDate = d => new Date(d + 'T12:00').toLocaleDateString('pt-BR');
+const statsOf = regs => {
+  const tot = regs.reduce((a,r) => a + (r.atividades||[]).reduce((s,x) => s + x.quantidade, 0), 0);
+  const dias = new Set(regs.map(r => r.data)).size;
+  return {tot, dias, n: regs.length, med: dias ? (tot/dias).toFixed(1) : 0};
+};
+
+const Inp = ({label, ...p}) => (
+  <div style={{marginBottom:16}}>
+    {label && <label className="inp-label">{label}</label>}
+    <input className="inp" {...p}/>
+  </div>
+);
+
+const Sel = ({label, options, ...p}) => (
+  <div style={{marginBottom:16}}>
+    {label && <label className="inp-label">{label}</label>}
+    <select className="inp" style={{cursor:'pointer'}} {...p}>
+      {options.map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+    </select>
+  </div>
+);
+
+const NivelBadge = ({n, size='sm'}) => (
+  <span className={`badge ${NIVEIS[n].cls}`} style={{fontSize: size==='lg'?14:12}}>
+    {NIVEIS[n].emoji} Nível {n}
+  </span>
+);
+
+const ProgBar = ({val, max, color='var(--accent)'}) => {
+  const pct = max ? Math.min(100, Math.round((val/max)*100)) : 0;
+  return <div className="prog-wrap"><div className="prog-bar" style={{width:pct+'%',background:color}}/></div>;
+};
+
+function DashTab({regs, usuarios, regsF, fMes, fAno, setFMes, setFAno, rankAtivs, maxRank, statsOf}) {
+  const MESES_LABEL = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const st = statsOf(regsF);
+  const porEst = usuarios.map(u => {
+    const ur = regsF.filter(r => r.estagiario===u.nome);
+    return {nome:u.nome, nivel:u.nivel, ...statsOf(ur)};
+  }).sort((a,b)=>b.tot-a.tot);
+
+  const ultimos6 = Array.from({length:6},(_,i)=>{
+    const d = new Date(fAno, fMes - (5-i), 1);
+    return {mes: d.getMonth(), ano: d.getFullYear(), label: MESES_LABEL[d.getMonth()]};
+  });
+
+  const dadosBarras = ultimos6.map(({mes,ano,label}) => {
+    const entry = {label, total:0, porEst:{}};
+    usuarios.forEach(u => {
+      const tot = regs.filter(r => {
+        const d = new Date(r.data);
+        return d.getMonth()===mes && d.getFullYear()===ano && r.estagiario===u.nome;
+      }).reduce((s,r)=>s+(r.atividades||[]).reduce((a,x)=>a+x.quantidade,0),0);
+      entry.porEst[u.nome] = tot;
+      entry.total += tot;
+    });
+    return entry;
+  });
+  const maxBarra = Math.max(...dadosBarras.map(d=>d.total), 1);
+
+  const avaliacaoMensal = usuarios.map(u => {
+    const mesesAval = ultimos6.map(({mes,ano,label}) => {
+      const rMes = regs.filter(r => {
+        const d = new Date(r.data);
+        return d.getMonth()===mes && d.getFullYear()===ano && r.estagiario===u.nome;
+      });
+      const totAtivs = {};
+      rMes.forEach(r=>(r.atividades||[]).forEach(a=>{totAtivs[a.id]=(totAtivs[a.id]||0)+a.quantidade;}));
+      const metas = ATIVIDADES[u.nivel]||[];
+      const metasAtingidas = metas.filter(a=>(totAtivs[a.id]||0)>=a.meta).length;
+      const pctMetas = metas.length ? Math.round((metasAtingidas/metas.length)*100) : 0;
+      const comps = rMes.filter(r=>r.comportamento && Object.keys(r.comportamento).length>0);
+      let notaComp = 0;
+      if (comps.length>0) {
+        const soma = comps.reduce((s,r)=>{
+          const vals = Object.values(r.comportamento).map(Number).filter(v=>v>0);
+          return s + (vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0);
+        },0);
+        notaComp = +(soma/comps.length).toFixed(1);
+      }
+      const status = pctMetas>=80 && notaComp>=4 ? 'ok' : pctMetas>=50 && notaComp>=3 ? 'atencao' : rMes.length===0 ? 'sem' : 'critico';
+      return {label, pctMetas, notaComp, regs:rMes.length, status};
+    });
+    return {nome:u.nome, nivel:u.nivel, meses:mesesAval};
+  });
+
+  const COR_NIVEL = ['','#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#ef4444','#06b6d4'];
+  const [estSel, setEstSel] = useState(usuarios[0]?.nome||'');
+  const dadosLinha = avaliacaoMensal.find(a=>a.nome===estSel);
+
+  return (
+    <>
+      {/* Filtros */}
+      <div style={{display:'flex',gap:12,marginBottom:24,alignItems:'flex-end'}}>
+        <div style={{flex:1}}>
+          <label className="inp-label">Ano de referência</label>
+          <select className="inp" value={fAno} onChange={e=>setFAno(+e.target.value)}>
+            {[2024,2025,2026].map(y=><option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+        <div style={{flex:1}}>
+          <label className="inp-label">Mês atual</label>
+          <select className="inp" value={fMes} onChange={e=>setFMes(+e.target.value)}>
+            {MESES_LABEL.map((m,i)=><option key={i} value={i}>{m}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div className="stat-grid" style={{marginBottom:24}}>
+        {[['Registros',st.n,'📋'],['Atividades',st.tot,'⚡'],['Dias Ativos',st.dias,'📅'],['Média/Dia',st.med,'📈']].map(([l,v,e])=>(
+          <div key={l} className="stat-box">
+            <div style={{fontSize:22,marginBottom:4}}>{e}</div>
+            <div className="stat-num n1">{v}</div>
+            <div className="stat-lbl">{l}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Gráfico barras */}
+      <div className="card" style={{marginBottom:20}}>
+        <div className="sec-label" style={{marginBottom:16}}>
+          <div style={{width:18,height:3,background:'var(--green)',borderRadius:2}}/>
+          📊 Atividades por Mês — Comparativo (últimos 6 meses)
+        </div>
+        {dadosBarras.every(d=>d.total===0)
+          ? <div style={{textAlign:'center',color:'var(--text-dim)',padding:20,fontSize:13}}>Sem dados nos últimos 6 meses</div>
+          : <div style={{overflowX:'auto'}}>
+              <svg viewBox="0 0 700 180" style={{width:'100%',minWidth:320}}>
+                {dadosBarras.map((d,i) => {
+                  const x = i*(700/6)+20;
+                  const barW = 60;
+                  let yOff = 140;
+                  const nomes = Object.entries(d.porEst).filter(([,v])=>v>0);
+                  return (
+                    <g key={i}>
+                      {nomes.map(([nome,val],j) => {
+                        const bh = maxBarra>0?(val/maxBarra)*120:0;
+                        yOff -= bh;
+                        const u = usuarios.find(u=>u.nome===nome);
+                        const cor = u ? COR_NIVEL[u.nivel] : '#3b82f6';
+                        return <rect key={j} x={x} y={yOff} width={barW} height={bh} fill={cor} opacity={0.85} rx={3}/>;
+                      })}
+                      <text x={x+barW/2} y={155} textAnchor="middle" fontSize={10} fill="#6b8aaa">{d.label}</text>
+                      {d.total>0 && <text x={x+barW/2} y={140-(d.total/maxBarra*120)-4} textAnchor="middle" fontSize={10} fill="#e8f0fe" fontWeight="700">{d.total}</text>}
+                    </g>
+                  );
+                })}
+                <line x1={10} y1={140} x2={690} y2={140} stroke="#1c3352" strokeWidth={1}/>
+              </svg>
+              <div style={{display:'flex',flexWrap:'wrap',gap:10,marginTop:8}}>
+                {usuarios.map(u=>(
+                  <div key={u.nome} style={{display:'flex',alignItems:'center',gap:5,fontSize:11}}>
+                    <div style={{width:10,height:10,borderRadius:3,background:COR_NIVEL[u.nivel],flexShrink:0}}/>
+                    <span style={{color:'var(--text-muted)'}}>{u.nome.split(' ')[0]} (N{u.nivel})</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+        }
+      </div>
+
+      {/* Gráfico linha */}
+      <div className="card" style={{marginBottom:20}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+          <div className="sec-label" style={{margin:0}}>
+            <div style={{width:18,height:3,background:'var(--accent)',borderRadius:2}}/>
+            📈 Evolução Individual — % Metas
+          </div>
+          <select className="inp" value={estSel} onChange={e=>setEstSel(e.target.value)} style={{width:'auto',fontSize:12,padding:'6px 10px'}}>
+            {usuarios.map(u=><option key={u.nome} value={u.nome}>{u.nome.split(' ')[0]}</option>)}
+          </select>
+        </div>
+        {!dadosLinha
+          ? <div style={{textAlign:'center',color:'var(--text-dim)',padding:20,fontSize:13}}>Selecione um estagiário</div>
+          : <svg viewBox="0 0 400 140" style={{width:'100%'}}>
+              {[0,25,50,75,100].map(v=>(
+                <g key={v}>
+                  <line x1={40} y1={110-(v*0.9)} x2={390} y2={110-(v*0.9)} stroke="#1c3352" strokeWidth={0.5}/>
+                  <text x={35} y={114-(v*0.9)} textAnchor="end" fontSize={9} fill="#3d5a78">{v}%</text>
+                </g>
+              ))}
+              {dadosLinha.meses.map((m,i)=>{
+                const x = 40+i*(350/5);
+                const y = 110-(m.pctMetas*0.9);
+                const px = i>0?40+(i-1)*(350/5):x;
+                const py = i>0?110-(dadosLinha.meses[i-1].pctMetas*0.9):y;
+                return (
+                  <g key={i}>
+                    {i>0 && <line x1={px} y1={py} x2={x} y2={y} stroke="#3b82f6" strokeWidth={2}/>}
+                    <circle cx={x} cy={y} r={4} fill={m.pctMetas>=80?'#10b981':m.pctMetas>=50?'#f59e0b':'#ef4444'} stroke="#0d1f35" strokeWidth={1.5}/>
+                    <text x={x} y={126} textAnchor="middle" fontSize={9} fill="#6b8aaa">{m.label}</text>
+                    <text x={x} y={y-7} textAnchor="middle" fontSize={9} fill="#e8f0fe" fontWeight="700">{m.pctMetas}%</text>
+                  </g>
+                );
+              })}
+              {dadosLinha.meses.map((m,i)=>{
+                if(!m.notaComp) return null;
+                const x=40+i*(350/5);
+                const y=110-(m.notaComp/5*90);
+                const pm=dadosLinha.meses[i-1];
+                const px=i>0?40+(i-1)*(350/5):x;
+                const py=i>0&&pm?.notaComp?110-(pm.notaComp/5*90):y;
+                return (
+                  <g key={'c'+i}>
+                    {i>0&&pm?.notaComp&&<line x1={px} y1={py} x2={x} y2={y} stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="4,2"/>}
+                    <circle cx={x} cy={y} r={3} fill="#f59e0b" stroke="#0d1f35" strokeWidth={1}/>
+                  </g>
+                );
+              })}
+              <g>
+                <line x1={45} y1={12} x2={65} y2={12} stroke="#3b82f6" strokeWidth={2}/>
+                <text x={68} y={16} fontSize={9} fill="#6b8aaa">% Metas</text>
+                <line x1={130} y1={12} x2={150} y2={12} stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="4,2"/>
+                <text x={153} y={16} fontSize={9} fill="#6b8aaa">Comportamento</text>
+              </g>
+            </svg>
+        }
+      </div>
+
+      {/* Avaliação mensal */}
+      <div className="card" style={{marginBottom:20}}>
+        <div className="sec-label" style={{marginBottom:16}}>
+          <div style={{width:18,height:3,background:'var(--purple)',borderRadius:2}}/>
+          🏅 Avaliação Mensal de KPIs — Todos os Estagiários
+        </div>
+        <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+            <thead>
+              <tr>
+                <th style={{textAlign:'left',padding:'6px 8px',color:'var(--text-muted)',fontWeight:600,borderBottom:'1px solid var(--border)',minWidth:100}}>Estagiário</th>
+                {ultimos6.map((m,i)=>(
+                  <th key={i} style={{textAlign:'center',padding:'6px 8px',color:'var(--text-muted)',fontWeight:600,borderBottom:'1px solid var(--border)',minWidth:60}}>{m.label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {avaliacaoMensal.map((a,i)=>(
+                <tr key={i} style={{borderBottom:'1px solid var(--border)'}}>
+                  <td style={{padding:'8px 8px'}}>
+                    <div style={{fontWeight:600}}>{a.nome.split(' ')[0]}</div>
+                    <NivelBadge n={a.nivel}/>
+                  </td>
+                  {a.meses.map((m,j)=>{
+                    const bg = m.status==='ok'?'#10b98120':m.status==='atencao'?'#f59e0b20':m.status==='critico'?'#ef444420':'transparent';
+                    const cor = m.status==='ok'?'#10b981':m.status==='atencao'?'#f59e0b':m.status==='critico'?'#ef4444':'var(--text-dim)';
+                    const emoji = m.status==='ok'?'✅':m.status==='atencao'?'⚠️':m.status==='critico'?'❌':'—';
+                    return (
+                      <td key={j} style={{textAlign:'center',padding:'8px 6px',background:bg,borderRadius:4}}>
+                        <div style={{fontSize:14}}>{emoji}</div>
+                        {m.regs>0 && <>
+                          <div style={{fontSize:10,color:cor,fontWeight:700}}>{m.pctMetas}%</div>
+                          <div style={{fontSize:10,color:'var(--text-dim)'}}>{m.notaComp>0?`★${m.notaComp}`:''}</div>
+                        </>}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{display:'flex',gap:16,marginTop:12,fontSize:11,color:'var(--text-muted)',flexWrap:'wrap'}}>
+          <span>✅ Ótimo (metas ≥80% e comp ≥4)</span>
+          <span>⚠️ Atenção (metas ≥50% e comp ≥3)</span>
+          <span>❌ Crítico</span>
+          <span>— Sem registros</span>
+        </div>
+      </div>
+
+      {/* Ranking */}
+      <div className="card" style={{marginBottom:20}}>
+        <div className="sec-label"><div style={{width:18,height:3,background:'var(--green)',borderRadius:2}}/>Ranking do Mês Selecionado</div>
+        {porEst.filter(e=>e.tot>0).length===0
+          ? <div style={{color:'var(--text-dim)',fontSize:13,textAlign:'center',padding:20}}>Sem dados no período</div>
+          : porEst.filter(e=>e.tot>0).map((e,i)=>(
+            <div key={e.nome} style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
+              <span style={{width:22,height:22,borderRadius:6,background:'var(--border)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'var(--text-muted)',flexShrink:0}}>{i+1}</span>
+              <div style={{flex:1}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                  <span style={{fontSize:13,fontWeight:600}}>{e.nome}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:'var(--accent)'}}>{e.tot}</span>
+                </div>
+                <ProgBar val={e.tot} max={porEst[0]?.tot||1} color='var(--green)'/>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+
+      {/* Top atividades */}
+      {rankAtivs.length>0 && (
+        <div className="card">
+          <div className="sec-label"><div style={{width:18,height:3,background:'var(--purple)',borderRadius:2}}/>Top Atividades do Período</div>
+          {rankAtivs.map(([nome,val])=>(
+            <div key={nome} className="bar-wrap">
+              <span className="bar-label">{nome.length>18?nome.substring(0,18)+'…':nome}</span>
+              <div className="bar-bg"><div className="bar-fill" style={{width:(val/maxRank*100)+'%',background:'var(--purple)'}}/></div>
+              <span className="bar-val n2">{val}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
 }
 
-function logout(){
-user=null;
-render();
+function GuiaTab({user}) {
+  const [nivelGuia, setNivelGuia] = useState(user.nivel);
+  const ng = GUIA_NIVEIS[nivelGuia];
+  const nv2 = NIVEIS[nivelGuia];
+  const porCatGuia = ATIVIDADES[nivelGuia].reduce((acc,a) => {
+    if (!acc[a.cat]) acc[a.cat]=[];
+    acc[a.cat].push(a); return acc;
+  }, {});
+  return (
+    <>
+                {/* Seletor de nível */}
+                <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:20}}>
+                  {Object.entries(NIVEIS).map(([k,v]) => {
+                    const isCur = +k === user.nivel;
+                    const isSel = +k === nivelGuia;
+                    return (
+                      <button key={k} onClick={()=>setNivelGuia(+k)} style={{
+                        padding:'7px 12px',borderRadius:8,border:'1px solid',cursor:'pointer',
+                        fontSize:12,fontWeight:700,transition:'all .15s',
+                        background: isSel ? v.cor.replace('var(','').replace(')','') : 'var(--bg-card2)',
+                        borderColor: isSel ? 'transparent' : 'var(--border)',
+                        color: isSel ? '#fff' : isCur ? 'var(--accent)' : 'var(--text-muted)',
+                        boxShadow: isSel ? '0 2px 8px rgba(0,0,0,.3)' : 'none',
+                      }}>
+                        {v.emoji} N{k} {isCur ? '← você' : ''}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Header do nível selecionado */}
+                <div className="card" style={{marginBottom:16,borderColor: nv2.cor.replace('var(','').replace(')','') + '55'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:14}}>
+                    <div style={{fontSize:36}}>{nv2.emoji}</div>
+                    <div>
+                      <div style={{fontWeight:800,fontSize:17}}>Nível {nivelGuia} — {nv2.nome}</div>
+                      <div style={{fontSize:12,color:'var(--text-muted)',marginTop:4}}>Duração estimada: {nv2.dur} meses · {ATIVIDADES[nivelGuia].length} atividades</div>
+                    </div>
+                    {nivelGuia === user.nivel && (
+                      <span style={{marginLeft:'auto',background:'var(--accent)',color:'#fff',borderRadius:8,padding:'4px 10px',fontSize:11,fontWeight:700}}>Seu nível atual</span>
+                    )}
+                    {nivelGuia < user.nivel && (
+                      <span style={{marginLeft:'auto',background:'var(--green)',color:'#fff',borderRadius:8,padding:'4px 10px',fontSize:11,fontWeight:700}}>✓ Concluído</span>
+                    )}
+                    {nivelGuia > user.nivel && (
+                      <span style={{marginLeft:'auto',background:'var(--border)',color:'var(--text-muted)',borderRadius:8,padding:'4px 10px',fontSize:11,fontWeight:700}}>Próximo</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Objetivos */}
+                <div className="card" style={{marginBottom:12}}>
+                  <div className="sec-label" style={{marginBottom:12}}>
+                    <div style={{width:18,height:3,background:'var(--accent)',borderRadius:2}}/>
+                    🎯 Objetivos de Aprendizado
+                  </div>
+                  {ng.objetivos.map((o,i) => (
+                    <div key={i} style={{display:'flex',gap:10,padding:'8px 0',borderBottom:i<ng.objetivos.length-1?'1px solid var(--border)':'none'}}>
+                      <span style={{color:'var(--accent)',fontWeight:800,fontSize:13,flexShrink:0}}>{i+1}.</span>
+                      <span style={{fontSize:13,lineHeight:1.5}}>{o}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Cuidados */}
+                <div className="card" style={{marginBottom:12,borderColor:'#ef444430'}}>
+                  <div className="sec-label" style={{marginBottom:12}}>
+                    <div style={{width:18,height:3,background:'var(--red)',borderRadius:2}}/>
+                    🛡️ Cuidados e Biossegurança
+                  </div>
+                  {ng.cuidados.map((c,i) => (
+                    <div key={i} style={{background:'#ef444410',border:'1px solid #ef444425',borderRadius:8,padding:'9px 12px',marginBottom:6,fontSize:13,lineHeight:1.5}}>
+                      {c}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Atividades por categoria */}
+                <div className="card" style={{marginBottom:12}}>
+                  <div className="sec-label" style={{marginBottom:12}}>
+                    <div style={{width:18,height:3,background:'var(--purple)',borderRadius:2}}/>
+                    📋 Atividades por Categoria
+                  </div>
+                  {Object.entries(porCatGuia).map(([cat,ativs]) => (
+                    <div key={cat} style={{marginBottom:14}}>
+                      <div style={{fontSize:11,fontWeight:700,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.8px',marginBottom:6}}>{cat}</div>
+                      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:5}}>
+                        {ativs.map(a => (
+                          <div key={a.id} style={{background:'var(--bg-card2)',border:'1px solid var(--border)',borderRadius:7,padding:'7px 10px'}}>
+                            <div style={{fontSize:12,fontWeight:600}}>{a.n}</div>
+                            <div style={{fontSize:10,color:'var(--text-dim)',marginTop:2}}>Meta: {a.meta}/mês</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Dicas */}
+                <div className="card" style={{marginBottom:12,borderColor:'#f59e0b30'}}>
+                  <div className="sec-label" style={{marginBottom:12}}>
+                    <div style={{width:18,height:3,background:'var(--yellow)',borderRadius:2}}/>
+                    💡 Dicas Práticas HOC
+                  </div>
+                  {ng.dicas.map((d,i) => (
+                    <div key={i} style={{background:'#f59e0b10',border:'1px solid #f59e0b25',borderRadius:8,padding:'9px 12px',marginBottom:6,fontSize:13,lineHeight:1.5}}>
+                      {d}
+                    </div>
+                  ))}
+                </div>
+
+                {/* RDC 1.002/2025 */}
+                <div className="card" style={{marginBottom:12,borderColor:'#8b5cf630'}}>
+                  <div className="sec-label" style={{marginBottom:12}}>
+                    <div style={{width:18,height:3,background:'var(--purple)',borderRadius:2}}/>
+                    📋 RDC ANVISA 1.002/2025 — Alertas deste Nível
+                  </div>
+                  <div style={{background:'#8b5cf608',border:'1px solid #8b5cf620',borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:11,color:'var(--text-muted)'}}>
+                    Resolução da Diretoria Colegiada nº 1.002, de 15/12/2025 — Boas Práticas de Funcionamento para Serviços Odontológicos. Os artigos abaixo são os mais relevantes para suas atividades neste nível.
+                  </div>
+                  {ng.rdc.map((r,i) => (
+                    <div key={i} style={{marginBottom:10,borderRadius:8,overflow:'hidden',border:'1px solid #8b5cf630'}}>
+                      <div style={{background:'#8b5cf618',padding:'7px 12px',fontSize:11,fontWeight:700,color:'#a78bfa',letterSpacing:'0.3px'}}>
+                        📌 {r.art}
+                      </div>
+                      <div style={{padding:'9px 12px',fontSize:13,lineHeight:1.6,color:'var(--text)'}}>
+                        {r.texto}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+    </>
+  );
 }
 
-function saveReg(){
-const data=document.getElementById('data').value;
-const ativs=[];
-Object.keys(document.querySelectorAll('.qtd')).forEach(i=>{
-const val=document.querySelectorAll('.qtd')[i].value;
-if(val>0)ativs.push({n:'Atividade '+i,q:val});
-});
-if(ativs.length>0){
-registros.push({data,ativs,user:user.nome});
-alert('✅ Salvo!');
-render();
+function App() {
+  const [tela, setTela]     = useState('login');
+  const [user, setUser]     = useState(null);
+  const [usuarios, setUsr]  = useState([]);
+  const [regs, setRegs]     = useState([]);
+  const [busy, setBusy]     = useState(false);
+  const [modal, setModal]   = useState(null);
+  const [avaliacoes, setAvaliacoes] = useState([]);
+  const [modalAval, setModalAval] = useState(null); // {usuario}
+  const [avalComp, setAvalComp]   = useState({});
+  const [avalObs, setAvalObs]     = useState('');
+  const [avalRec, setAvalRec]     = useState('manter');
+  const [avalMes, setAvalMes]     = useState(new Date().getMonth());
+  const [avalAno, setAvalAno]     = useState(new Date().getFullYear());
+
+  const [email, setEmail]   = useState('');
+  const [senha, setSenha]   = useState('');
+  const [errMsg, setErr]    = useState('');
+
+  // Autocadastro (estagiário)
+  const [modoTela, setModoTela] = useState('login'); // 'login' | 'cadastro'
+  const [cNome, setCNome]   = useState('');
+  const [cEmail, setCEmail] = useState('');
+  const [cSenha, setCSenha] = useState('');
+  const [cSenha2, setCSenha2] = useState('');
+  const [cNivel, setCNivel] = useState(1);
+  const [cArea,  setCArea]  = useState('clinico');
+  const [cTurnoI, setCTurnoI] = useState('08:00');
+  const [cTurnoF, setCTurnoF] = useState('17:00');
+  const [cErr, setCErr]     = useState('');
+
+  const [qtds, setQtds]     = useState({});
+  const [comp, setComp]     = useState({});
+  const [obsD, setObs]      = useState('');
+  const [dt, setDt]         = useState(new Date().toISOString().split('T')[0]);
+  const [hrEntrada, setHrEntrada] = useState('');
+  const [hrSaida,   setHrSaida]   = useState('');
+  const [aba, setAba]       = useState('reg');
+
+  const [abaA, setAbaA]     = useState('usuarios');
+  const [fEst, setFEst]     = useState('');
+  const [fMes, setFMes]     = useState(new Date().getMonth());
+  const [fAno, setFAno]     = useState(new Date().getFullYear());
+
+  const [nNome,  setNN]     = useState('');
+  const [nEmail, setNE]     = useState('');
+  const [nSenha, setNS]     = useState('');
+  const [nNivel, setNNv]    = useState(1);
+  const [nTurnoI, setNTI]   = useState('08:00');
+  const [nTurnoF, setNTF]   = useState('17:00');
+  const [nArea,  setNArea]  = useState('clinico');
+  const [nTipo,  setNTipo]  = useState('estagiario');
+
+  const carregar = async () => {
+    if (!sb) return;
+    setBusy(true);
+    const [u, r, av] = await Promise.all([
+      sb.from('usuarios').select('*').eq('ativo',true).order('nome'),
+      sb.from('registros').select('*').order('data',{ascending:false}),
+      sb.from('avaliacoes').select('*').order('ano',{ascending:false}).order('mes',{ascending:false})
+    ]);
+    if (u.data) setUsr(u.data);
+    if (r.data) setRegs(r.data);
+    if (av.data) setAvaliacoes(av.data);
+    setBusy(false);
+  };
+
+  useEffect(() => { carregar(); }, []);
+
+  const login = async () => {
+    if (!email || !senha) { setErr('Preencha e-mail e senha'); return; }
+    if (!sb) { setErr('Configuração do banco não encontrada. Veja DEPLOY.md'); return; }
+    setErr(''); setBusy(true);
+    const {data:arr} = await sb.from('usuarios').select('*').eq('email',email).eq('senha_hash',hash(senha));
+    const data = arr && arr[0];
+    if (data) {
+      setUser(data);
+      setTela(data.tipo === 'admin' ? 'admin' : 'est');
+      if (data.tipo === 'estagiario') agendarAlertas(data);
+    } else setErr('E-mail ou senha incorretos');
+    setBusy(false);
+  };
+
+  // ── Notificações de turno ──
+  const agendarAlertas = (u) => {
+    if (!u.turno_inicio || !u.turno_fim) return;
+    if (!('Notification' in window)) return;
+    const pedir = async () => {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') return;
+      const agendar = (horaStr, msg, anteciparMin=0) => {
+        const [h,m] = horaStr.split(':').map(Number);
+        const agora = new Date();
+        const alvo = new Date();
+        alvo.setHours(h, m - anteciparMin, 0, 0);
+        if (alvo <= agora) alvo.setDate(alvo.getDate() + 1);
+        const diff = alvo - agora;
+        setTimeout(() => {
+          new Notification('HOC — Hospital Odontológico', {
+            body: msg,
+            icon: '/icons/icon-192.png',
+            badge: '/icons/icon-72.png',
+          });
+        }, diff);
+      };
+      agendar(u.turno_inicio, `⏰ Seu estágio começa em 10 minutos! (${u.turno_inicio})`, 10);
+      agendar(u.turno_fim,    `✅ Hora de registrar sua saída! (${u.turno_fim})`);
+    };
+    pedir();
+  };
+
+  // ── Autocadastro de estagiário (entra ativo direto) ──
+  const autocadastrar = async () => {
+    setCErr('');
+    if (!cNome.trim() || !cEmail.trim() || !cSenha) { setCErr('Preencha todos os campos'); return; }
+    if (cSenha.length < 8) { setCErr('A senha deve ter no mínimo 8 caracteres'); return; }
+    if (cSenha !== cSenha2) { setCErr('As senhas não coincidem'); return; }
+    if (!sb) { setCErr('Configuração do banco não encontrada. Veja DEPLOY.md'); return; }
+
+    setBusy(true);
+    const emailNorm = cEmail.trim().toLowerCase();
+    const {data: existentes} = await sb.from('usuarios').select('id').eq('email', emailNorm);
+    if (existentes && existentes.length > 0) {
+      setCErr('Este e-mail já está cadastrado. Faça login ou use outro e-mail.');
+      setBusy(false);
+      return;
+    }
+
+    const {data, error} = await sb.from('usuarios').insert([{
+      nome: cNome.trim(),
+      email: emailNorm,
+      senha_hash: hash(cSenha),
+      nivel: +cNivel,
+      area: cArea,
+      tipo: 'estagiario',
+      turno_inicio: cTurnoI,
+      turno_fim: cTurnoF,
+      ativo: true
+    }]).select();
+
+    if (!error && data && data[0]) {
+      setUser(data[0]);
+      setTela('est');
+      agendarAlertas(data[0]);
+      setCNome(''); setCEmail(''); setCSenha(''); setCSenha2(''); setCNivel(1); setCArea('clinico'); setCTurnoI('08:00'); setCTurnoF('17:00');
+      carregar();
+    } else {
+      setCErr('Erro ao cadastrar: ' + (error?.message || 'tente novamente'));
+    }
+    setBusy(false);
+  };
+
+  const cadastrar = async () => {
+    if (!nNome || !nEmail || !nSenha) { alert('Preencha todos os campos'); return; }
+    setBusy(true);
+    const {error} = await sb.from('usuarios').insert([{nome:nNome,email:nEmail,senha_hash:hash(nSenha),nivel:+nNivel,area:nArea,turno_inicio:nTurnoI,turno_fim:nTurnoF,tipo:nTipo,ativo:true}]);
+    if (!error) { alert('✅ Cadastro realizado!'); setNN(''); setNE(''); setNS(''); setNNv(1); setNArea('clinico'); setNTipo('estagiario'); setNTI('08:00'); setNTF('17:00'); setModal(null); carregar(); }
+    else alert('Erro: ' + error.message);
+    setBusy(false);
+  };
+
+  const promover = async (id, n) => {
+    if (n >= 7) { alert('Nível máximo já atingido'); return; }
+    if (!confirm(`Promover para Nível ${n+1}?`)) return;
+    await sb.from('usuarios').update({nivel:n+1}).eq('id',id);
+    alert(`✅ Promovido para Nível ${n+1}`);
+    carregar();
+  };
+
+  const salvarAvaliacao = async () => {
+    if (Object.keys(avalComp).length < 7) { alert('Avalie todos os 7 critérios antes de salvar'); return; }
+    setBusy(true);
+    const u = modalAval;
+    const payload = {
+      estagiario: u.nome,
+      estagiario_id: u.id,
+      mes: avalMes,
+      ano: avalAno,
+      comportamento: avalComp,
+      obs: avalObs,
+      recomendacao: avalRec,
+      gestor: user.nome,
+    };
+    // upsert: atualiza se já existe avaliação deste estagiário neste mês/ano
+    const {error} = await sb.from('avaliacoes').upsert(payload, {onConflict:'estagiario,mes,ano'});
+    if (!error) {
+      alert('✅ Avaliação salva!');
+      setModalAval(null);
+      setAvalComp({}); setAvalObs(''); setAvalRec('manter');
+      carregar();
+    } else alert('Erro: ' + error.message);
+    setBusy(false);
+  };
+
+  const desativar = async id => {
+    if (!confirm('Desativar este estagiário?')) return;
+    await sb.from('usuarios').update({ativo:false}).eq('id',id);
+    carregar();
+  };
+
+  // ── Gerar Relatório PDF ──
+  const gerarRelatorio = (u) => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const W = 210, MARGIN = 20;
+    let y = 0;
+    const AZUL=[7,17,31], AZULM=[29,78,136], AZULC=[59,130,246], BRANCO=[255,255,255], CINZA=[100,120,140];
+
+    // Cabeçalho
+    doc.setFillColor(...AZUL); doc.rect(0,0,W,38,'F');
+    try { doc.addImage('data:image/jpeg;base64,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','JPEG',MARGIN,5,42,18); }
+    catch(e) { doc.setTextColor(...BRANCO); doc.setFontSize(22); doc.setFont('helvetica','bold'); doc.text('HOC',MARGIN,20); }
+    doc.setTextColor(...BRANCO); doc.setFontSize(8.5); doc.setFont('helvetica','normal');
+    doc.text('Hospital Odontológico · CRO-SP CL 7833',W-MARGIN,12,{align:'right'});
+    doc.text('Av. Indianópolis, 153 · São Paulo · SP',W-MARGIN,17,{align:'right'});
+    doc.text('Dr. Alenio Calil Mathias · Diretor Clínico · CRO-SP 36117',W-MARGIN,22,{align:'right'});
+    doc.setFontSize(12); doc.setFont('helvetica','bold');
+    doc.text('DECLARAÇÃO DE ESTÁGIO CLÍNICO',W/2,32,{align:'center'});
+    y = 46;
+
+    // Dados do estagiário
+    doc.setFillColor(...AZULM); doc.rect(MARGIN,y,W-2*MARGIN,7,'F');
+    doc.setTextColor(...BRANCO); doc.setFontSize(9); doc.setFont('helvetica','bold');
+    doc.text('DADOS DO ESTAGIÁRIO',MARGIN+3,y+5); y+=10;
+
+    const ur = regs.filter(r=>r.estagiario===u.nome);
+    const ord = [...ur].sort((a,b)=>new Date(a.data)-new Date(b.data));
+    const dtI = ord.length ? new Date(ord[0].data+'T12:00').toLocaleDateString('pt-BR') : 'Sem registros';
+    const turnoStr = (u.turno_inicio && u.turno_fim) ? `${u.turno_inicio} → ${u.turno_fim}` : 'Não informado';
+    const dtF = ord.length ? new Date(ord[ord.length-1].data+'T12:00').toLocaleDateString('pt-BR') : 'Sem registros';
+    const nvNome = NIVEIS[u.nivel]?.nome||'';
+
+    doc.setTextColor(30,30,30); doc.setFontSize(9);
+    [['Nome completo:',u.nome],['E-mail:',u.email],['Nível atual:',`Nível ${u.nivel} — ${nvNome}`],
+     ['Período:',`${dtI} a ${dtF}`],['Turno:',turnoStr],['Total de registros:',`${ur.length} dia(s) registrado(s)`]
+    ].forEach(([lb,vl])=>{
+      doc.setFont('helvetica','bold'); doc.text(lb,MARGIN,y);
+      doc.setFont('helvetica','normal'); doc.text(vl,MARGIN+42,y); y+=6;
+    }); y+=4;
+
+    // Atividades
+    doc.setFillColor(...AZULM); doc.rect(MARGIN,y,W-2*MARGIN,7,'F');
+    doc.setTextColor(...BRANCO); doc.setFontSize(9); doc.setFont('helvetica','bold');
+    doc.text('ATIVIDADES REALIZADAS — TOTAL ACUMULADO',MARGIN+3,y+5); y+=10;
+
+    const tots={};
+    ur.forEach(r=>(r.atividades||[]).forEach(a=>{
+      if(!tots[a.nome]) tots[a.nome]={cat:a.cat,total:0};
+      tots[a.nome].total+=a.quantidade;
+    }));
+    const porCatPDF={};
+    Object.entries(tots).forEach(([n,d])=>{
+      if(!porCatPDF[d.cat]) porCatPDF[d.cat]=[];
+      porCatPDF[d.cat].push({nome:n,total:d.total});
+    });
+
+    doc.setFontSize(8.5);
+    if(!Object.keys(porCatPDF).length){
+      doc.setFont('helvetica','italic'); doc.setTextColor(...CINZA);
+      doc.text('Nenhuma atividade registrada.',MARGIN,y); y+=8;
+    } else {
+      Object.entries(porCatPDF).forEach(([cat,ativs])=>{
+        if(y>250){doc.addPage();y=20;}
+        doc.setFont('helvetica','bold'); doc.setTextColor(...AZULC);
+        doc.text(cat.toUpperCase(),MARGIN,y); y+=5;
+        doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40);
+        ativs.forEach(a=>{
+          if(y>270){doc.addPage();y=20;}
+          doc.text(`• ${a.nome}`,MARGIN+4,y);
+          doc.text(`${a.total}x`,W-MARGIN,y,{align:'right'}); y+=5;
+        }); y+=2;
+      });
+    } y+=4;
+
+    // Avaliações
+    const avsE = avaliacoes.filter(av=>av.estagiario===u.nome);
+    if(avsE.length>0){
+      if(y>220){doc.addPage();y=20;}
+      doc.setFillColor(...AZULM); doc.rect(MARGIN,y,W-2*MARGIN,7,'F');
+      doc.setTextColor(...BRANCO); doc.setFontSize(9); doc.setFont('helvetica','bold');
+      doc.text('AVALIAÇÕES DE COMPORTAMENTO',MARGIN+3,y+5); y+=10;
+      const ML=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+      avsE.slice(0,6).forEach(av=>{
+        if(y>260){doc.addPage();y=20;}
+        const med=av.comportamento?(Object.values(av.comportamento).reduce((s,v)=>s+(+v),0)/Object.values(av.comportamento).length).toFixed(1):'—';
+        const rec=av.recomendacao==='promover'?'↑ Promover':av.recomendacao==='atencao'?'Atenção':'✓ Manter';
+        doc.setFont('helvetica','bold'); doc.setTextColor(40,40,40);
+        doc.text(`${ML[av.mes]}/${av.ano}`,MARGIN,y);
+        doc.setFont('helvetica','normal');
+        doc.text(`Média: ${med} estrelas   Recomendação: ${rec}`,MARGIN+22,y); y+=5;
+        if(av.obs){
+          doc.setTextColor(...CINZA); doc.setFontSize(8);
+          doc.splitTextToSize(`Obs: ${av.obs}`,W-2*MARGIN-5).forEach(l=>{doc.text(l,MARGIN+4,y);y+=4;});
+          doc.setFontSize(8.5);
+        }
+        doc.setTextColor(40,40,40); y+=2;
+      }); y+=2;
+    }
+
+    // Declaração
+    if(y>220){doc.addPage();y=20;}
+    doc.setFillColor(...AZULM); doc.rect(MARGIN,y,W-2*MARGIN,7,'F');
+    doc.setTextColor(...BRANCO); doc.setFontSize(9); doc.setFont('helvetica','bold');
+    doc.text('DECLARAÇÃO',MARGIN+3,y+5); y+=10;
+
+    const totAtivs=Object.values(tots).reduce((s,v)=>s+v.total,0);
+    const txtDecl=`Declaramos, para os devidos fins, que ${u.nome} realizou estágio clínico no HOC - Hospital Odontológico, sob supervisão da equipe clínica, no período de ${dtI} a ${dtF}, atingindo o Nível ${u.nivel} de competência (${nvNome}), com ${ur.length} dia(s) de atividades registradas e ${totAtivs} procedimentos realizados. O estagiário demonstrou comprometimento com os protocolos do HOC e com as normas da RDC ANVISA 1.002/2025.`;
+    doc.setTextColor(40,40,40); doc.setFont('helvetica','normal'); doc.setFontSize(9);
+    doc.splitTextToSize(txtDecl,W-2*MARGIN).forEach(l=>{doc.text(l,MARGIN,y);y+=5.5;}); y+=10;
+
+    const hoje=new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
+    doc.setFontSize(8.5); doc.setTextColor(...CINZA);
+    doc.text(`São Paulo, ${hoje}`,W/2,y,{align:'center'}); y+=14;
+
+    const xL=MARGIN+20, xR=W/2+20;
+    doc.setDrawColor(...AZULM); doc.setLineWidth(0.4);
+    doc.line(xL,y,xL+60,y); doc.line(xR,y,xR+60,y); y+=5;
+    doc.setTextColor(40,40,40); doc.setFontSize(8.5); doc.setFont('helvetica','bold');
+    doc.text('Dr. Alenio Calil Mathias',xL+30,y,{align:'center'});
+    doc.text(u.nome,xR+30,y,{align:'center'}); y+=4;
+    doc.setFont('helvetica','normal'); doc.setTextColor(...CINZA); doc.setFontSize(7.5);
+    doc.text('Diretor Clínico · CRO-SP 36117',xL+30,y,{align:'center'});
+    doc.text('Estagiário(a)',xR+30,y,{align:'center'});
+
+    // Rodapé todas as páginas
+    const nPg=doc.internal.getNumberOfPages();
+    for(let i=1;i<=nPg;i++){
+      doc.setPage(i);
+      doc.setFillColor(...AZUL); doc.rect(0,285,W,12,'F');
+      doc.setTextColor(...BRANCO); doc.setFontSize(7); doc.setFont('helvetica','normal');
+      doc.text('HOC Hospital Odontológico · CRO-SP CL 7833 · Av. Indianópolis, 153 · São Paulo · SP',W/2,290,{align:'center'});
+      doc.text(`Página ${i} de ${nPg}`,W/2,294,{align:'center'});
+    }
+
+    doc.save(`HOC_Relatorio_${u.nome.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
+
+  const salvar = async () => {
+    const listaBase = user.area==='marketing' ? ATIVIDADES_MARKETING :
+                       user.area==='comercial' ? ATIVIDADES_COMERCIAL :
+                       ATIVIDADES[user.nivel]||[];
+    const ativs = Object.entries(qtds).filter(([,v]) => v>0).map(([id,q]) => {
+      const a = listaBase.find(x => x.id===id);
+      return {id, nome:a?.n||id, cat:a?.cat||'', quantidade:q};
+    });
+    if (!ativs.length) { alert('Registre ao menos uma atividade'); return; }
+    setBusy(true);
+    const {data,error} = await sb.from('registros').insert([{
+      data:dt, estagiario:user.nome, nivel:user.nivel, area:user.area||'clinico', atividades:ativs,
+      obs:obsD, hora_entrada:hrEntrada||null, hora_saida:hrSaida||null, created_at:new Date().toISOString()
+    }]).select();
+    if (!error) {
+      setRegs([data[0],...regs]);
+      setQtds({}); setObs(''); setHrEntrada(''); setHrSaida('');
+      alert('✅ Registro salvo!');
+    } else alert('Erro ao salvar: ' + error.message);
+    setBusy(false);
+  };
+
+  const mesesNoNivel = uid => {
+    const nome = usuarios.find(u => u.id===uid)?.nome;
+    const ur = regs.filter(r => r.estagiario===nome);
+    if (!ur.length) return 0;
+    const pr = new Date(ur[ur.length-1].data);
+    const hj = new Date();
+    return (hj.getFullYear()-pr.getFullYear())*12 + (hj.getMonth()-pr.getMonth());
+  };
+
+  // ─────────────────────────────────────────────────────────────
+  // TELA: LOGIN / CADASTRO
+  // ─────────────────────────────────────────────────────────────
+  if (tela === 'login') return (
+    <div className="login-wrap">
+      <div className="login-box">
+        <div className="login-logo">
+          <div className="login-title">HOC</div>
+          <div className="login-sub">Sistema de Estagiários · Hospital Odontológico</div>
+        </div>
+        <div className="card" style={{borderColor:'var(--border-light)'}}>
+          {!sb && (
+            <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#f87171',marginBottom:20}}>
+              ⚠️ Banco de dados não configurado. Veja DEPLOY.md para configurar as variáveis de ambiente.
+            </div>
+          )}
+
+          {modoTela === 'login' ? (
+            <>
+              <Inp label="E-mail" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="seu@email.com" onKeyDown={e=>e.key==='Enter'&&login()}/>
+              <Inp label="Senha" type="password" value={senha} onChange={e=>setSenha(e.target.value)} placeholder="••••••••" onKeyDown={e=>e.key==='Enter'&&login()}/>
+              {errMsg && <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#f87171',marginBottom:16}}>{errMsg}</div>}
+              <button className="btn btn-primary btn-full" onClick={login} disabled={busy}>
+                {busy ? <><span className="spinner" style={{width:16,height:16}}/> Entrando...</> : 'Entrar'}
+              </button>
+              <div style={{textAlign:'center',marginTop:18,fontSize:13,color:'var(--text-muted)'}}>
+                Ainda não tem conta?{' '}
+                <button className="btn-link" onClick={()=>{setModoTela('cadastro'); setCErr(''); setErr('');}}>
+                  Criar conta de estagiário
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{fontWeight:700,fontSize:16,marginBottom:18}}>Criar conta de estagiário</div>
+              <Inp label="Nome Completo" value={cNome} onChange={e=>setCNome(e.target.value)} placeholder="João Silva"/>
+              <Inp label="E-mail" type="email" value={cEmail} onChange={e=>setCEmail(e.target.value)} placeholder="joao@email.com"/>
+              <Inp label="Senha" type="password" value={cSenha} onChange={e=>setCSenha(e.target.value)} placeholder="Mínimo 8 caracteres"/>
+              <Inp label="Confirmar Senha" type="password" value={cSenha2} onChange={e=>setCSenha2(e.target.value)} placeholder="Repita a senha"/>
+              <div style={{marginBottom:16}}>
+                <label className="inp-label">Área de Estágio</label>
+                <select className="inp" value={cArea} onChange={e=>setCArea(e.target.value)} style={{cursor:'pointer'}}>
+                  <option value="clinico">🦷 Clínico</option>
+                  <option value="marketing">📱 Marketing</option>
+                  <option value="comercial">💼 Comercial</option>
+                </select>
+              </div>
+              {cArea==='clinico' && <div style={{marginBottom:16}}>
+                <label className="inp-label">Nível de entrada</label>
+                <select className="inp" value={cNivel} onChange={e=>setCNivel(e.target.value)} style={{cursor:'pointer'}}>
+                  {Object.entries(NIVEIS).map(([k,v])=>(
+                    <option key={k} value={k}>Nível {k} — {v.emoji} {v.nome}</option>
+                  ))}
+                </select>
+                <div style={{fontSize:11,color:'var(--text-dim)',marginTop:5}}>Se tiver dúvida, escolha Nível 1. O gestor pode alterar depois.</div>
+              </div>}
+              <div style={{marginBottom:16}}>
+                <label className="inp-label">Horário do Turno</label>
+                <div style={{display:'flex',gap:10,alignItems:'center'}}>
+                  <div style={{flex:1}}>
+                    <label style={{fontSize:11,color:'var(--text-muted)',display:'block',marginBottom:4}}>INÍCIO</label>
+                    <input type="time" className="inp" value={cTurnoI} onChange={e=>setCTurnoI(e.target.value)}/>
+                  </div>
+                  <div style={{color:'var(--text-dim)',paddingTop:20}}>→</div>
+                  <div style={{flex:1}}>
+                    <label style={{fontSize:11,color:'var(--text-muted)',display:'block',marginBottom:4}}>FIM</label>
+                    <input type="time" className="inp" value={cTurnoF} onChange={e=>setCTurnoF(e.target.value)}/>
+                  </div>
+                </div>
+                <div style={{fontSize:11,color:'var(--text-dim)',marginTop:5}}>Você receberá alertas 10 min antes de entrar e na hora de sair.</div>
+              </div>
+              {cErr && <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#f87171',marginBottom:16}}>{cErr}</div>}
+              <button className="btn btn-success btn-full" onClick={autocadastrar} disabled={busy}>
+                {busy ? <><span className="spinner" style={{width:16,height:16}}/> Criando conta...</> : '✓ Criar conta e entrar'}
+              </button>
+              <div style={{textAlign:'center',marginTop:18,fontSize:13,color:'var(--text-muted)'}}>
+                Já tem conta?{' '}
+                <button className="btn-link" onClick={()=>{setModoTela('login'); setCErr(''); setErr('');}}>
+                  Fazer login
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+        <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v6.3
+        </div>
+      </div>
+    </div>
+  );
+
+  // ─────────────────────────────────────────────────────────────
+  // TELA: ESTAGIÁRIO
+  // ─────────────────────────────────────────────────────────────
+  if (tela === 'est') {
+    const nv    = NIVEIS[user.nivel];
+    const mReg  = regs.filter(r => r.estagiario === user.nome);
+    const st    = statsOf(mReg);
+    const meses = mesesNoNivel(user.id);
+    const promo = meses >= nv.dur && user.nivel < 7;
+    const porCat = ATIVIDADES[user.nivel].reduce((acc,a) => {
+      if (!acc[a.cat]) acc[a.cat]=[];
+      acc[a.cat].push(a); return acc;
+    }, {});
+    const compMedia = COMP_ITEMS.map((_,i) => comp[i]||0);
+
+    return (
+      <div className="page">
+        <div className="header">
+          <div>
+            <div className="logo-text">HOC</div>
+            <div className="logo-sub">Estagiários</div>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <NivelBadge n={user.nivel}/>
+            {(user.turno_inicio||user.turno_fim) && <span style={{fontSize:12,color:'var(--cyan)'}}>🕐 {user.turno_inicio||'?'}→{user.turno_fim||'?'}</span>}
+            <span style={{fontSize:13,color:'var(--text-muted)'}}>{user.nome.split(' ')[0]}</span>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{setTela('login'); setModoTela('login');}}>Sair</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>gerarRelatorio(user)}>📄 Relatório</button>
+          </div>
+        </div>
+
+        <div className="content">
+          {promo && (
+            <div className="alert alert-promo" style={{marginBottom:20}}>
+              🎉 Você completou {meses} meses no Nível {user.nivel}! Aguarde aprovação do gestor para promoção.
+            </div>
+          )}
+
+          <div className="stat-grid" style={{marginBottom:24}}>
+            {[
+              {l:'Registros',v:st.n,     s:'dias registrados'},
+              {l:'Atividades',v:st.tot,   s:'total acumulado'},
+              {l:'Dias Ativos',v:st.dias,  s:'presença confirmada'},
+              {l:'Média/Dia',v:st.med,    s:'atividades/dia'},
+            ].map(s => (
+              <div key={s.l} className="stat-box">
+                <div className={`stat-num ${nv.cls.split(' ')[0]}`}>{s.v}</div>
+                <div className="stat-lbl">{s.l}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="card" style={{marginBottom:24}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:15}}>{nv.emoji} {nv.nome}</div>
+                <div style={{fontSize:12,color:'var(--text-muted)',marginTop:3}}>{meses} meses no nível · Meta: {nv.dur} meses</div>
+              </div>
+              <span style={{fontSize:22,fontWeight:800,color:'var(--accent)'}}>{Math.min(100,Math.round((meses/nv.dur)*100))}%</span>
+            </div>
+            <ProgBar val={meses} max={nv.dur} color='var(--accent)'/>
+            <div style={{display:'flex',justifyContent:'space-between',marginTop:14}}>
+              {Object.entries(NIVEIS).map(([k,v]) => {
+                const done = +k < user.nivel, cur = +k === user.nivel;
+                return (
+                  <div key={k} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+                    <div style={{
+                      width:28,height:28,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',
+                      fontSize:11,fontWeight:800,
+                      background: done?'var(--green)':cur?'var(--accent)':'var(--border)',
+                      color: done||cur?'#fff':'var(--text-dim)'
+                    }}>{done?'✓':k}</div>
+                    <div style={{fontSize:9,color:'var(--text-dim)',display:window.innerWidth<480?'none':'block'}}>{v.emoji}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="tabs" style={{marginBottom:20}}>
+            {(user.area==='clinico'||!user.area
+              ? [['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas'],['guia','📚 Guia']]
+              : [['reg','📝 Registrar'],['hist','📊 Histórico']]
+            ).map(([k,l]) => (
+              <button key={k} className={`tab ${aba===k?'active':''}`} onClick={()=>setAba(k)}>{l}</button>
+            ))}
+          </div>
+
+          {aba==='reg' && <>
+            {user.area==='marketing' && <div className="alert alert-info" style={{marginBottom:16}}>📱 Estagiário de Marketing</div>}
+            {user.area==='comercial' && <div className="alert" style={{background:'#f59e0b18',border:'1px solid #f59e0b40',color:'#fbbf24',marginBottom:16}}>💼 Estagiário Comercial</div>}
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20,flexWrap:'wrap'}}>
+              <label className="inp-label" style={{margin:0}}>Data:</label>
+              <input type="date" className="inp" value={dt} onChange={e=>setDt(e.target.value)} style={{width:'auto'}}/>
+              <label className="inp-label" style={{margin:0,marginLeft:8}}>Entrada:</label>
+              <input type="time" className="inp" value={hrEntrada} onChange={e=>setHrEntrada(e.target.value)} style={{width:'auto'}}/>
+              <label className="inp-label" style={{margin:0,marginLeft:8}}>Saída:</label>
+              <input type="time" className="inp" value={hrSaida} onChange={e=>setHrSaida(e.target.value)} style={{width:'auto'}}/>
+            </div>
+
+            {(() => {
+              const listaAtivs = user.area==='marketing' ? ATIVIDADES_MARKETING :
+                                 user.area==='comercial' ? ATIVIDADES_COMERCIAL :
+                                 ATIVIDADES[user.nivel]||[];
+              const catMap = listaAtivs.reduce((acc,a)=>{if(!acc[a.cat])acc[a.cat]=[];acc[a.cat].push(a);return acc},{});
+              return Object.entries(catMap).map(([cat,ativs]) => (
+              <div key={cat} style={{marginBottom:20}}>
+                <div className="sec-label">
+                  <div style={{width:18,height:3,background:'var(--accent)',borderRadius:2}}/>
+                  {cat}
+                </div>
+                {ativs.map(a => (
+                  <div key={a.id} className="act-row">
+                    <div>
+                      <div className="act-name">{a.n}</div>
+                      <div className="act-meta">Meta mensal: {a.meta}</div>
+                    </div>
+                    <div className="counter">
+                      <button className="counter-btn" onClick={()=>setQtds(p=>({...p,[a.id]:Math.max(0,(p[a.id]||0)-1)}))} >−</button>
+                      <span className={`counter-val ${(qtds[a.id]||0)>0?nv.cls.split(' ')[0]:''}`}>{qtds[a.id]||0}</span>
+                      <button className="counter-btn" onClick={()=>setQtds(p=>({...p,[a.id]:(p[a.id]||0)+1}))}>+</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))})()}
+
+            <div className="alert alert-info" style={{marginBottom:20}}>
+              ℹ️ A avaliação de comportamento é realizada mensalmente pelo gestor. Você pode ver os critérios na aba 📚 Guia.
+            </div>
+
+            <div style={{marginBottom:20}}>
+              <label className="inp-label">Observações do dia</label>
+              <textarea className="inp" value={obsD} onChange={e=>setObs(e.target.value)} rows={3} placeholder="Aprendizados, dificuldades, sugestões..." style={{resize:'vertical'}}/>
+            </div>
+
+            <button className="btn btn-primary btn-full" onClick={salvar} disabled={busy}>
+              {busy ? <><span className="spinner" style={{width:16,height:16}}/> Salvando...</> : '💾 Salvar Registro'}
+            </button>
+          </>}
+
+          {aba==='hist' && (
+            mReg.length === 0
+            ? <div style={{textAlign:'center',padding:'60px 20px',color:'var(--text-dim)'}}>
+                <div style={{fontSize:48,marginBottom:12}}>📋</div>
+                <div style={{fontWeight:600}}>Nenhum registro ainda</div>
+                <div style={{fontSize:13,marginTop:6}}>Registre sua primeira atividade na aba Registrar</div>
+              </div>
+            : [...mReg].sort((a,b)=>new Date(b.data)-new Date(a.data)).map(r => (
+              <div key={r.id} className="card card-hover" style={{marginBottom:12}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+                  <div>
+                    <div style={{fontWeight:700}}>{fmtDate(r.data)}</div>
+                    {(r.hora_entrada||r.hora_saida) && <div style={{fontSize:12,color:'var(--text-muted)',marginTop:2}}>🕐 {r.hora_entrada||'--:--'} → {r.hora_saida||'--:--'}</div>}
+                  </div>
+                  <NivelBadge n={r.nivel}/>
+                </div>
+                <div className="ativs-grid">
+                  {(r.atividades||[]).map((a,i) => (
+                    <div key={i} className="ativ-chip">
+                      <span style={{color:'var(--text-muted)'}}>{a.nome}: </span>
+                      <span style={{fontWeight:700,color:'var(--accent)'}}>{a.quantidade}</span>
+                    </div>
+                  ))}
+                </div>
+                {r.obs && <div className="obs-box">💬 {r.obs}</div>}
+              </div>
+            ))
+          )}
+
+          {aba==='metas' && (() => {
+            const mesAtual = new Date().getMonth();
+            const anoAtual = new Date().getFullYear();
+            const regsM = mReg.filter(r => {
+              const d = new Date(r.data);
+              return d.getMonth()===mesAtual && d.getFullYear()===anoAtual;
+            });
+            const totais = {};
+            regsM.forEach(r => (r.atividades||[]).forEach(a => {totais[a.id]=(totais[a.id]||0)+a.quantidade;}));
+            return (
+              <>
+                <div className="alert alert-info" style={{marginBottom:20}}>
+                  📅 Metas do mês de {new Date().toLocaleString('pt-BR',{month:'long'})}
+                </div>
+                {Object.entries(ATIVIDADES[user.nivel].reduce((acc,a)=>{if(!acc[a.cat])acc[a.cat]=[];acc[a.cat].push(a);return acc},{})).map(([cat,ativs])=>(
+                  <div key={cat} style={{marginBottom:20}}>
+                    <div className="sec-label"><div style={{width:18,height:3,background:'var(--purple)',borderRadius:2}}/>{cat}</div>
+                    {ativs.map(a => {
+                      const feito = totais[a.id]||0;
+                      const pct = Math.min(100,Math.round((feito/a.meta)*100));
+                      return (
+                        <div key={a.id} className="act-row" style={{marginBottom:6,display:'block'}}>
+                          <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+                            <span className="act-name">{a.n}</span>
+                            <span style={{fontSize:12,fontWeight:700,color:pct>=100?'var(--green)':'var(--accent)'}}>{feito}/{a.meta}</span>
+                          </div>
+                          <ProgBar val={feito} max={a.meta} color={pct>=100?'var(--green)':'var(--accent)'}/>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </>
+            );
+          })()}
+
+          {aba==='guia' && <GuiaTab user={user}/>}
+        </div>
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // TELA: ADMIN
+  // ─────────────────────────────────────────────────────────────
+  if (tela === 'admin') {
+    const regsF = regs.filter(r => {
+      const d = new Date(r.data);
+      return d.getMonth()===fMes && d.getFullYear()===fAno && (!fEst || r.estagiario===fEst);
+    });
+
+    const allNames = [...new Set(regs.map(r => r.estagiario))].sort();
+
+    const rankAtivs = (() => {
+      const totais = {};
+      regsF.forEach(r => (r.atividades||[]).forEach(a => {totais[a.nome]=(totais[a.nome]||0)+a.quantidade;}));
+      return Object.entries(totais).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    })();
+    const maxRank = rankAtivs[0]?.[1] || 1;
+
+    return (
+      <div className="page">
+        <div className="header">
+          <div>
+            <div className="logo-text">HOC</div>
+            <div className="logo-sub">Painel Administrativo</div>
+          </div>
+          <div style={{display:'flex',gap:10}}>
+            <button className="btn btn-ghost btn-sm" onClick={carregar}>🔄</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{setTela('login'); setModoTela('login');}}>Sair</button>
+          </div>
+        </div>
+
+        <div className="content">
+          <div className="tabs" style={{marginBottom:24}}>
+            {[['usuarios','👥 Estagiários'],['dash','📊 Dashboard'],['aval','⭐ Avaliações'],['hist','📋 Histórico']].map(([k,l])=>(
+              <button key={k} className={`tab ${abaA===k?'active':''}`} onClick={()=>setAbaA(k)}>{l}</button>
+            ))}
+          </div>
+
+          {abaA==='usuarios' && <>
+            <div style={{marginBottom:20}}>
+              <button className="btn btn-success" onClick={()=>setModal('cadastro')}>+ Cadastrar Estagiário</button>
+            </div>
+            {busy && <div style={{textAlign:'center',padding:40,color:'var(--text-muted)'}}><div className="spinner" style={{margin:'0 auto 12px'}}/></div>}
+            {usuarios.length===0 && !busy && (
+              <div style={{textAlign:'center',padding:'60px 20px',color:'var(--text-dim)'}}>
+                <div style={{fontSize:48,marginBottom:12}}>👥</div>
+                <div>Nenhum estagiário cadastrado</div>
+              </div>
+            )}
+            {usuarios.map(u => {
+              const meses = mesesNoNivel(u.id);
+              const pronto = meses >= NIVEIS[u.nivel].dur && u.nivel < 7;
+              const ur = regs.filter(r => r.estagiario===u.nome);
+              const st = statsOf(ur);
+              return (
+                <div key={u.id} className="user-card">
+                  {pronto && <div className="alert alert-promo" style={{marginBottom:12}}>⚠️ Pronto para promoção — {meses} meses no Nível {u.nivel}</div>}
+                  <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14}}>
+                    <div className={`user-avatar ${NIVEIS[u.nivel].cls}`}>{u.nome.charAt(0).toUpperCase()}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:700,fontSize:15}}>{u.nome}</div>
+                      <div style={{fontSize:12,color:'var(--text-muted)',margin:'3px 0'}}>{u.email}</div>
+                      {u.area==='clinico' && <><NivelBadge n={u.nivel}/> <span style={{fontSize:11,color:'var(--text-dim)',marginLeft:8}}>{meses} meses no nível</span></>}
+              {u.area==='marketing' && <span className="badge" style={{background:'#ec489920',color:'#ec4899',fontSize:12}}>📱 Marketing</span>}
+              {u.area==='comercial' && <span className="badge" style={{background:'#f59e0b20',color:'#f59e0b',fontSize:12}}>💼 Comercial</span>}
+              {(!u.area||u.area==='clinico') && u.area!=='marketing' && u.area!=='comercial' && u.area && false && null}
+              {(u.turno_inicio||u.turno_fim) && <span style={{fontSize:11,color:'var(--cyan)',marginLeft:8}}>🕐 {u.turno_inicio||'?'} → {u.turno_fim||'?'}</span>}
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                      <button className="btn btn-sm" style={{background:'var(--purple)',color:'#fff'}} onClick={()=>{setModalAval(u);setAvalComp({});setAvalObs('');setAvalRec('manter');setAvalMes(new Date().getMonth());setAvalAno(new Date().getFullYear());}}>⭐ Avaliar</button>
+                      <button className="btn btn-sm" style={{background:'var(--cyan)',color:'#fff'}} onClick={()=>gerarRelatorio(u)}>📄 Relatório</button>
+                      {u.nivel < 7 && <button className="btn btn-warn btn-sm" onClick={()=>promover(u.id,u.nivel)}>↑ Promover</button>}
+                      <button className="btn btn-danger btn-sm" onClick={()=>desativar(u.id)}>✕ Desativar</button>
+                    </div>
+                  </div>
+                  <div className="stat-grid" style={{gridTemplateColumns:'repeat(3,1fr)'}}>
+                    {[['Registros',st.n],['Atividades',st.tot],['Dias',st.dias]].map(([l,v])=>(
+                      <div key={l} className="stat-box"><div className="stat-num" style={{fontSize:18}}>{v}</div><div className="stat-lbl">{l}</div></div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </>}
+
+          {abaA==='dash' && <DashTab regs={regs} usuarios={usuarios} regsF={regsF} fMes={fMes} fAno={fAno} setFMes={setFMes} setFAno={setFAno} rankAtivs={rankAtivs} maxRank={maxRank} statsOf={statsOf}/>}
+
+          {abaA==='aval' && (() => {
+            const MESES_LABEL = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+            return (
+              <>
+                <div style={{marginBottom:20}}>
+                  <button className="btn" style={{background:'var(--purple)',color:'#fff'}} onClick={()=>{
+                    if(!usuarios.length){alert('Nenhum estagiário cadastrado');return;}
+                    setModalAval(usuarios[0]);setAvalComp({});setAvalObs('');setAvalRec('manter');
+                    setAvalMes(new Date().getMonth());setAvalAno(new Date().getFullYear());
+                  }}>⭐ Nova Avaliação Mensal</button>
+                </div>
+                {avaliacoes.length===0
+                  ? <div style={{textAlign:'center',padding:'60px 20px',color:'var(--text-dim)'}}>
+                      <div style={{fontSize:48,marginBottom:12}}>⭐</div>
+                      <div>Nenhuma avaliação registrada ainda</div>
+                    </div>
+                  : avaliacoes.map(av => {
+                      const mediaComp = av.comportamento ? +(Object.values(av.comportamento).reduce((s,v)=>s+(+v),0)/Object.values(av.comportamento).length).toFixed(1) : 0;
+                      const recCor = av.recomendacao==='promover'?'var(--green)':av.recomendacao==='atencao'?'var(--yellow)':'var(--accent)';
+                      const recLabel = av.recomendacao==='promover'?'↑ Promover':av.recomendacao==='atencao'?'⚠️ Atenção':'✓ Manter Nível';
+                      return (
+                        <div key={av.id} className="card card-hover" style={{marginBottom:10}}>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                            <div>
+                              <span style={{fontWeight:700,fontSize:14}}>{av.estagiario}</span>
+                              <span style={{fontSize:12,color:'var(--text-muted)',marginLeft:10}}>{MESES_LABEL[av.mes]}/{av.ano}</span>
+                            </div>
+                            <span style={{background:recCor,color:'#fff',borderRadius:8,padding:'3px 10px',fontSize:11,fontWeight:700}}>{recLabel}</span>
+                          </div>
+                          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:6,marginBottom:10}}>
+                            {COMP_ITEMS.map((item,i)=>(
+                              <div key={i} style={{background:'var(--bg-card2)',border:'1px solid var(--border)',borderRadius:6,padding:'6px 10px'}}>
+                                <div style={{fontSize:10,color:'var(--text-muted)',marginBottom:4}}>{item}</div>
+                                <div style={{display:'flex',gap:2}}>
+                                  {[1,2,3,4,5].map(n=>(
+                                    <span key={n} style={{fontSize:12,color:(av.comportamento?.[i]||0)>=n?'var(--yellow)':'var(--border)'}}>★</span>
+                                  ))}
+                                  <span style={{fontSize:11,fontWeight:700,marginLeft:4,color:'var(--text)'}}>{av.comportamento?.[i]||0}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                            <div style={{fontSize:12,color:'var(--text-muted)'}}>Média: <strong style={{color:'var(--yellow)'}}>{mediaComp} ★</strong> · Gestor: {av.gestor}</div>
+                          </div>
+                          {av.obs && <div className="obs-box" style={{marginTop:8}}>💬 {av.obs}</div>}
+                        </div>
+                      );
+                    })
+                }
+              </>
+            );
+          })()}
+
+          {abaA==='hist' && (() => {
+            return (
+              <>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:20}}>
+                  <div>
+                    <label className="inp-label">Estagiário</label>
+                    <select className="inp" value={fEst} onChange={e=>setFEst(e.target.value)}>
+                      <option value=''>Todos</option>
+                      {allNames.map(n=><option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="inp-label">Mês</label>
+                    <select className="inp" value={fMes} onChange={e=>setFMes(+e.target.value)}>
+                      {['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'].map((m,i)=><option key={i} value={i}>{m}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="inp-label">Ano</label>
+                    <select className="inp" value={fAno} onChange={e=>setFAno(+e.target.value)}>
+                      {[2024,2025,2026].map(y=><option key={y} value={y}>{y}</option>)}
+                    </select>
+                  </div>
+                </div>
+                {regsF.length===0
+                  ? <div style={{textAlign:'center',padding:'60px 20px',color:'var(--text-dim)'}}><div style={{fontSize:48,marginBottom:12}}>📋</div><div>Sem registros no período</div></div>
+                  : regsF.map(r => (
+                    <div key={r.id} className="card card-hover" style={{marginBottom:10}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                        <div>
+                          <span style={{fontWeight:700,fontSize:14}}>{r.estagiario}</span>
+                          <span style={{fontSize:12,color:'var(--text-muted)',marginLeft:10}}>{fmtDate(r.data)}</span>
+                          {(r.hora_entrada||r.hora_saida) && <span style={{fontSize:12,color:'var(--text-muted)',marginLeft:10}}>🕐 {r.hora_entrada||'--:--'} → {r.hora_saida||'--:--'}</span>}
+                        </div>
+                        <NivelBadge n={r.nivel}/>
+                      </div>
+                      <div className="ativs-grid">
+                        {(r.atividades||[]).map((a,i)=>(
+                          <div key={i} className="ativ-chip">
+                            <span style={{color:'var(--text-muted)'}}>{a.nome}: </span>
+                            <span style={{fontWeight:700,color:'var(--accent)'}}>{a.quantidade}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {r.obs && <div className="obs-box">💬 {r.obs}</div>}
+                    </div>
+                  ))
+                }
+              </>
+            );
+          })()}
+        </div>
+
+        {modalAval && (
+          <div className="overlay" onClick={()=>setModalAval(null)}>
+            <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:520}}>
+              <div className="modal-title">⭐ Avaliar — {modalAval.nome.split(' ')[0]}</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginBottom:16}}>
+                <div>
+                  <label className="inp-label">Estagiário</label>
+                  <select className="inp" value={modalAval.id} onChange={e=>setModalAval(usuarios.find(u=>u.id===e.target.value))}>
+                    {usuarios.map(u=><option key={u.id} value={u.id}>{u.nome.split(' ')[0]}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="inp-label">Mês</label>
+                  <select className="inp" value={avalMes} onChange={e=>setAvalMes(+e.target.value)}>
+                    {['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'].map((m,i)=><option key={i} value={i}>{m}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="inp-label">Ano</label>
+                  <select className="inp" value={avalAno} onChange={e=>setAvalAno(+e.target.value)}>
+                    {[2024,2025,2026].map(y=><option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="sec-label" style={{marginBottom:10}}>
+                <div style={{width:18,height:3,background:'var(--yellow)',borderRadius:2}}/>
+                Comportamento (1–5 estrelas)
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(210px,1fr))',gap:8,marginBottom:16}}>
+                {COMP_ITEMS.map((item,i)=>(
+                  <div key={i} className="card-sm">
+                    <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:8}}>{item}</div>
+                    <div className="stars">
+                      {[1,2,3,4,5].map(n=>(
+                        <button key={n} className={`star ${(avalComp[i]||0)>=n?'on':''}`} onClick={()=>setAvalComp(p=>({...p,[i]:n}))}>{n}</button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{marginBottom:14}}>
+                <label className="inp-label">Observação geral</label>
+                <textarea className="inp" value={avalObs} onChange={e=>setAvalObs(e.target.value)} rows={3} placeholder="Pontos fortes, áreas de melhoria, comportamento geral..." style={{resize:'vertical'}}/>
+              </div>
+              <div style={{marginBottom:20}}>
+                <label className="inp-label">Recomendação</label>
+                <div style={{display:'flex',gap:8}}>
+                  {[['manter','✓ Manter Nível','var(--accent)'],['promover','↑ Promover','var(--green)'],['atencao','⚠️ Atenção','var(--yellow)']].map(([v,l,c])=>(
+                    <button key={v} onClick={()=>setAvalRec(v)} style={{
+                      flex:1,padding:'10px 8px',borderRadius:8,border:'2px solid',cursor:'pointer',fontSize:12,fontWeight:700,
+                      borderColor: avalRec===v ? c : 'var(--border)',
+                      background: avalRec===v ? c+'22' : 'var(--bg-card2)',
+                      color: avalRec===v ? c : 'var(--text-muted)',
+                    }}>{l}</button>
+                  ))}
+                </div>
+              </div>
+              <div style={{display:'flex',gap:10}}>
+                <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModalAval(null)}>Cancelar</button>
+                <button className="btn" style={{flex:2,background:'var(--purple)',color:'#fff'}} onClick={salvarAvaliacao} disabled={busy}>
+                  {busy?'Salvando...':'⭐ Salvar Avaliação'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {modal==='cadastro' && (
+          <div className="overlay" onClick={()=>setModal(null)}>
+            <div className="modal" onClick={e=>e.stopPropagation()}>
+              <div className="modal-title">Novo Cadastro</div>
+              <Inp label="Nome Completo" value={nNome} onChange={e=>setNN(e.target.value)} placeholder="João Silva"/>
+              <Inp label="E-mail" type="email" value={nEmail} onChange={e=>setNE(e.target.value)} placeholder="joao@hoc.com.br"/>
+              <Inp label="Senha Temporária" type="password" value={nSenha} onChange={e=>setNS(e.target.value)} placeholder="Mínimo 8 caracteres"/>
+              <div style={{marginBottom:16}}>
+                <label className="inp-label">Tipo de Acesso</label>
+                <select className="inp" value={nTipo} onChange={e=>setNTipo(e.target.value)} style={{cursor:'pointer'}}>
+                  <option value="estagiario">Estagiário</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              {nTipo==='estagiario' && <>
+              <div style={{marginBottom:16}}>
+                <label className="inp-label">Área de Estágio</label>
+                <select className="inp" value={nArea} onChange={e=>setNArea(e.target.value)} style={{cursor:'pointer'}}>
+                  <option value="clinico">🦷 Clínico</option>
+                  <option value="marketing">📱 Marketing</option>
+                  <option value="comercial">💼 Comercial</option>
+                </select>
+              </div>
+              {nArea==='clinico' && <Sel label="Nível Inicial"
+                value={nNivel} onChange={e=>setNNv(e.target.value)}
+                options={Object.entries(NIVEIS).map(([k,v])=>[k,`Nível ${k} — ${v.nome}`])}/>
+              <div style={{marginBottom:16}}>
+                <label className="inp-label">Horário do Turno</label>
+                <div style={{display:'flex',gap:10,alignItems:'center'}}>
+                  <div style={{flex:1}}>
+                    <label style={{fontSize:11,color:'var(--text-muted)',display:'block',marginBottom:4}}>INÍCIO</label>
+                    <input type="time" className="inp" value={nTurnoI} onChange={e=>setNTI(e.target.value)}/>
+                  </div>
+                  <div style={{color:'var(--text-dim)',paddingTop:20}}>→</div>
+                  <div style={{flex:1}}>
+                    <label style={{fontSize:11,color:'var(--text-muted)',display:'block',marginBottom:4}}>FIM</label>
+                    <input type="time" className="inp" value={nTurnoF} onChange={e=>setNTF(e.target.value)}/>
+                  </div>
+                </div>
+              </div>
+              </>}
+              <div style={{display:'flex',gap:10,marginTop:4}}>
+                <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModal(null)}>Cancelar</button>
+                <button className="btn btn-success" style={{flex:1}} onClick={cadastrar} disabled={busy}>
+                  {busy?'Cadastrando...':'Cadastrar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return null;
 }
-}
 
-function render(){
-const app=document.getElementById('app');
-if(!user){
-app.innerHTML=`
-<div style="display:flex;align-items:center;justify-content:center;min-height:100vh">
-<div style="width:100%;max-width:400px">
-<div style="text-align:center;margin-bottom:32px">
-<h1 style="font-size:28px;font-weight:700">🏥 HOC v7.0</h1>
-<p style="color:rgba(255,255,255,0.6)">Clínica | Marketing | Comercial</p>
-</div>
-<div class="card">
-<input id="email" type="email" placeholder="Email">
-<input id="senha" type="password" placeholder="Senha">
-<button onclick="login()" style="width:100%">Entrar</button>
-</div>
-</div>
-</div>`;
-return;}
-
-const dept=DEPTS[user.dept];
-const ativs=ATIVS[user.dept][user.nivel]||ATIVS[user.dept][1];
-
-app.innerHTML=`
-<div class="header">
-<div>
-<h2>Olá, ${user.nome}!</h2>
-<span class="badge" style="background:${dept.cor}">${dept.emoji} ${dept.nome}</span>
-${user.dept==='clinica'?`<span style="margin-left:8px;color:rgba(255,255,255,0.6)">Nível ${user.nivel}</span>`:''}
-</div>
-<button onclick="logout()">Sair</button>
-</div>
-
-<div class="container">
-<div class="tabs">
-<button class="tab-btn active" onclick="mudarAba('reg')">📝 Registrar</button>
-<button class="tab-btn" onclick="mudarAba('hist')">📊 Histórico</button>
-</div>
-
-<div id="tab-reg" class="card">
-<h3 style="margin-bottom:16px">Registrar Atividades</h3>
-<label>Data</label>
-<input id="data" type="date">
-<label>Atividades (quantidade)</label>
-${ativs.map((a,i)=>`
-<div class="ativ-item">
-<div>
-<div style="font-weight:500">${a.n}</div>
-<div style="font-size:11px;color:rgba(255,255,255,0.5)">Meta: ${a.m}/mês</div>
-</div>
-<div style="display:flex;gap:4px">
-<button style="width:30px;padding:4px" onclick="altQtd(${i},-1)">−</button>
-<input class="qtd" type="number" value="0" min="0" style="width:40px;margin:0">
-<button style="width:30px;padding:4px" onclick="altQtd(${i},1)">+</button>
-</div>
-</div>
-`).join('')}
-<button onclick="saveReg()" style="width:100%;margin-top:16px">💾 Salvar</button>
-</div>
-
-<div id="tab-hist" class="card hidden">
-<h3>Histórico</h3>
-${registros.length===0?'<p style="color:rgba(255,255,255,0.6);margin-top:16px">Sem registros</p>':registros.map(r=>`
-<div style="background:rgba(255,255,255,0.05);padding:12px;border-radius:8px;margin-top:8px">
-<div style="font-weight:600">${r.data}</div>
-<div style="font-size:12px;color:rgba(255,255,255,0.6)">${r.user} - ${r.ativs.length} atividades</div>
-</div>
-`).join('')}
-</div>
-</div>`;
-
-document.getElementById('data').valueAsDate=new Date();
-}
-
-function mudarAba(aba){
-document.querySelectorAll('.card').forEach(e=>e.classList.add('hidden'));
-document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active'));
-if(aba==='reg'){document.getElementById('tab-reg').classList.remove('hidden');document.querySelectorAll('.tab-btn')[0].classList.add('active');}
-else{document.getElementById('tab-hist').classList.remove('hidden');document.querySelectorAll('.tab-btn')[1].classList.add('active');}
-}
-
-function altQtd(i,d){
-const inp=document.querySelectorAll('.qtd')[i];
-inp.value=Math.max(0,parseInt(inp.value)+d);
-}
-
-render();
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
-</body>
-</html>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(console.error);
+      });
+    }
+    </script>
+
+    </body>
+    </html>
