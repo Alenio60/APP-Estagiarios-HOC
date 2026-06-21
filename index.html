@@ -3,73 +3,193 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HOC - Sistema de Estagiários Completo v7.0</title>
+<title>HOC - Sistema de Estagiários v7.0</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Inter',system-ui,sans-serif;background:linear-gradient(135deg,#0a1628 0%,#1a2942 50%,#0a1628 100%);min-height:100vh;color:#fff}
-input,select,textarea,button{font-family:inherit}
-::-webkit-scrollbar{width:8px}
-::-webkit-scrollbar-track{background:#1a2942}
-::-webkit-scrollbar-thumb{background:#2d4a6f;border-radius:4px}
-.logo-hoc{max-width:280px;height:auto;margin:0 auto 20px;display:block}
-.hoc-card{background:rgba(255,255,255,0.05);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:32px;box-shadow:0 8px 32px rgba(0,0,0,0.3)}
-.hoc-input{width:100%;padding:14px 16px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;font-size:15px;outline:none;transition:all 0.2s}
-.hoc-input:focus{border-color:#4a9eff;background:rgba(255,255,255,0.1)}
-.hoc-input::placeholder{color:rgba(255,255,255,0.4)}
-.hoc-btn-primary{width:100%;padding:14px;background:linear-gradient(135deg,#4a9eff 0%,#2d7ad4 100%);border:none;border-radius:8px;color:#fff;font-size:16px;font-weight:600;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 12px rgba(74,158,255,0.3)}
-.hoc-btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(74,158,255,0.4)}
-.hoc-btn-primary:disabled{opacity:0.5;cursor:not-allowed;transform:none}
-.hoc-btn-secondary{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);padding:10px 20px;border-radius:8px;color:rgba(255,255,255,0.8);font-size:14px;cursor:pointer;transition:all 0.2s}
-.hoc-btn-success{background:linear-gradient(135deg,#10b981,#059669);border:none;padding:10px 20px;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-right:8px}
-.hoc-btn-warning{background:linear-gradient(135deg,#f59e0b,#d97706);border:none;padding:10px 20px;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-right:8px}
-.hoc-btn-danger{background:linear-gradient(135deg,#ef4444,#dc2626);border:none;padding:8px 16px;border-radius:8px;color:#fff;font-size:13px;font-weight:600;cursor:pointer}
-.hoc-btn-sm{padding:6px 12px;font-size:12px}
-.hoc-label{display:block;color:rgba(255,255,255,0.7);font-size:13px;font-weight:500;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px}
-.hoc-tag{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600}
-.hoc-header{background:rgba(0,0,0,0.3);backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,0.1);padding:16px 24px}
-.hoc-footer{text-align:center;padding:20px;color:rgba(255,255,255,0.4);font-size:12px}
-.stat-card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;text-align:center}
-.nivel-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600}
-.alert-promo{background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px}
-.loading{text-align:center;padding:40px;color:rgba(255,255,255,0.6)}
-.spinner{border:3px solid rgba(255,255,255,0.1);border-top:3px solid #4a9eff;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:0 auto}
-@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
-.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
-.modal-content{background:linear-gradient(135deg,#1e3a5f,#1a2942);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:32px;max-width:500px;width:100%;max-height:90vh;overflow-y:auto}
-.tab-btn{flex:1;padding:10px;border:none;border-radius:8px;background:transparent;color:rgba(255,255,255,0.6);font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s}
-.tab-btn.active{background:#4a9eff;color:#fff}
-.user-item{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;margin-bottom:12px}
-.biometric-icon{font-size:48px;text-align:center;margin:20px 0}
-.dept-badge{display:inline-block;padding:4px 10px;border-radius:16px;font-size:11px;font-weight:700;text-transform:uppercase}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #0a1628, #1a2942); min-height: 100vh; color: #fff; }
+.hoc-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; }
+.hoc-input { width: 100%; padding: 12px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; margin-bottom: 12px; }
+.hoc-btn-primary { width: 100%; padding: 12px; background: #4a9eff; border: none; border-radius: 8px; color: #fff; font-weight: 600; cursor: pointer; }
+.hoc-btn-primary:hover { background: #2d7ad4; }
+.hoc-header { background: rgba(0,0,0,0.3); padding: 16px 24px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.dept-badge { display: inline-block; padding: 4px 10px; border-radius: 16px; font-size: 11px; font-weight: 700; margin-right: 8px; }
+.tab-btn { padding: 10px 16px; background: transparent; border: none; color: rgba(255,255,255,0.6); font-weight: 600; cursor: pointer; margin-right: 8px; }
+.tab-btn.active { background: #4a9eff; color: #fff; border-radius: 8px; }
+.loading { text-align: center; padding: 40px; }
+.spinner { border: 3px solid rgba(255,255,255,0.1); border-top: 3px solid #4a9eff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.modal-content { background: #1a2942; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; max-width: 500px; width: 90%; }
+.stat-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px; text-align: center; margin-bottom: 12px; }
+.hoc-card-item { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const {useState,useEffect} = React;
-const {createClient} = supabase;
+const { useState, useEffect } = React;
+const { createClient } = supabase;
 
-const LOGO_HOC = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 280 80'%3E%3Crect fill='%234a9eff' x='10' y='20' width='50' height='40' rx='5'/%3E%3Ctext x='140' y='55' font-size='32' font-weight='bold' fill='%23fff' font-family='Arial'%3EHOC%3C/text%3E%3C/svg%3E";
-
-// Inicializar Supabase
 const supabaseUrl = 'https://jxqrntxwwxjkupvalyan.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4cXJudHh3d3hqa3VwdmFseWFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0ODExOTMsImV4cCI6MjA5MTA1NzE5M30.xYTfRyPCr6Jb-ltIJyH4LFW1g6W_s-huVAHQtfASyLI';
 const sb = createClient(supabaseUrl, supabaseKey);
 
-// DEPARTAMENTOS
 const DEPARTAMENTOS = {
-  clinica: {nome: "Clínica", emoji: "🦷", cor: "#4a9eff"},
-  marketing: {nome: "Marketing", emoji: "📱", cor: "#ec4899"},
-  comercial: {nome: "Comercial", emoji: "💼", cor: "#f59e0b"}
+  clinica: { nome: "Clínica", emoji: "🦷", cor: "#4a9eff" },
+  marketing: { nome: "Marketing", emoji: "📱", cor: "#ec4899" },
+  comercial: { nome: "Comercial", emoji: "💼", cor: "#f59e0b" }
 };
 
-// NIVEIS CLINICA
 const NIVEIS = {
-  1:{nome:"Introdução e Formação Básica",cor:"#4a9eff",emoji:"🧼",duracao:2},
-  2:{nome:"Suporte Clínico e Radiologia",cor:"#8b5cf6",emoj
+  1: { nome: "Nível 1", cor: "#4a9eff", duracao: 2 },
+  2: { nome: "Nível 2", cor: "#8b5cf6", duracao: 2 },
+  3: { nome: "Nível 3", cor: "#ec4899", duracao: 2 },
+  4: { nome: "Nível 4", cor: "#f59e0b", duracao: 2 },
+  5: { nome: "Nível 5", cor: "#10b981", duracao: 2 },
+  6: { nome: "Nível 6", cor: "#ef4444", duracao: 2 },
+  7: { nome: "Nível 7", cor: "#06b6d4", duracao: 2 }
+};
+
+function App() {
+  const [tela, setTela] = useState("login");
+  const [user, setUser] = useState(null);
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const fazerLogin = async () => {
+    if (!email || !senha) { alert("Preencha email e senha"); return; }
+    setLoading(true);
+    try {
+      const hash = CryptoJS.SHA256(senha).toString();
+      const { data } = await sb.from('usuarios').select('*').eq('email', email).eq('senha_hash', hash).eq('ativo', true).single();
+      if (data) {
+        setUser(data);
+        setTela(data.tipo === 'admin' ? 'admin' : 'est');
+      } else {
+        alert("Email ou senha incorretos");
+      }
+    } catch (err) {
+      alert("Erro ao fazer login");
+      console.error(err);
+    }
+    setLoading(false);
+  };
+
+  // TELA LOGIN
+  if (tela === "login") {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+        <div style={{ width: "100%", maxWidth: "420px" }}>
+          <div style={{ textAlign: "center", marginBottom: "32px" }}>
+            <h1 style={{ fontSize: "28px", fontWeight: "700", marginBottom: "8px" }}>🏥 HOC Estagiários</h1>
+            <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "14px" }}>v7.0 - Clínica + Marketing + Comercial</p>
+          </div>
+          <div className="hoc-card">
+            <input 
+              className="hoc-input" 
+              value={email} 
+              onChange={e => setEmail(e.target.value)} 
+              onKeyDown={e => e.key === "Enter" && fazerLogin()} 
+              placeholder="Email"
+              type="email"
+            />
+            <input 
+              className="hoc-input" 
+              value={senha} 
+              onChange={e => setSenha(e.target.value)} 
+              onKeyDown={e => e.key === "Enter" && fazerLogin()} 
+              placeholder="Senha"
+              type="password"
+            />
+            <button className="hoc-btn-primary" onClick={fazerLogin} disabled={loading}>
+              {loading ? "Entrando..." : "Entrar"}
+            </button>
+          </div>
+          <div style={{ textAlign: "center", padding: "20px", fontSize: "12px", color: "rgba(255,255,255,0.4)" }}>
+            HOC Hospital Odontológico
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // TELA ESTAGIÁRIO
+  if (tela === "est" && user) {
+    const deptInfo = DEPARTAMENTOS[user.departamento];
+    return (
+      <div style={{ minHeight: "100vh" }}>
+        <div className="hoc-header">
+          <div style={{ maxWidth: "900px", margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <h2 style={{ fontSize: "18px", fontWeight: "600" }}>Olá, {user.nome}!</h2>
+              <span className="dept-badge" style={{ background: deptInfo.cor, color: "#fff" }}>
+                {deptInfo.emoji} {deptInfo.nome}
+              </span>
+              {user.departamento === "clinica" && <span style={{ marginLeft: "8px", fontSize: "13px", color: "rgba(255,255,255,0.6)" }}>Nível {user.nivel}</span>}
+            </div>
+            <button style={{ padding: "8px 16px", background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", borderRadius: "8px", cursor: "pointer" }} onClick={() => { setUser(null); setTela("login"); }}>
+              Sair
+            </button>
+          </div>
+        </div>
+        <div style={{ maxWidth: "900px", margin: "0 auto", padding: "24px 20px" }}>
+          <div className="stat-card">
+            <div style={{ fontSize: "24px", fontWeight: "700", color: deptInfo.cor }}>📋</div>
+            <div style={{ fontSize: "14px", color: "rgba(255,255,255,0.6)" }}>Sistema de Registro</div>
+            <div style={{ fontSize: "12px", marginTop: "8px", color: "rgba(255,255,255,0.5)" }}>Registre suas atividades diárias aqui</div>
+          </div>
+          <div className="hoc-card-item">
+            <p>✅ Sistema carregado com sucesso!</p>
+            <p style={{ marginTop: "8px", fontSize: "13px", color: "rgba(255,255,255,0.6)" }}>Departamento: {deptInfo.nome}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // TELA ADMIN
+  if (tela === "admin" && user) {
+    return (
+      <div style={{ minHeight: "100vh" }}>
+        <div className="hoc-header">
+          <div style={{ maxWidth: "1100px", margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h2 style={{ fontSize: "18px", fontWeight: "600" }}>🏥 Painel Administrativo</h2>
+            <button style={{ padding: "8px 16px", background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", borderRadius: "8px", cursor: "pointer" }} onClick={() => { setUser(null); setTela("login"); }}>
+              Sair
+            </button>
+          </div>
+        </div>
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "24px 20px" }}>
+          <button className="tab-btn active">👥 Estagiários</button>
+          <button className="tab-btn">🎯 Metas</button>
+          <button className="tab-btn">📋 Histórico</button>
+          <div style={{ marginTop: "24px" }}>
+            <div className="hoc-card-item">
+              <p>✅ Painel Administrativo Carregado!</p>
+              <p style={{ marginTop: "8px", fontSize: "13px", color: "rgba(255,255,255,0.6)" }}>Versão 7.0 - Com suporte a Clínica, Marketing e Comercial</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="loading">
+      <div className="spinner"></div>
+      <p style={{ marginTop: "20px" }}>Carregando...</p>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
