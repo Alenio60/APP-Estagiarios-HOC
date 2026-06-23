@@ -17,6 +17,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
 <script>
@@ -198,13 +199,27 @@ const ATIVIDADES_MARKETING = [
 ];
 
 const ATIVIDADES_COMERCIAL = [
-  {id:"clead",n:"Leads enviados",cat:"Prospecção"},
-  {id:"cmsg",n:"Mensagens respondidas",cat:"Atendimento"},
-  {id:"ctel",n:"Telefonemas feitos",cat:"Atendimento"},
-  {id:"cagc",n:"Agendamentos confirmados",cat:"Conversão"},
-  {id:"cagx",n:"Agendamentos cancelados",cat:"Conversão"},
-  {id:"cvie",n:"Pacientes que vieram",cat:"Conversão"},
-  {id:"cconv",n:"Conversão obtida",cat:"Conversão"},
+  // Leads por tipo
+  {id:"clea_part",n:"Leads Particular",cat:"Leads por Tipo"},
+  {id:"clea_conv",n:"Leads Convênio",cat:"Leads por Tipo"},
+  {id:"clea_intg",n:"Leads HOC Integra",cat:"Leads por Tipo"},
+  // Atendimentos
+  {id:"cat_pass",n:"Atendimento Passivo (lead ligou)",cat:"Atendimentos"},
+  {id:"cat_ativ",n:"Atendimento Ativo (estagiário ligou)",cat:"Atendimentos"},
+  {id:"cat_agnd",n:"Agendou no atendimento",cat:"Atendimentos"},
+  // Contatos ex-pacientes
+  {id:"cex_coro",n:"Contato ex-paciente — Coroa",cat:"Contatos Ex-Pacientes"},
+  {id:"cex_impl",n:"Contato ex-paciente — Implante",cat:"Contatos Ex-Pacientes"},
+  {id:"cex_limp",n:"Contato ex-paciente — Limpeza",cat:"Contatos Ex-Pacientes"},
+  {id:"cex_clar",n:"Contato ex-paciente — Clareamento",cat:"Contatos Ex-Pacientes"},
+  {id:"cex_rest",n:"Contato ex-paciente — Restauração",cat:"Contatos Ex-Pacientes"},
+  {id:"cex_endo",n:"Contato ex-paciente — Endodontia",cat:"Contatos Ex-Pacientes"},
+  {id:"cex_prot",n:"Contato ex-paciente — Prótese",cat:"Contatos Ex-Pacientes"},
+  // Resultados
+  {id:"cres_agnd",n:"Resultado — Agendou",cat:"Resultados"},
+  {id:"cres_int",n:"Resultado — Interessado",cat:"Resultados"},
+  {id:"cres_des",n:"Resultado — Desistiu",cat:"Resultados"},
+  {id:"cres_nao",n:"Resultado — Não atendeu",cat:"Resultados"},
 ];
 
 const COMP_ITEMS = ["Pontualidade","Uniforme/EPI","Postura profissional","Dedicação","Relacionamento equipe","Postura c/ pacientes","Iniciativa"];
@@ -853,6 +868,133 @@ function GuiaTab({user}) {
   );
 }
 
+
+function ComercialDash({regs, user}) {
+  const {useState: uS, useEffect: uE, useRef} = React;
+  const [periodo, setPeriodo] = uS('hoje');
+  const [dtI, setDtI] = uS(new Date().toISOString().split('T')[0]);
+  const [dtF, setDtF] = uS(new Date().toISOString().split('T')[0]);
+  const chartLeadsRef = useRef(null);
+  const chartAtRef   = useRef(null);
+  const chartExRef   = useRef(null);
+  const chartResRef  = useRef(null);
+  const chartsRef    = useRef({});
+
+  const getRangeStr = () => {
+    const hoje = new Date();
+    if (periodo==='hoje') {
+      const d = hoje.toISOString().split('T')[0];
+      return {ini:d, fim:d};
+    }
+    if (periodo==='semana') {
+      const ini = new Date(hoje); ini.setDate(hoje.getDate()-hoje.getDay());
+      const fim = new Date(hoje); fim.setDate(ini.getDate()+6);
+      return {ini:ini.toISOString().split('T')[0], fim:fim.toISOString().split('T')[0]};
+    }
+    if (periodo==='mes') {
+      const ini = new Date(hoje.getFullYear(),hoje.getMonth(),1);
+      const fim = new Date(hoje.getFullYear(),hoje.getMonth()+1,0);
+      return {ini:ini.toISOString().split('T')[0], fim:fim.toISOString().split('T')[0]};
+    }
+    return {ini:dtI, fim:dtF};
+  };
+
+  const range = getRangeStr();
+  const regsP = regs.filter(r => r.estagiario===user.nome && r.data>=range.ini && r.data<=range.fim);
+
+  const soma = (ids) => regsP.reduce((s,r)=>s+(r.atividades||[]).filter(a=>ids.includes(a.id)).reduce((x,a)=>x+a.quantidade,0),0);
+
+  const totalLeads    = soma(['clea_part','clea_conv','clea_intg']);
+  const totalAtend    = soma(['cat_pass','cat_ativ']);
+  const totalAgnd     = soma(['cat_agnd','cres_agnd']);
+  const totalEx       = soma(['cex_coro','cex_impl','cex_limp','cex_clar','cex_rest','cex_endo','cex_prot']);
+  const conv          = totalLeads>0 ? ((totalAgnd/totalLeads)*100).toFixed(1) : 0;
+
+  const dias = periodo==='hoje'?1:periodo==='semana'?7:periodo==='mes'?30:
+    Math.max(1,Math.round((new Date(dtF)-new Date(dtI))/(1000*60*60*24))+1);
+  const metaAgnd  = dias*5;
+  const metaEx    = dias*40;
+
+  const mkChart = (ref, key, type, labels, data, colors) => {
+    if (!ref.current) return;
+    if (chartsRef.current[key]) chartsRef.current[key].destroy();
+    chartsRef.current[key] = new Chart(ref.current, {
+      type, data:{labels, datasets:[{data, backgroundColor:colors, borderWidth:0}]},
+      options:{responsive:true, plugins:{legend:{position:'bottom', labels:{color:'#6b8aaa',font:{size:11}}}}}
+    });
+  };
+
+  uE(() => {
+    mkChart(chartLeadsRef,'leads','doughnut',
+      ['Particular','Convênio','HOC Integra'],
+      [soma(['clea_part']),soma(['clea_conv']),soma(['clea_intg'])],
+      ['#3b82f6','#8b5cf6','#10b981']);
+    mkChart(chartAtRef,'at','bar',
+      ['Passivo','Ativo','Agendou'],
+      [soma(['cat_pass']),soma(['cat_ativ']),soma(['cat_agnd'])],
+      ['#06b6d4','#f59e0b','#10b981']);
+    mkChart(chartExRef,'ex','bar',
+      ['Coroa','Implante','Limpeza','Clareamento','Restauração','Endodontia','Prótese'],
+      ['cex_coro','cex_impl','cex_limp','cex_clar','cex_rest','cex_endo','cex_prot'].map(id=>soma([id])),
+      ['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#ef4444','#06b6d4']);
+    mkChart(chartResRef,'res','doughnut',
+      ['Agendou','Interessado','Desistiu','Não atendeu'],
+      [soma(['cres_agnd']),soma(['cres_int']),soma(['cres_des']),soma(['cres_nao'])],
+      ['#10b981','#f59e0b','#ef4444','#6b8aaa']);
+  }, [regsP.length, periodo, dtI, dtF]);
+
+  const KPI = ({label,val,meta,cor}) => {
+    const pct = meta>0?Math.min(100,Math.round((val/meta)*100)):0;
+    const status = pct>=80?'✅':pct>=50?'⚠️':'❌';
+    return (
+      <div className="stat-box" style={{borderColor:cor+'44'}}>
+        <div style={{fontSize:20,marginBottom:4}}>{status}</div>
+        <div className="stat-num" style={{color:cor,fontSize:20}}>{val}</div>
+        <div className="stat-lbl">{label}</div>
+        {meta>0 && <div style={{fontSize:10,color:'var(--text-dim)',marginTop:4}}>{pct}% da meta ({meta})</div>}
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      {/* Filtro de período */}
+      <div style={{display:'flex',gap:6,marginBottom:20,flexWrap:'wrap'}}>
+        {[['hoje','Hoje'],['semana','Semana'],['mes','Mês'],['custom','Customizado']].map(([v,l])=>(
+          <button key={v} onClick={()=>setPeriodo(v)} className="btn btn-sm" style={{
+            background:periodo===v?'var(--accent)':'var(--bg-card2)',
+            color:periodo===v?'#fff':'var(--text-muted)',
+            border:`1px solid ${periodo===v?'var(--accent)':'var(--border)'}`,
+          }}>{l}</button>
+        ))}
+        {periodo==='custom' && (
+          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            <input type="date" className="inp" value={dtI} onChange={e=>setDtI(e.target.value)} style={{width:'auto'}}/>
+            <span style={{color:'var(--text-dim)'}}>→</span>
+            <input type="date" className="inp" value={dtF} onChange={e=>setDtF(e.target.value)} style={{width:'auto'}}/>
+          </div>
+        )}
+      </div>
+
+      {/* KPIs */}
+      <div className="stat-grid" style={{marginBottom:20}}>
+        <KPI label="Agendamentos" val={totalAgnd} meta={metaAgnd} cor="var(--green)"/>
+        <KPI label="Ex-Pacientes" val={totalEx} meta={metaEx} cor="var(--cyan)"/>
+        <KPI label="Total Leads" val={totalLeads} meta={0} cor="var(--accent)"/>
+        <KPI label="Conversão" val={conv+'%'} meta={0} cor="var(--yellow)"/>
+      </div>
+
+      {/* Gráficos */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:16,marginBottom:20}}>
+        <div className="card"><div className="sec-label">🎯 Leads por Tipo</div><canvas ref={chartLeadsRef}/></div>
+        <div className="card"><div className="sec-label">📞 Atendimentos</div><canvas ref={chartAtRef}/></div>
+        <div className="card"><div className="sec-label">👥 Ex-Pacientes por Tratamento</div><canvas ref={chartExRef}/></div>
+        <div className="card"><div className="sec-label">📊 Resultados</div><canvas ref={chartResRef}/></div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [tela, setTela]     = useState('login');
   const [user, setUser]     = useState(null);
@@ -1309,7 +1451,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v6.9 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v7.0 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -1396,11 +1538,15 @@ function App() {
           <div className="tabs" style={{marginBottom:20}}>
             {(user.area==='clinico'||!user.area
               ? [['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas'],['guia','📚 Guia']]
+              : user.area==='comercial'
+              ? [['dash','📊 Dashboard'],['reg','📝 Registrar'],['hist','📋 Histórico']]
               : [['reg','📝 Registrar'],['hist','📊 Histórico']]
             ).map(([k,l]) => (
               <button key={k} className={`tab ${aba===k?'active':''}`} onClick={()=>setAba(k)}>{l}</button>
             ))}
           </div>
+
+          {aba==='dash' && user.area==='comercial' && <ComercialDash regs={regs} user={user}/>}
 
           {aba==='reg' && <>
             {user.area==='marketing' && <div className="alert alert-info" style={{marginBottom:16}}>📱 Estagiário de Marketing</div>}
