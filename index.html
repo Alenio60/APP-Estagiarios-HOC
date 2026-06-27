@@ -1188,7 +1188,19 @@ function App() {
     setBusy(false);
   };
 
-  useEffect(() => { carregar(); }, []);
+  useEffect(() => {
+    carregar();
+    // Restaurar sessão salva
+    try {
+      const sessao = localStorage.getItem('hoc_sessao');
+      if (sessao) {
+        const u = JSON.parse(sessao);
+        setUser(u);
+        setTela(u.tipo === 'admin' ? 'admin' : 'est');
+        if (u.tipo === 'estagiario') agendarAlertas(u);
+      }
+    } catch(e) {}
+  }, []);
 
   const login = async () => {
     if (!email || !senha) { setErr('Preencha e-mail e senha'); return; }
@@ -1200,6 +1212,7 @@ function App() {
       setUser(data);
       setTela(data.tipo === 'admin' ? 'admin' : 'est');
       if (data.tipo === 'estagiario') agendarAlertas(data);
+      try { localStorage.setItem('hoc_sessao', JSON.stringify(data)); } catch(e) {}
     } else setErr('E-mail ou senha incorretos');
     setBusy(false);
   };
@@ -1265,6 +1278,7 @@ function App() {
       setUser(data[0]);
       setTela('est');
       agendarAlertas(data[0]);
+      try { localStorage.setItem('hoc_sessao', JSON.stringify(data[0])); } catch(e) {}
       setCNome(''); setCEmail(''); setCSenha(''); setCSenha2(''); setCNivel(1); setCArea('clinico'); setCTurnoI('08:00'); setCTurnoF('17:00');
       carregar();
     } else {
@@ -1288,6 +1302,8 @@ function App() {
     await sb.from('usuarios').update({nivel:n+1}).eq('id',id);
     alert(`✅ Promovido para Nível ${n+1}`);
     carregar();
+    // Atualizar sessão se for o próprio usuário logado
+    try { const s=localStorage.getItem('hoc_sessao'); if(s){const u=JSON.parse(s); if(u.id===id){u.nivel=n+1; localStorage.setItem('hoc_sessao',JSON.stringify(u));}} } catch(e) {}
   };
 
   const salvarAvaliacao = async () => {
@@ -1576,7 +1592,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v7.3 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v7.4 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -1607,7 +1623,7 @@ function App() {
             <NivelBadge n={user.nivel}/>
             {(user.turno_inicio||user.turno_fim) && <span style={{fontSize:12,color:'var(--cyan)'}}>🕐 {user.turno_inicio||'?'}→{user.turno_fim||'?'}</span>}
             <span style={{fontSize:13,color:'var(--text-muted)'}}>{user.nome.split(' ')[0]}</span>
-            <button className="btn btn-ghost btn-sm" onClick={()=>{setTela('login'); setModoTela('login');}}>Sair</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{setTela('login'); setModoTela('login'); try{localStorage.removeItem('hoc_sessao');}catch(e){};}}>Sair</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>gerarRelatorio(user)}>📄 Relatório</button>
           </div>
         </div>
@@ -1846,7 +1862,7 @@ function App() {
           </div>
           <div style={{display:'flex',gap:10}}>
             <button className="btn btn-ghost btn-sm" onClick={carregar}>🔄</button>
-            <button className="btn btn-ghost btn-sm" onClick={()=>{setTela('login'); setModoTela('login');}}>Sair</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{setTela('login'); setModoTela('login'); try{localStorage.removeItem('hoc_sessao');}catch(e){};}}>Sair</button>
           </div>
         </div>
 
