@@ -1027,6 +1027,7 @@ function App() {
   const [cErr, setCErr]     = useState('');
 
   const [qtds, setQtds]     = useState({});
+  const [nivelReg, setNivelReg] = useState(null); // null = usa nível atual
   const [comp, setComp]     = useState({});
   const [obsD, setObs]      = useState('');
   const [dt, setDt]         = useState(new Date().toISOString().split('T')[0]);
@@ -1345,12 +1346,12 @@ function App() {
     if (!ativs.length) { alert('Registre ao menos uma atividade'); return; }
     setBusy(true);
     const {data,error} = await sb.from('registros').insert([{
-      data:dt, estagiario:user.nome, nivel:user.nivel, area:user.area||'clinico', atividades:ativs,
+      data:dt, estagiario:user.nome, nivel:nivelReg||user.nivel, area:user.area||'clinico', atividades:ativs,
       obs:obsD, hora_entrada:hrEntrada||null, hora_saida:hrSaida||null, created_at:new Date().toISOString()
     }]).select();
     if (!error) {
       setRegs([data[0],...regs]);
-      setQtds({}); setObs(''); setHrEntrada(''); setHrSaida('');
+      setQtds({}); setObs(''); setHrEntrada(''); setHrSaida(''); setNivelReg(null);
       alert('✅ Registro salvo!');
     } else alert('Erro ao salvar: ' + error.message);
     setBusy(false);
@@ -1451,7 +1452,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v7.0 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v7.1 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -1551,6 +1552,24 @@ function App() {
           {aba==='reg' && <>
             {user.area==='marketing' && <div className="alert alert-info" style={{marginBottom:16}}>📱 Estagiário de Marketing</div>}
             {user.area==='comercial' && <div className="alert" style={{background:'#f59e0b18',border:'1px solid #f59e0b40',color:'#fbbf24',marginBottom:16}}>💼 Estagiário Comercial</div>}
+            {(user.area==='clinico'||!user.area) && user.nivel > 1 && (
+              <div style={{marginBottom:16,background:'var(--bg-card2)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 14px'}}>
+                <label className="inp-label" style={{marginBottom:8}}>Registrar atividades do nível:</label>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                  {Array.from({length:user.nivel},(_,i)=>i+1).map(n=>(
+                    <button key={n} onClick={()=>setNivelReg(nivelReg===n&&n===user.nivel?null:n)}
+                      className="btn btn-sm"
+                      style={{
+                        background:(nivelReg||user.nivel)===n?NIVEIS[n].cor.replace('var(','').replace(')',''):'var(--bg-card)',
+                        color:(nivelReg||user.nivel)===n?'#fff':'var(--text-muted)',
+                        border:`1px solid ${(nivelReg||user.nivel)===n?'transparent':'var(--border)'}`,
+                      }}>
+                      {NIVEIS[n].emoji} N{n}{n===user.nivel?' (atual)':''}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20,flexWrap:'wrap'}}>
               <label className="inp-label" style={{margin:0}}>Data:</label>
               <input type="date" className="inp" value={dt} onChange={e=>setDt(e.target.value)} style={{width:'auto'}}/>
@@ -1561,9 +1580,10 @@ function App() {
             </div>
 
             {(() => {
+              const nivelAtivo = (user.area==='clinico'||!user.area) ? (nivelReg||user.nivel) : user.nivel;
               const listaAtivs = user.area==='marketing' ? ATIVIDADES_MARKETING :
                                  user.area==='comercial' ? ATIVIDADES_COMERCIAL :
-                                 ATIVIDADES[user.nivel]||[];
+                                 ATIVIDADES[nivelAtivo]||[];
               const catMap = listaAtivs.reduce((acc,a)=>{if(!acc[a.cat])acc[a.cat]=[];acc[a.cat].push(a);return acc},{});
               return Object.entries(catMap).map(([cat,ativs]) => (
               <div key={cat} style={{marginBottom:20}}>
