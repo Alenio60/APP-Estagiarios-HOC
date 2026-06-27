@@ -86,8 +86,8 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .btn-sm{padding:6px 12px;font-size:12px}
 .btn-link{background:none;border:none;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;padding:0}
 .btn-link:hover{text-decoration:underline}
-.tabs{display:flex;gap:4px;background:var(--bg-card2);padding:4px;border-radius:var(--radius-sm);border:1px solid var(--border)}
-.tab{flex:1;padding:10px 12px;border:none;border-radius:6px;background:transparent;color:var(--text-muted);font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;text-align:center}
+.tabs{display:flex;gap:4px;background:var(--bg-card2);padding:4px;border-radius:var(--radius-sm);border:1px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tab{flex:shrink;padding:10px 12px;border:none;border-radius:6px;background:transparent;color:var(--text-muted);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;text-align:center;white-space:nowrap;min-width:fit-content}
 .tab.active{background:var(--accent);color:#fff;box-shadow:0 2px 8px var(--accent-glow)}
 .badge{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700}
 .tag{display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600}
@@ -1592,7 +1592,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v7.4 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v7.5 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
