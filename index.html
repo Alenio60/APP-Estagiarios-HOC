@@ -173,13 +173,98 @@ const NIVEIS = {
 };
 
 const ATIVIDADES = {
-  1:[{id:"lav",n:"Lavagem de materiais",cat:"Esterilização",meta:20},{id:"sec",n:"Secagem de materiais",cat:"Esterilização",meta:20},{id:"emb",n:"Embalagem de instrumentos",cat:"Esterilização",meta:15},{id:"aut",n:"Monitorização de autoclaves",cat:"Esterilização",meta:5},{id:"val",n:"Controle de validade",cat:"Esterilização",meta:10},{id:"limp",n:"Limpeza das clínicas",cat:"Organização",meta:10},{id:"gess",n:"Vazamento modelos gesso",cat:"Laboratório",meta:5},{id:"alg",n:"Moldagens com alginato",cat:"Laboratório",meta:5},{id:"cort",n:"Corte/acabamento modelos",cat:"Laboratório",meta:5},{id:"apos",n:"Estudo Apostila HOC",cat:"Conhecimento",meta:8}],
-  2:[{id:"pan",n:"RX Panorâmico",cat:"Radiologia",meta:10},{id:"peri",n:"Periapical digital/manual",cat:"Radiologia",meta:8},{id:"dio",n:"Plataforma DIO",cat:"Radiologia",meta:5},{id:"kit",n:"Montagem mesa clínica",cat:"Clínica",meta:15},{id:"inst",n:"Preparo de pacientes",cat:"Clínica",meta:10},{id:"ctrl",n:"Controle Odonto/agenda",cat:"Clínica",meta:8},{id:"rec",n:"Receitas e medicamentos",cat:"Clínica",meta:5},{id:"wpp",n:"WhatsApp pré/pós-op",cat:"Clínica",meta:8},{id:"obs2",n:"Observação procedimentos",cat:"Clínica",meta:8}],
-  3:[{id:"omat",n:"Materiais ortodontia",cat:"Ortodontia",meta:10},{id:"oaux",n:"Auxílio atendimentos",cat:"Ortodontia",meta:8},{id:"oapa",n:"Aparelhos fixos/removíveis",cat:"Ortodontia",meta:5},{id:"omol",n:"Moldagem para placas",cat:"Placas",meta:8},{id:"ovaz",n:"Vazamento modelos",cat:"Placas",meta:8},{id:"opla",n:"Fabricação placas",cat:"Placas",meta:6},{id:"ocon",n:"Controle placas",cat:"Placas",meta:5},{id:"oali",n:"Placas alinhadores",cat:"Placas",meta:4},{id:"ocla",n:"Placas clareamento",cat:"Placas",meta:4}],
-  4:[{id:"pedo",n:"Odontopediatria",cat:"Odontopediatria",meta:8},{id:"exde",n:"Exodontia decíduos",cat:"Odontopediatria",meta:5},{id:"ende",n:"Endodontia decíduos",cat:"Odontopediatria",meta:4},{id:"cape",n:"CAPE",cat:"CAPE",meta:6},{id:"cmon",n:"Montagem mesa cirúrgica",cat:"Cirurgia",meta:8},{id:"cexo",n:"Exodontias simples",cat:"Cirurgia",meta:6},{id:"crea",n:"Reaberturas implantes",cat:"Cirurgia",meta:4},{id:"ccom",n:"Cirurgias complexas",cat:"Cirurgia",meta:3},{id:"eqp",n:"Manutenção equipos",cat:"Equipamentos",meta:4},{id:"vac",n:"Bombas vácuo/compressor",cat:"Equipamentos",meta:4}],
-  5:[{id:"cuni",n:"Componentes unitários",cat:"Implantodontia",meta:8},{id:"cpro",n:"Protocolo/barra",cat:"Implantodontia",meta:5},{id:"cmol",n:"Moldagem avançada",cat:"Implantodontia",meta:5},{id:"crea2",n:"Materiais reaberturas",cat:"Implantodontia",meta:6},{id:"rout",n:"Controle próteses",cat:"Prótese",meta:8},{id:"rpla",n:"Planilha próteses",cat:"Prótese",meta:5},{id:"rage",n:"Agenda protesistas",cat:"Prótese",meta:5},{id:"estq",n:"Controle estoque",cat:"Gestão",meta:8},{id:"comp",n:"Solicitação compras",cat:"Gestão",meta:5}],
-  6:[{id:"ginv",n:"Atualização inventário",cat:"Estoque",meta:8},{id:"gval",n:"Controle validade",cat:"Estoque",meta:6},{id:"grep",n:"Reposição materiais",cat:"Estoque",meta:5},{id:"gfor",n:"Comunicação fornecedores",cat:"Fornecedores",meta:5},{id:"gqua",n:"Fiscalização entregas",cat:"Fornecedores",meta:4},{id:"gflu",n:"Verificação fluxos",cat:"Operacional",meta:6},{id:"gpro",n:"Padronização protocolos",cat:"Operacional",meta:4},{id:"grel",n:"Relatórios admin",cat:"Operacional",meta:4}],
-  7:[{id:"scan",n:"Escaneamento Medit",cat:"Digital",meta:8},{id:"exoc",n:"Design Exocad",cat:"Digital",meta:6},{id:"medt",n:"Planejamento Medit",cat:"Digital",meta:6},{id:"dcor",n:"Desenho coroas",cat:"Digital",meta:5},{id:"dpla",n:"Placas miorrelaxantes",cat:"Digital",meta:5},{id:"imp3",n:"Impressão 3D",cat:"Digital",meta:5},{id:"acab",n:"Acabamento trabalhos",cat:"Digital",meta:5},{id:"dent",n:"DentistaOn",cat:"Digital",meta:4}],
+  1:[
+    {id:"lav",n:"Lavagem e esterilização de materiais",cat:"Esterilização",meta:20,freq:"Diário"},
+    {id:"sec",n:"Secagem de materiais",cat:"Esterilização",meta:20,freq:"Diário"},
+    {id:"emb",n:"Embalagem de instrumentos",cat:"Esterilização",meta:15,freq:"Diário"},
+    {id:"aut",n:"Monitorização de autoclaves",cat:"Esterilização",meta:5,freq:"Diário"},
+    {id:"val",n:"Controle de validade",cat:"Esterilização",meta:10,freq:"Diário"},
+    {id:"agua_m",n:"Colocar água para destilar (manhã)",cat:"Esterilização",meta:20,freq:"Diário"},
+    {id:"agua_t",n:"Colocar água para destilar (tarde)",cat:"Esterilização",meta:20,freq:"Diário"},
+    {id:"fita",n:"Monitorar fita indicadora das autoclaves",cat:"Esterilização",meta:5,freq:"Diário"},
+    {id:"cicbio",n:"Monitorar ciclo biológico das autoclaves",cat:"Esterilização",meta:4,freq:"Semanal"},
+    {id:"limp_aut",n:"Limpeza semanal da autoclave",cat:"Esterilização",meta:4,freq:"Semanal"},
+    {id:"dest",n:"Limpeza da Destiladora",cat:"Esterilização",meta:2,freq:"Quinzenal"},
+    {id:"venc",n:"Verificar vencimento dos instrumentais",cat:"Esterilização",meta:1,freq:"Mensal"},
+    {id:"limp",n:"Limpeza das clínicas",cat:"Organização",meta:20,freq:"Diário"},
+    {id:"fisc",n:"Fiscalização de instrumental",cat:"Organização",meta:20,freq:"Diário"},
+    {id:"gess",n:"Vazamento modelos gesso",cat:"Laboratório",meta:5,freq:"Eventual"},
+    {id:"alg",n:"Moldagens com alginato",cat:"Laboratório",meta:5,freq:"Eventual"},
+    {id:"cort",n:"Corte/acabamento modelos",cat:"Laboratório",meta:5,freq:"Eventual"},
+    {id:"apos",n:"Estudo Apostila HOC",cat:"Conhecimento",meta:8,freq:"Semanal"},
+  ],
+  2:[
+    {id:"pan",n:"RX Panorâmico",cat:"Radiologia",meta:10,freq:"Diário"},
+    {id:"peri",n:"Periapical digital/manual",cat:"Radiologia",meta:8,freq:"Eventual"},
+    {id:"dio",n:"Plataforma DIO",cat:"Radiologia",meta:5,freq:"Eventual"},
+    {id:"kit",n:"Montagem mesa clínica",cat:"Clínica",meta:15,freq:"Diário"},
+    {id:"inst",n:"Preparo de pacientes",cat:"Clínica",meta:10,freq:"Diário"},
+    {id:"ctrl",n:"Controle Odonto/agenda",cat:"Clínica",meta:8,freq:"Diário"},
+    {id:"rec",n:"Receitas e medicamentos",cat:"Clínica",meta:5,freq:"Eventual"},
+    {id:"wpp",n:"WhatsApp pré/pós-op",cat:"Clínica",meta:8,freq:"Diário"},
+    {id:"obs2",n:"Observação procedimentos",cat:"Clínica",meta:8,freq:"Diário"},
+    {id:"equip23",n:"Verificação equipos 02, 03 e CAPE",cat:"Equipamentos",meta:4,freq:"Semanal"},
+    {id:"equip1",n:"Verificação equipos 01",cat:"Equipamentos",meta:4,freq:"Semanal"},
+    {id:"agcir",n:"Agenda cirurgia",cat:"Clínica",meta:20,freq:"Diário"},
+  ],
+  3:[
+    {id:"omat",n:"Materiais ortodontia",cat:"Ortodontia",meta:10,freq:"Diário"},
+    {id:"oaux",n:"Auxílio atendimentos",cat:"Ortodontia",meta:8,freq:"Diário"},
+    {id:"oapa",n:"Aparelhos fixos/removíveis",cat:"Ortodontia",meta:5,freq:"Eventual"},
+    {id:"omol",n:"Moldagem para placas",cat:"Placas",meta:8,freq:"Eventual"},
+    {id:"ovaz",n:"Vazamento modelos",cat:"Placas",meta:8,freq:"Eventual"},
+    {id:"opla",n:"Fabricação placas",cat:"Placas",meta:6,freq:"Eventual"},
+    {id:"ocon",n:"Controle placas",cat:"Placas",meta:5,freq:"Semanal"},
+    {id:"oali",n:"Placas alinhadores",cat:"Placas",meta:4,freq:"Eventual"},
+    {id:"ocla",n:"Placas clareamento",cat:"Placas",meta:4,freq:"Eventual"},
+  ],
+  4:[
+    {id:"pedo",n:"Odontopediatria",cat:"Odontopediatria",meta:8,freq:"Eventual"},
+    {id:"exde",n:"Exodontia decíduos",cat:"Odontopediatria",meta:5,freq:"Eventual"},
+    {id:"ende",n:"Endodontia decíduos",cat:"Odontopediatria",meta:4,freq:"Eventual"},
+    {id:"cape",n:"CAPE",cat:"CAPE",meta:6,freq:"Eventual"},
+    {id:"cmon",n:"Montagem mesa cirúrgica",cat:"Cirurgia",meta:8,freq:"Eventual"},
+    {id:"cexo",n:"Exodontias simples",cat:"Cirurgia",meta:6,freq:"Eventual"},
+    {id:"crea",n:"Reaberturas implantes",cat:"Cirurgia",meta:4,freq:"Eventual"},
+    {id:"ccom",n:"Cirurgias complexas",cat:"Cirurgia",meta:3,freq:"Eventual"},
+    {id:"eqp",n:"Manutenção equipos (checklist)",cat:"Equipamentos",meta:4,freq:"Semanal"},
+    {id:"vac",n:"Bombas vácuo/compressor",cat:"Equipamentos",meta:4,freq:"Semanal"},
+  ],
+  5:[
+    {id:"cuni",n:"Componentes unitários",cat:"Implantodontia",meta:8,freq:"Eventual"},
+    {id:"cpro",n:"Protocolo/barra",cat:"Implantodontia",meta:5,freq:"Eventual"},
+    {id:"cmol",n:"Moldagem avançada",cat:"Implantodontia",meta:5,freq:"Eventual"},
+    {id:"crea2",n:"Materiais reaberturas",cat:"Implantodontia",meta:6,freq:"Eventual"},
+    {id:"rout",n:"Controle próteses",cat:"Prótese",meta:8,freq:"Diário"},
+    {id:"rpla",n:"Planilha próteses",cat:"Prótese",meta:5,freq:"Diário"},
+    {id:"rage",n:"Agenda protesistas",cat:"Prótese",meta:5,freq:"Diário"},
+    {id:"agprot",n:"Agenda próteses e componentes",cat:"Prótese",meta:20,freq:"Diário"},
+    {id:"estq",n:"Controle estoque",cat:"Gestão",meta:8,freq:"Diário"},
+    {id:"comp",n:"Componentes (controle)",cat:"Gestão",meta:5,freq:"Mensal"},
+  ],
+  6:[
+    {id:"ginv",n:"Atualização inventário",cat:"Estoque",meta:8,freq:"Mensal"},
+    {id:"gval",n:"Controle validade",cat:"Estoque",meta:6,freq:"Mensal"},
+    {id:"grep",n:"Reposição materiais",cat:"Estoque",meta:5,freq:"Mensal"},
+    {id:"gfor",n:"Comunicação fornecedores",cat:"Fornecedores",meta:5,freq:"Eventual"},
+    {id:"gqua",n:"Fiscalização entregas",cat:"Fornecedores",meta:4,freq:"Eventual"},
+    {id:"gflu",n:"Verificação fluxos",cat:"Operacional",meta:6,freq:"Semanal"},
+    {id:"gpro",n:"Padronização protocolos",cat:"Operacional",meta:4,freq:"Eventual"},
+    {id:"grel",n:"Relatórios admin",cat:"Operacional",meta:4,freq:"Mensal"},
+    {id:"gcomp",n:"Compras (apenas orto)",cat:"Compras",meta:1,freq:"Mensal"},
+    {id:"gcpla",n:"Compras de placas (alinhador)",cat:"Compras",meta:4,freq:"Semanal"},
+    {id:"gagc",n:"Agenda cirurgia geral",cat:"Agenda",meta:20,freq:"Diário"},
+  ],
+  7:[
+    {id:"scan",n:"Escaneamento Medit",cat:"Digital",meta:8,freq:"Eventual"},
+    {id:"exoc",n:"Design Exocad",cat:"Digital",meta:6,freq:"Eventual"},
+    {id:"medt",n:"Planejamento Medit",cat:"Digital",meta:6,freq:"Eventual"},
+    {id:"dcor",n:"Desenho coroas",cat:"Digital",meta:5,freq:"Eventual"},
+    {id:"dpla",n:"Placas miorrelaxantes",cat:"Digital",meta:5,freq:"Eventual"},
+    {id:"imp3",n:"Impressão 3D",cat:"Digital",meta:5,freq:"Eventual"},
+    {id:"acab",n:"Acabamento trabalhos",cat:"Digital",meta:5,freq:"Eventual"},
+    {id:"dent",n:"DentistaOn",cat:"Digital",meta:4,freq:"Eventual"},
+  ],
 };
 
 const ATIVIDADES_MARKETING = [
@@ -1719,7 +1804,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v7.5 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v7.6 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -1862,7 +1947,7 @@ function App() {
                   <div key={a.id} className="act-row">
                     <div>
                       <div className="act-name">{a.n}</div>
-                      <div className="act-meta">Meta mensal: {a.meta}</div>
+                      <div className="act-meta">Meta mensal: {a.meta}{a.freq ? ` · ${a.freq}` : ''}</div>
                     </div>
                     <div className="counter">
                       <button className="counter-btn" onClick={()=>setQtds(p=>({...p,[a.id]:Math.max(0,(p[a.id]||0)-1)}))} >−</button>
