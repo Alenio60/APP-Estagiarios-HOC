@@ -1824,7 +1824,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v7.7 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v7.8 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -2151,7 +2151,7 @@ function App() {
                     <div style={{display:'flex',flexDirection:'column',gap:6}}>
                       <button className="btn btn-sm" style={{background:'var(--purple)',color:'#fff'}} onClick={()=>{setModalAval(u);setAvalComp({});setAvalObs('');setAvalRec('manter');setAvalMes(new Date().getMonth());setAvalAno(new Date().getFullYear());}}>⭐ Avaliar</button>
                       <button className="btn btn-sm" style={{background:'var(--cyan)',color:'#fff'}} onClick={()=>gerarRelatorio(u)}>📄 Relatório</button>
-                      {u.nivel < 7 && <button className="btn btn-warn btn-sm" onClick={()=>promover(u.id,u.nivel)}>↑ Promover</button>}
+                      {u.nivel < 8 && <button className="btn btn-warn btn-sm" onClick={()=>promover(u.id,u.nivel)}>{u.nivel===7?'⭐ Supervisor':'↑ Promover'}</button>}
                       <button className="btn btn-danger btn-sm" onClick={()=>desativar(u.id)}>✕ Desativar</button>
                     </div>
                   </div>
