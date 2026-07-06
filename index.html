@@ -96,9 +96,9 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .stat-num{font-size:26px;font-weight:800;margin-bottom:2px}
 .stat-lbl{font-size:11px;color:var(--text-muted);font-weight:500}
 .n1{color:#3b82f6} .n2{color:#8b5cf6} .n3{color:#ec4899}
-.n4{color:#f59e0b} .n5{color:#10b981} .n6{color:#ef4444} .n7{color:#06b6d4}
+.n4{color:#f59e0b} .n5{color:#10b981} .n6{color:#ef4444} .n7{color:#06b6d4} .n8{color:#f59e0b}
 .bg1{background:#3b82f620} .bg2{background:#8b5cf620} .bg3{background:#ec489920}
-.bg4{background:#f59e0b20} .bg5{background:#10b98120} .bg6{background:#ef444420} .bg7{background:#06b6d420}
+.bg4{background:#f59e0b20} .bg5{background:#10b98120} .bg6{background:#ef444420} .bg7{background:#06b6d420} .bg8{background:#f59e0b20}
 .counter{display:flex;align-items:center;gap:8px}
 .counter-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border-light);background:var(--bg-card2);color:var(--text);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .counter-btn:hover{border-color:var(--accent);color:var(--accent)}
@@ -170,6 +170,7 @@ const NIVEIS = {
   5:{nome:"Prótese e Gestão de Materiais",     emoji:"🦴", cor:"var(--n5)",cls:"n5 bg5", dur:2},
   6:{nome:"Gestão Administrativa",             emoji:"📋", cor:"var(--n6)",cls:"n6 bg6", dur:2},
   7:{nome:"Odontologia Digital",               emoji:"💻", cor:"var(--n7)",cls:"n7 bg7", dur:2},
+  8:{nome:"Supervisor Clínico",                  emoji:"⭐", cor:"var(--yellow)",cls:"n8 bg8", dur:6},
 };
 
 const ATIVIDADES = {
@@ -266,6 +267,24 @@ const ATIVIDADES = {
     {id:"dent",n:"DentistaOn",cat:"Digital",meta:4,freq:"Eventual"},
   ],
 };
+
+const ATIVIDADES_SUPERVISOR = [
+  // Supervisão de estagiários
+  {id:"sup_obs",n:"Supervisão de atividades dos estagiários",cat:"Liderança",meta:20,freq:"Diário"},
+  {id:"sup_feed",n:"Feedback individual para estagiários",cat:"Liderança",meta:8,freq:"Semanal"},
+  {id:"sup_reun",n:"Reunião de equipe / alinhamento",cat:"Liderança",meta:4,freq:"Semanal"},
+  {id:"sup_trej",n:"Treinamento de novos estagiários",cat:"Liderança",meta:4,freq:"Eventual"},
+  // Controle clínico
+  {id:"sup_prot",n:"Controle de protocolos clínicos",cat:"Gestão Clínica",meta:8,freq:"Semanal"},
+  {id:"sup_pac",n:"Acompanhamento de andamento de pacientes",cat:"Gestão Clínica",meta:20,freq:"Diário"},
+  {id:"sup_qual",n:"Controle de qualidade dos procedimentos",cat:"Gestão Clínica",meta:10,freq:"Semanal"},
+  {id:"sup_inc",n:"Registro e gestão de intercorrências",cat:"Gestão Clínica",meta:4,freq:"Eventual"},
+  // Gestão operacional
+  {id:"sup_esc",n:"Escala e distribuição de tarefas",cat:"Gestão Operacional",meta:4,freq:"Semanal"},
+  {id:"sup_rel",n:"Relatório de supervisão semanal",cat:"Gestão Operacional",meta:4,freq:"Semanal"},
+  {id:"sup_est",n:"Controle de estoque e materiais críticos",cat:"Gestão Operacional",meta:4,freq:"Semanal"},
+  {id:"sup_agen",n:"Gestão de agenda e fluxo de pacientes",cat:"Gestão Operacional",meta:20,freq:"Diário"},
+];
 
 const ATIVIDADES_MARKETING = [
   {id:"mpost",n:"Criação de posts",cat:"Conteúdo"},
@@ -1475,8 +1494,8 @@ function App() {
   };
 
   const promover = async (id, n) => {
-    if (n >= 7) { alert('Nível máximo já atingido'); return; }
-    if (!confirm(`Promover para Nível ${n+1}?`)) return;
+    if (n >= 8) { alert('Nível máximo já atingido'); return; }
+    if (!confirm(`Promover para ${n+1===8?'Supervisor Clínico ⭐':'Nível '+(n+1)}?`)) return;
     await sb.from('usuarios').update({nivel:n+1}).eq('id',id);
     alert(`✅ Promovido para Nível ${n+1}`);
     carregar();
@@ -1656,6 +1675,7 @@ function App() {
   const salvar = async () => {
     const listaBase = user.area==='marketing' ? ATIVIDADES_MARKETING :
                        user.area==='comercial' ? ATIVIDADES_COMERCIAL :
+                       user.nivel===8 ? ATIVIDADES_SUPERVISOR :
                        ATIVIDADES[user.nivel]||[];
     const ativs = Object.entries(qtds).filter(([,v]) => v>0).map(([id,q]) => {
       const a = listaBase.find(x => x.id===id);
@@ -1804,7 +1824,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v7.6 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v7.7 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -1834,6 +1854,7 @@ function App() {
           <div style={{display:'flex',alignItems:'center',gap:12}}>
             <NivelBadge n={user.nivel}/>
             {(user.turno_inicio||user.turno_fim) && <span style={{fontSize:12,color:'var(--cyan)'}}>🕐 {user.turno_inicio||'?'}→{user.turno_fim||'?'}</span>}
+            {user.nivel===8 && <span style={{fontSize:12,fontWeight:700,color:'var(--yellow)',background:'#f59e0b20',padding:'2px 8px',borderRadius:6}}>⭐ Supervisor</span>}
             <span style={{fontSize:13,color:'var(--text-muted)'}}>{user.nome.split(' ')[0]}</span>
             <button className="btn btn-ghost btn-sm" onClick={()=>{setTela('login'); setModoTela('login'); try{localStorage.removeItem('hoc_sessao');}catch(e){};}}>Sair</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>gerarRelatorio(user)}>📄 Relatório</button>
@@ -1933,8 +1954,10 @@ function App() {
 
             {(() => {
               const nivelAtivo = (user.area==='clinico'||!user.area) ? (nivelReg||user.nivel) : user.nivel;
+              const maxNivel = user.nivel===8 ? 8 : user.nivel;
               const listaAtivs = user.area==='marketing' ? ATIVIDADES_MARKETING :
                                  user.area==='comercial' ? ATIVIDADES_COMERCIAL :
+                                 nivelAtivo===8 ? ATIVIDADES_SUPERVISOR :
                                  ATIVIDADES[nivelAtivo]||[];
               const catMap = listaAtivs.reduce((acc,a)=>{if(!acc[a.cat])acc[a.cat]=[];acc[a.cat].push(a);return acc},{});
               return Object.entries(catMap).map(([cat,ativs]) => (
@@ -2121,6 +2144,7 @@ function App() {
                       {u.area==='clinico' && <><NivelBadge n={u.nivel}/> <span style={{fontSize:11,color:'var(--text-dim)',marginLeft:8}}>{meses} meses no nível</span></>}
               {u.area==='marketing' && <span className="badge" style={{background:'#ec489920',color:'#ec4899',fontSize:12}}>📱 Marketing</span>}
               {u.area==='comercial' && <span className="badge" style={{background:'#f59e0b20',color:'#f59e0b',fontSize:12}}>💼 Comercial</span>}
+              {u.nivel===8 && <span className="badge" style={{background:'#f59e0b30',color:'#f59e0b',fontSize:12,marginLeft:6}}>⭐ Supervisor</span>}
               {(!u.area||u.area==='clinico') && u.area!=='marketing' && u.area!=='comercial' && u.area && false && null}
               {(u.turno_inicio||u.turno_fim) && <span style={{fontSize:11,color:'var(--cyan)',marginLeft:8}}>🕐 {u.turno_inicio||'?'} → {u.turno_fim||'?'}</span>}
                     </div>
