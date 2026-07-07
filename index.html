@@ -838,10 +838,12 @@ function DashTab({regs, usuarios, regsF, fMes, fAno, setFMes, setFAno, rankAtivs
 }
 
 function GuiaTab({user}) {
-  const [nivelGuia, setNivelGuia] = useState(user.nivel);
-  const ng = GUIA_NIVEIS[nivelGuia];
-  const nv2 = NIVEIS[nivelGuia];
-  const porCatGuia = ATIVIDADES[nivelGuia].reduce((acc,a) => {
+  const nivelInicial = user.nivel <= 7 ? user.nivel : 7;
+  const [nivelGuia, setNivelGuia] = useState(nivelInicial);
+  const ng = GUIA_NIVEIS[nivelGuia] || GUIA_NIVEIS[7];
+  const nv2 = NIVEIS[nivelGuia] || NIVEIS[7];
+  const listaGuia = nivelGuia===8 ? ATIVIDADES_SUPERVISOR : (ATIVIDADES[nivelGuia]||[]);
+  const porCatGuia = listaGuia.reduce((acc,a) => {
     if (!acc[a.cat]) acc[a.cat]=[];
     acc[a.cat].push(a); return acc;
   }, {});
@@ -2058,7 +2060,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.1 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.2 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
