@@ -974,6 +974,240 @@ function GuiaTab({user}) {
 
 
 
+
+function EstoqueTab({user, sb}) {
+  const {useState, useEffect, useMemo} = React;
+  const [itens, setItens]       = useState([]);
+  const [movs, setMovs]         = useState([]);
+  const [busca, setBusca]       = useState('');
+  const [catFiltro, setCatFiltro] = useState('');
+  const [statusFiltro, setStatusFiltro] = useState('');
+  const [modal, setModal]       = useState(null); // {item, tipo:'entrada'|'saida'}
+  const [modalCad, setModalCad] = useState(false);
+  const [qtdMov, setQtdMov]     = useState(1);
+  const [obsMov, setObsMov]     = useState('');
+  const [busy, setBusy]         = useState(false);
+  const [aba, setAba]           = useState('estoque'); // estoque | historico
+  // Cadastro novo item
+  const [nProd, setNProd]       = useState('');
+  const [nCat, setNCat]         = useState('');
+  const [nQtd, setNQtd]         = useState(0);
+  const [nMin, setNMin]         = useState(1);
+  const [nUn, setNUn]           = useState('un');
+
+  const isSup = user.nivel === 8 || user.tipo === 'admin';
+
+  const carregar = async () => {
+    if (!sb) return;
+    const {data:e} = await sb.from('estoque').select('*').order('categoria').order('produto');
+    if (e) setItens(e);
+    const {data:m} = await sb.from('estoque_movimentacoes').select('*').order('created_at',{ascending:false}).limit(100);
+    if (m) setMovs(m);
+  };
+
+  useEffect(() => { carregar(); }, []);
+
+  const cats = useMemo(() => [...new Set(itens.map(i=>i.categoria))].sort(), [itens]);
+
+  const itensFiltrados = useMemo(() => itens.filter(i => {
+    const buscaOk = !busca || i.produto.toLowerCase().includes(busca.toLowerCase());
+    const catOk   = !catFiltro || i.categoria === catFiltro;
+    const stOk    = !statusFiltro || i.status === statusFiltro;
+    return buscaOk && catOk && stOk;
+  }), [itens, busca, catFiltro, statusFiltro]);
+
+  const stats = useMemo(() => ({
+    total: itens.length,
+    ok: itens.filter(i=>i.status==='OK').length,
+    comprar: itens.filter(i=>i.status==='COMPRAR').length,
+    critico: itens.filter(i=>i.status==='CRÍTICO').length,
+  }), [itens]);
+
+  const movimentar = async () => {
+    if (!modal || qtdMov <= 0) return;
+    setBusy(true);
+    const {item, tipo} = modal;
+    const novaQtd = tipo==='entrada' ? item.quantidade + qtdMov : Math.max(0, item.quantidade - qtdMov);
+    await sb.from('estoque').update({quantidade: novaQtd, updated_at: new Date().toISOString()}).eq('id', item.id);
+    await sb.from('estoque_movimentacoes').insert([{
+      produto_id: item.id, produto_nome: item.produto,
+      tipo, quantidade: qtdMov, responsavel: user.nome, obs: obsMov
+    }]);
+    setModal(null); setQtdMov(1); setObsMov('');
+    await carregar();
+    setBusy(false);
+  };
+
+  const cadastrar = async () => {
+    if (!nProd || !nCat) return;
+    setBusy(true);
+    await sb.from('estoque').insert([{produto:nProd, categoria:nCat, quantidade:+nQtd, minimo:+nMin, unidade:nUn}]);
+    setModalCad(false); setNProd(''); setNCat(''); setNQtd(0); setNMin(1); setNUn('un');
+    await carregar();
+    setBusy(false);
+  };
+
+  const corStatus = s => s==='OK'?'var(--green)':s==='COMPRAR'?'var(--yellow)':'var(--red)';
+
+  return (
+    <div>
+      {/* KPIs */}
+      <div className="stat-grid" style={{marginBottom:16}}>
+        {[['Total',stats.total,'var(--accent)'],['✅ OK',stats.ok,'var(--green)'],
+          ['⚠️ Comprar',stats.comprar,'var(--yellow)'],['🚨 Crítico',stats.critico,'var(--red)']
+        ].map(([l,v,c])=>(
+          <div key={l} className="stat-box" onClick={()=>setStatusFiltro(l.includes('OK')?'OK':l.includes('Comprar')?'COMPRAR':l.includes('Crítico')?'CRÍTICO':'')} style={{cursor:'pointer',borderColor:c+'44'}}>
+            <div className="stat-num" style={{color:c,fontSize:22}}>{v}</div>
+            <div className="stat-lbl">{l}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Abas */}
+      <div className="tabs" style={{marginBottom:16}}>
+        {[['estoque','📦 Estoque'],['historico','📋 Histórico']].map(([k,l])=>(
+          <button key={k} className={`tab ${aba===k?'active':''}`} onClick={()=>setAba(k)}>{l}</button>
+        ))}
+      </div>
+
+      {aba==='estoque' && <>
+        {/* Filtros */}
+        <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
+          <input className="inp" placeholder="🔍 Buscar produto..." value={busca} onChange={e=>setBusca(e.target.value)} style={{flex:2,minWidth:180}}/>
+          <select className="inp" value={catFiltro} onChange={e=>setCatFiltro(e.target.value)} style={{flex:1,minWidth:130}}>
+            <option value="">Todas categorias</option>
+            {cats.map(c=><option key={c} value={c}>{c}</option>)}
+          </select>
+          {statusFiltro && <button className="btn btn-ghost btn-sm" onClick={()=>setStatusFiltro('')}>✕ Limpar filtro</button>}
+          {isSup && <button className="btn btn-success btn-sm" onClick={()=>setModalCad(true)}>+ Novo item</button>}
+        </div>
+
+        {/* Lista */}
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          {itensFiltrados.map(item=>(
+            <div key={item.id} className="card-sm" style={{borderLeft:`3px solid ${corStatus(item.status)}`}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
+                <div style={{flex:1,minWidth:150}}>
+                  <div style={{fontWeight:600,fontSize:14}}>{item.produto}</div>
+                  <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>{item.categoria} · Mín: {item.minimo} {item.unidade||'un'}</div>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                  <div style={{textAlign:'center'}}>
+                    <div style={{fontSize:20,fontWeight:800,color:corStatus(item.status)}}>{item.quantidade}</div>
+                    <div style={{fontSize:10,color:corStatus(item.status),fontWeight:700}}>{item.status}</div>
+                  </div>
+                  {isSup && <div style={{display:'flex',gap:4}}>
+                    <button className="btn btn-sm btn-success" onClick={()=>{setModal({item,tipo:'entrada'});setQtdMov(1);}}>+ Entrada</button>
+                    <button className="btn btn-sm btn-danger" onClick={()=>{setModal({item,tipo:'saida'});setQtdMov(1);}}>− Saída</button>
+                  </div>}
+                </div>
+              </div>
+            </div>
+          ))}
+          {itensFiltrados.length===0 && <div style={{textAlign:'center',color:'var(--text-muted)',padding:40}}>Nenhum item encontrado</div>}
+        </div>
+      </>}
+
+      {aba==='historico' && <>
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          {movs.map(m=>(
+            <div key={m.id} className="card-sm" style={{borderLeft:`3px solid ${m.tipo==='entrada'?'var(--green)':'var(--red)'}`}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <div>
+                  <div style={{fontWeight:600,fontSize:13}}>{m.produto_nome}</div>
+                  <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>
+                    {m.tipo==='entrada'?'📥 Entrada':'📤 Saída'} · {m.quantidade} un · {m.responsavel}
+                  </div>
+                  {m.obs && <div style={{fontSize:11,color:'var(--text-dim)',marginTop:2}}>Obs: {m.obs}</div>}
+                </div>
+                <div style={{fontSize:11,color:'var(--text-muted)',textAlign:'right'}}>
+                  {new Date(m.created_at).toLocaleDateString('pt-BR')}
+                  <div>{new Date(m.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+          {movs.length===0 && <div style={{textAlign:'center',color:'var(--text-muted)',padding:40}}>Nenhuma movimentação ainda</div>}
+        </div>
+      </>}
+
+      {/* Modal Movimentação */}
+      {modal && (
+        <div className="overlay" onClick={()=>setModal(null)}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <div className="modal-title">
+              {modal.tipo==='entrada'?'📥 Registrar Entrada':'📤 Registrar Saída'} — {modal.item.produto}
+            </div>
+            <div style={{marginBottom:12}}>
+              <label className="inp-label">Quantidade</label>
+              <div style={{display:'flex',alignItems:'center',gap:10}}>
+                <button className="counter-btn" onClick={()=>setQtdMov(Math.max(1,qtdMov-1))}>−</button>
+                <span className="counter-val" style={{fontSize:22,fontWeight:800,minWidth:40,textAlign:'center'}}>{qtdMov}</span>
+                <button className="counter-btn" onClick={()=>setQtdMov(qtdMov+1)}>+</button>
+              </div>
+            </div>
+            <div style={{marginBottom:16}}>
+              <label className="inp-label">Observação (opcional)</label>
+              <input className="inp" value={obsMov} onChange={e=>setObsMov(e.target.value)} placeholder="Ex: Compra NF 12345"/>
+            </div>
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModal(null)}>Cancelar</button>
+              <button className={`btn ${modal.tipo==='entrada'?'btn-success':'btn-danger'}`} style={{flex:1}} onClick={movimentar} disabled={busy}>
+                {busy?'Salvando...':modal.tipo==='entrada'?'Confirmar Entrada':'Confirmar Saída'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Cadastro */}
+      {modalCad && (
+        <div className="overlay" onClick={()=>setModalCad(false)}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <div className="modal-title">+ Novo Produto</div>
+            <div style={{marginBottom:12}}>
+              <label className="inp-label">Nome do Produto</label>
+              <input className="inp" value={nProd} onChange={e=>setNProd(e.target.value)} placeholder="Ex: Luva estéril 7,0"/>
+            </div>
+            <div style={{marginBottom:12}}>
+              <label className="inp-label">Categoria</label>
+              <input className="inp" list="cats-list" value={nCat} onChange={e=>setNCat(e.target.value)} placeholder="Ex: EPI"/>
+              <datalist id="cats-list">{cats.map(c=><option key={c} value={c}/>)}</datalist>
+            </div>
+            <div style={{display:'flex',gap:8,marginBottom:12}}>
+              <div style={{flex:1}}>
+                <label className="inp-label">Qtd Inicial</label>
+                <input type="number" className="inp" value={nQtd} onChange={e=>setNQtd(+e.target.value)} min="0"/>
+              </div>
+              <div style={{flex:1}}>
+                <label className="inp-label">Mínimo</label>
+                <input type="number" className="inp" value={nMin} onChange={e=>setNMin(+e.target.value)} min="1"/>
+              </div>
+              <div style={{flex:1}}>
+                <label className="inp-label">Unidade</label>
+                <select className="inp" value={nUn} onChange={e=>setNUn(e.target.value)}>
+                  <option value="un">un</option>
+                  <option value="cx">cx</option>
+                  <option value="fr">fr</option>
+                  <option value="pc">pc</option>
+                  <option value="L">L</option>
+                  <option value="kg">kg</option>
+                </select>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModalCad(false)}>Cancelar</button>
+              <button className="btn btn-success" style={{flex:1}} onClick={cadastrar} disabled={busy||!nProd||!nCat}>
+                {busy?'Salvando...':'Cadastrar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NiveisTab() {
   const [nivelSel, setNivelSel] = useState(1);
   const ng = GUIA_NIVEIS[nivelSel];
@@ -1824,7 +2058,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.0 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.1 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -1917,6 +2151,8 @@ function App() {
               ? [['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas'],['guia','📚 Guia']]
               : user.area==='comercial'
               ? [['dash','📊 Dashboard'],['reg','📝 Registrar'],['hist','📋 Histórico']]
+              : user.nivel===8
+              ? [['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas'],['guia','📚 Guia'],['estoque','📦 Estoque']]
               : [['reg','📝 Registrar'],['hist','📊 Histórico']]
             ).map(([k,l]) => (
               <button key={k} className={`tab ${aba===k?'active':''}`} onClick={()=>setAba(k)}>{l}</button>
@@ -1924,6 +2160,7 @@ function App() {
           </div>
 
           {aba==='dash' && user.area==='comercial' && <ComercialDash regs={regs} user={user}/>}
+          {aba==='estoque' && <EstoqueTab user={user} sb={sb}/>}
 
           {aba==='reg' && <>
             {user.area==='marketing' && <div className="alert alert-info" style={{marginBottom:16}}>📱 Estagiário de Marketing</div>}
@@ -2105,7 +2342,7 @@ function App() {
 
         <div className="content">
           <div className="tabs" style={{marginBottom:24}}>
-            {[['usuarios','👥 Estagiários'],['dash','📊 Dashboard'],['aval','⭐ Avaliações'],['hist','📋 Histórico'],['niveis','📚 Níveis']].map(([k,l])=>(
+            {[['usuarios','👥 Estagiários'],['dash','📊 Dashboard'],['aval','⭐ Avaliações'],['hist','📋 Histórico'],['niveis','📚 Níveis'],['estoque','📦 Estoque']].map(([k,l])=>(
               <button key={k} className={`tab ${abaA===k?'active':''}`} onClick={()=>setAbaA(k)}>{l}</button>
             ))}
           </div>
@@ -2293,6 +2530,7 @@ function App() {
         </div>
 
           {abaA==='niveis' && <NiveisTab/>}
+          {abaA==='estoque' && <EstoqueTab user={user} sb={sb}/>}
 
         {modalAval && (
           <div className="overlay" onClick={()=>setModalAval(null)}>
