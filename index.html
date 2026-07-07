@@ -1824,7 +1824,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v7.8 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v7.9 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -1834,12 +1834,14 @@ function App() {
   // TELA: ESTAGIÁRIO
   // ─────────────────────────────────────────────────────────────
   if (tela === 'est') {
-    const nv    = NIVEIS[user.nivel];
+    const nvKey = user.nivel <= 7 ? user.nivel : 7;
+    const nv    = NIVEIS[nvKey] || NIVEIS[7];
+    const isSupervisor = user.nivel === 8;
     const mReg  = regs.filter(r => r.estagiario === user.nome);
     const st    = statsOf(mReg);
     const meses = mesesNoNivel(user.id);
-    const promo = meses >= nv.dur && user.nivel < 7;
-    const porCat = ATIVIDADES[user.nivel].reduce((acc,a) => {
+    const promo = meses >= nv.dur && user.nivel < 7 && user.nivel !== 8;
+    const porCat = (user.nivel===8 ? ATIVIDADES_SUPERVISOR : ATIVIDADES[user.nivel]||[]).reduce((acc,a) => {
       if (!acc[a.cat]) acc[a.cat]=[];
       acc[a.cat].push(a); return acc;
     }, {});
@@ -1890,7 +1892,8 @@ function App() {
               </div>
               <span style={{fontSize:22,fontWeight:800,color:'var(--accent)'}}>{Math.min(100,Math.round((meses/nv.dur)*100))}%</span>
             </div>
-            <ProgBar val={meses} max={nv.dur} color='var(--accent)'/>
+            {!isSupervisor && <ProgBar val={meses} max={nv.dur} color='var(--accent)'/>}
+            {isSupervisor && <div style={{background:'#f59e0b20',border:'1px solid #f59e0b40',borderRadius:8,padding:'10px 14px',textAlign:'center',color:'var(--yellow)',fontWeight:700,fontSize:14}}>⭐ Supervisor Clínico — Nível máximo atingido!</div>}
             <div style={{display:'flex',justifyContent:'space-between',marginTop:14}}>
               {Object.entries(NIVEIS).map(([k,v]) => {
                 const done = +k < user.nivel, cur = +k === user.nivel;
@@ -1929,7 +1932,7 @@ function App() {
               <div style={{marginBottom:16,background:'var(--bg-card2)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 14px'}}>
                 <label className="inp-label" style={{marginBottom:8}}>Registrar atividades do nível:</label>
                 <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                  {Array.from({length:user.nivel},(_,i)=>i+1).map(n=>(
+                  {Array.from({length:Math.min(user.nivel,8)},(_,i)=>i+1).map(n=>(
                     <button key={n} onClick={()=>setNivelReg(nivelReg===n&&n===user.nivel?null:n)}
                       className="btn btn-sm"
                       style={{
@@ -1937,7 +1940,7 @@ function App() {
                         color:(nivelReg||user.nivel)===n?'#fff':'var(--text-muted)',
                         border:`1px solid ${(nivelReg||user.nivel)===n?'transparent':'var(--border)'}`,
                       }}>
-                      {NIVEIS[n].emoji} N{n}{n===user.nivel?' (atual)':''}
+                      {n===8?'⭐':NIVEIS[n]?.emoji||'⭐'} N{n}{n===user.nivel?' (atual)':''}
                     </button>
                   ))}
                 </div>
@@ -1953,8 +1956,7 @@ function App() {
             </div>
 
             {(() => {
-              const nivelAtivo = (user.area==='clinico'||!user.area) ? (nivelReg||user.nivel) : user.nivel;
-              const maxNivel = user.nivel===8 ? 8 : user.nivel;
+              const nivelAtivo = (user.area==='clinico'||!user.area) ? (nivelReg||Math.min(user.nivel,8)) : user.nivel;
               const listaAtivs = user.area==='marketing' ? ATIVIDADES_MARKETING :
                                  user.area==='comercial' ? ATIVIDADES_COMERCIAL :
                                  nivelAtivo===8 ? ATIVIDADES_SUPERVISOR :
@@ -2039,7 +2041,7 @@ function App() {
                 <div className="alert alert-info" style={{marginBottom:20}}>
                   📅 Metas do mês de {new Date().toLocaleString('pt-BR',{month:'long'})}
                 </div>
-                {Object.entries(ATIVIDADES[user.nivel].reduce((acc,a)=>{if(!acc[a.cat])acc[a.cat]=[];acc[a.cat].push(a);return acc},{})).map(([cat,ativs])=>(
+                {Object.entries((user.nivel===8?ATIVIDADES_SUPERVISOR:ATIVIDADES[user.nivel]||[]).reduce((acc,a)=>{if(!acc[a.cat])acc[a.cat]=[];acc[a.cat].push(a);return acc},{})).map(([cat,ativs])=>(
                   <div key={cat} style={{marginBottom:20}}>
                     <div className="sec-label"><div style={{width:18,height:3,background:'var(--purple)',borderRadius:2}}/>{cat}</div>
                     {ativs.map(a => {
