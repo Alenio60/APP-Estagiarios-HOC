@@ -30,17 +30,17 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg-base:#07111f;
-  --bg-card:#0d1f35;
-  --bg-card2:#0f2540;
-  --border:#1c3352;
-  --border-light:#244060;
-  --text:#e8f0fe;
-  --text-muted:#6b8aaa;
-  --text-dim:#3d5a78;
-  --accent:#3b82f6;
-  --accent-dark:#1d4ed8;
-  --accent-glow:rgba(59,130,246,0.25);
+  --bg-base:#000000;
+  --bg-card:#0a1628;
+  --bg-card2:#0d2040;
+  --border:#1a3a6a;
+  --border-light:#2a5298;
+  --text:#ffffff;
+  --text-muted:#7eb3f0;
+  --text-dim:#3a6aaa;
+  --accent:#4d9fff;
+  --accent-dark:#2a7de0;
+  --accent-glow:rgba(77,159,255,0.30);
   --green:#10b981;
   --yellow:#f59e0b;
   --red:#ef4444;
@@ -50,7 +50,7 @@
   --orange:#f97316;
   --radius:14px;
   --radius-sm:8px;
-  --shadow:0 4px 24px rgba(0,0,0,0.5);
+  --shadow:0 4px 32px rgba(0,0,0,0.8);
 }
 body{font-family:'Inter',system-ui,sans-serif;background:var(--bg-base);min-height:100vh;color:var(--text);-webkit-font-smoothing:antialiased;font-size:15px}
 input,select,textarea,button{font-family:inherit;outline:none}
@@ -124,7 +124,7 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .prog-wrap{background:var(--border);border-radius:4px;height:5px;overflow:hidden}
 .prog-bar{height:5px;border-radius:4px;transition:width .5s ease}
 .obs-box{background:var(--bg-card2);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--text-muted);margin-top:10px;border-left:3px solid var(--border-light)}
-.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(ellipse at 50% 0%,#0d2a4a 0%,var(--bg-base) 70%)}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(ellipse at 50% 0%,#0a1e3d 0%,#000000 70%)}
 .login-box{width:100%;max-width:400px}
 .login-logo{text-align:center;margin-bottom:32px}
 .login-title{font-size:32px;font-weight:800;letter-spacing:-1px;background:linear-gradient(135deg,#93c5fd,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
@@ -1824,7 +1824,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v7.9 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.0 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
