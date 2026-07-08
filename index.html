@@ -1038,6 +1038,206 @@ function BarcodeScannerModal({onDetected, onClose}) {
   );
 }
 
+function normalizarTexto(s) {
+  return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+}
+
+const MAPA_CABECALHO_ESTOQUE = {
+  produto: ['produto','nome','item','material','descricao'],
+  categoria: ['categoria','cat'],
+  quantidade: ['quantidade','qtd','qtdinicial','estoqueinicial','estoque','quantidadeinicial'],
+  minimo: ['minimo','min','estoqueminimo','qtdminima'],
+  unidade: ['unidade','un','und'],
+  codigo_barras: ['codigobarras','codigo','ean','barcode','codbarras']
+};
+
+function detectarDelimitador(linha) {
+  if (linha.includes('\t')) return '\t';
+  if (linha.includes(';')) return ';';
+  return ',';
+}
+
+function parseNumeroImport(v, delim) {
+  if (v == null) return NaN;
+  let s = String(v).trim();
+  if (!s) return NaN;
+  if (delim !== ',') s = s.replace(',', '.');
+  s = s.replace(/[^\d.\-]/g, '');
+  return parseFloat(s);
+}
+
+function analisarTabelaEstoque(texto) {
+  const linhas = texto.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0);
+  if (linhas.length < 2) return {erro: 'Cole pelo menos uma linha de cabeçalho e uma linha de dados.'};
+  const delim = detectarDelimitador(linhas[0]);
+  const cabecalho = linhas[0].split(delim).map(normalizarTexto);
+  const indices = {};
+  Object.entries(MAPA_CABECALHO_ESTOQUE).forEach(([chave, alternativas]) => {
+    const idx = cabecalho.findIndex(c => alternativas.includes(c));
+    if (idx >= 0) indices[chave] = idx;
+  });
+  const faltando = ['produto','categoria','quantidade','minimo'].filter(k => indices[k]===undefined);
+  if (faltando.length > 0) {
+    return {erro: `Não identifiquei as colunas: ${faltando.join(', ')}. O cabeçalho precisa ter Produto, Categoria, Quantidade e Mínimo (nomes parecidos também funcionam).`};
+  }
+  const registros = linhas.slice(1).map((linha, i) => {
+    const cols = linha.split(delim);
+    const produto = (cols[indices.produto]||'').trim();
+    const categoria = (cols[indices.categoria]||'').trim();
+    const quantidade = parseNumeroImport(cols[indices.quantidade], delim);
+    const minimo = parseNumeroImport(cols[indices.minimo], delim);
+    const unidade = indices.unidade!==undefined ? ((cols[indices.unidade]||'').trim() || 'un') : undefined;
+    const codigo_barras = indices.codigo_barras!==undefined ? ((cols[indices.codigo_barras]||'').trim() || null) : undefined;
+    let erro = '';
+    if (!produto) erro = 'Produto vazio';
+    else if (!categoria) erro = 'Categoria vazia';
+    else if (isNaN(quantidade)) erro = 'Quantidade inválida';
+    else if (isNaN(minimo)) erro = 'Mínimo inválido';
+    return { linha: i+2, produto, categoria, quantidade, minimo, unidade, codigo_barras, erro };
+  });
+  return {registros};
+}
+
+function ImportarEstoqueModal({itensAtuais, sb, onClose, onImported}) {
+  const {useState, useMemo} = React;
+  const [texto, setTexto]       = useState('');
+  const [erroAnalise, setErroAnalise] = useState('');
+  const [registros, setRegistros]     = useState(null);
+  const [etapa, setEtapa]       = useState('colar'); // colar | revisar | importando | concluido
+  const [progresso, setProgresso] = useState({feito:0, total:0});
+  const [resultado, setResultado] = useState(null);
+
+  const comAcao = useMemo(() => {
+    if (!registros) return [];
+    return registros.map(r => {
+      if (r.erro) return {...r, acao:'erro'};
+      const existente = itensAtuais.find(it =>
+        (r.codigo_barras && it.codigo_barras && it.codigo_barras === r.codigo_barras) ||
+        (normalizarTexto(it.produto) === normalizarTexto(r.produto) && normalizarTexto(it.categoria) === normalizarTexto(r.categoria))
+      );
+      return {...r, acao: existente ? 'atualiza' : 'novo', existenteId: existente?.id};
+    });
+  }, [registros, itensAtuais]);
+
+  const qtdNovos      = comAcao.filter(r=>r.acao==='novo').length;
+  const qtdAtualiza   = comAcao.filter(r=>r.acao==='atualiza').length;
+  const qtdErro       = comAcao.filter(r=>r.acao==='erro').length;
+
+  const analisar = () => {
+    const res = analisarTabelaEstoque(texto);
+    if (res.erro) { setErroAnalise(res.erro); setRegistros(null); return; }
+    setErroAnalise('');
+    setRegistros(res.registros);
+    setEtapa('revisar');
+  };
+
+  const importar = async () => {
+    setEtapa('importando');
+    let criados=0, atualizados=0; const erros=[];
+    const validos = comAcao.filter(r=>r.acao!=='erro');
+    for (let i=0;i<validos.length;i++) {
+      const r = validos[i];
+      setProgresso({feito:i+1, total:validos.length});
+      try {
+        if (r.acao==='atualiza') {
+          const campos = {quantidade:r.quantidade, minimo:r.minimo, updated_at:new Date().toISOString()};
+          if (r.unidade !== undefined) campos.unidade = r.unidade;
+          if (r.codigo_barras !== undefined) campos.codigo_barras = r.codigo_barras;
+          await sb.from('estoque').update(campos).eq('id', r.existenteId);
+          atualizados++;
+        } else {
+          await sb.from('estoque').insert([{
+            produto:r.produto, categoria:r.categoria, quantidade:r.quantidade, minimo:r.minimo,
+            unidade: r.unidade||'un', codigo_barras: r.codigo_barras||null
+          }]);
+          criados++;
+        }
+      } catch(e) {
+        erros.push(`${r.produto}: ${e.message||'erro desconhecido'}`);
+      }
+    }
+    setResultado({criados, atualizados, erros});
+    setEtapa('concluido');
+    await onImported();
+  };
+
+  return (
+    <div className="overlay" onClick={etapa==='importando'?undefined:onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:620,maxHeight:'85vh',overflowY:'auto'}}>
+        <div className="modal-title">📥 Importar estoque em massa</div>
+
+        {etapa==='colar' && <>
+          <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:10,lineHeight:1.5}}>
+            Cole a tabela direto do Excel/Planilha (Ctrl+C na planilha, Ctrl+V aqui) ou um CSV.
+            A primeira linha precisa ser o cabeçalho, com colunas: <b>Produto, Categoria, Quantidade, Mínimo</b> (Unidade e Código de barras são opcionais).
+          </div>
+          {erroAnalise && <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#ef4444',marginBottom:12}}>{erroAnalise}</div>}
+          <textarea className="inp" value={texto} onChange={e=>setTexto(e.target.value)} placeholder={"Produto\tCategoria\tQuantidade\tMinimo\tUnidade\tCodigoBarras\nLuva estéril 7,0\tEPI\t50\t20\tcx\t7891234567890"} style={{width:'100%',minHeight:180,fontFamily:'monospace',fontSize:12,resize:'vertical'}}/>
+          <div style={{display:'flex',gap:8,marginTop:16}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancelar</button>
+            <button className="btn btn-success" style={{flex:1}} onClick={analisar} disabled={!texto.trim()}>Analisar tabela</button>
+          </div>
+        </>}
+
+        {etapa==='revisar' && <>
+          <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
+            <div className="stat-box" style={{flex:1,minWidth:90}}><div className="stat-num" style={{color:'var(--green)',fontSize:20}}>{qtdNovos}</div><div className="stat-lbl">🆕 Novos</div></div>
+            <div className="stat-box" style={{flex:1,minWidth:90}}><div className="stat-num" style={{color:'var(--accent)',fontSize:20}}>{qtdAtualiza}</div><div className="stat-lbl">🔄 Atualiza</div></div>
+            <div className="stat-box" style={{flex:1,minWidth:90}}><div className="stat-num" style={{color:'var(--red)',fontSize:20}}>{qtdErro}</div><div className="stat-lbl">⚠️ Erros</div></div>
+          </div>
+
+          <div style={{maxHeight:320,overflowY:'auto',border:'1px solid var(--border)',borderRadius:8}}>
+            {comAcao.map((r,i) => (
+              <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 10px',borderBottom:'1px solid var(--border)',fontSize:12,gap:8}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.produto || `(linha ${r.linha} sem produto)`}</div>
+                  {r.acao!=='erro' && <div style={{color:'var(--text-muted)',fontSize:11}}>{r.categoria} · Qtd: {r.quantidade} · Mín: {r.minimo}</div>}
+                  {r.acao==='erro' && <div style={{color:'var(--red)',fontSize:11}}>Linha {r.linha}: {r.erro}</div>}
+                </div>
+                <div style={{
+                  fontSize:10,fontWeight:800,padding:'3px 8px',borderRadius:6,whiteSpace:'nowrap',
+                  background: r.acao==='novo'?'#22c55e22':r.acao==='atualiza'?'#3b82f622':'#ef444422',
+                  color: r.acao==='novo'?'var(--green)':r.acao==='atualiza'?'var(--accent)':'var(--red)'
+                }}>
+                  {r.acao==='novo'?'🆕 NOVO':r.acao==='atualiza'?'🔄 ATUALIZA':'⚠️ ERRO'}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{display:'flex',gap:8,marginTop:16}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>{setEtapa('colar');}}>← Voltar</button>
+            <button className="btn btn-success" style={{flex:1}} onClick={importar} disabled={qtdNovos+qtdAtualiza===0}>
+              Confirmar importação ({qtdNovos+qtdAtualiza})
+            </button>
+          </div>
+        </>}
+
+        {etapa==='importando' && (
+          <div style={{textAlign:'center',padding:30}}>
+            <div style={{fontSize:14,marginBottom:10}}>Importando... {progresso.feito}/{progresso.total}</div>
+            <div style={{width:'100%',height:8,background:'var(--border)',borderRadius:4,overflow:'hidden'}}>
+              <div style={{width:`${progresso.total?(progresso.feito/progresso.total*100):0}%`,height:'100%',background:'var(--accent)',transition:'width .2s'}}></div>
+            </div>
+          </div>
+        )}
+
+        {etapa==='concluido' && resultado && <>
+          <div className="alert" style={{background:'#22c55e18',border:'1px solid #22c55e40',color:'var(--green)',marginBottom:12}}>
+            ✅ Importação concluída: {resultado.criados} criado(s), {resultado.atualizados} atualizado(s).
+          </div>
+          {resultado.erros.length>0 && (
+            <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#ef4444',marginBottom:12,maxHeight:150,overflowY:'auto'}}>
+              {resultado.erros.map((e,i)=><div key={i} style={{fontSize:12}}>{e}</div>)}
+            </div>
+          )}
+          <button className="btn btn-success" style={{width:'100%'}} onClick={onClose}>Fechar</button>
+        </>}
+      </div>
+    </div>
+  );
+}
+
 function EstoqueTab({user, sb}) {
   const {useState, useEffect, useMemo} = React;
   const [itens, setItens]       = useState([]);
@@ -1062,6 +1262,7 @@ function EstoqueTab({user, sb}) {
   // Scanner
   const [scannerAberto, setScannerAberto] = useState(null); // 'busca' | 'cadastro' | null
   const [avisoScan, setAvisoScan]         = useState('');
+  const [modalImportar, setModalImportar] = useState(false);
 
   const isSup = user.nivel === 8 || user.tipo === 'admin';
 
@@ -1170,6 +1371,7 @@ function EstoqueTab({user, sb}) {
           {statusFiltro && <button className="btn btn-ghost btn-sm" onClick={()=>setStatusFiltro('')}>✕ Limpar filtro</button>}
           {isSup && <button className="btn btn-success btn-sm" onClick={()=>setModalCad(true)}>+ Novo item</button>}
           {isSup && <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={()=>{setAvisoScan('');setScannerAberto('busca');}}>📷 Bipar item</button>}
+          {isSup && <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={()=>setModalImportar(true)}>📥 Importar</button>}
         </div>
 
         {avisoScan && (
@@ -1317,6 +1519,10 @@ function EstoqueTab({user, sb}) {
 
       {scannerAberto && (
         <BarcodeScannerModal onDetected={handleScan} onClose={()=>setScannerAberto(null)}/>
+      )}
+
+      {modalImportar && (
+        <ImportarEstoqueModal itensAtuais={itens} sb={sb} onClose={()=>setModalImportar(false)} onImported={carregar}/>
       )}
     </div>
   );
@@ -2529,7 +2735,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.4 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.5 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
