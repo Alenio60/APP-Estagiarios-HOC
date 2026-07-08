@@ -1049,6 +1049,7 @@ function EstoqueTab({user, sb}) {
   const [modalCad, setModalCad] = useState(false);
   const [qtdMov, setQtdMov]     = useState(1);
   const [obsMov, setObsMov]     = useState('');
+  const [valorMov, setValorMov] = useState('');
   const [busy, setBusy]         = useState(false);
   const [aba, setAba]           = useState('estoque'); // estoque | historico
   // Cadastro novo item
@@ -1098,9 +1099,10 @@ function EstoqueTab({user, sb}) {
     await sb.from('estoque').update({quantidade: novaQtd, updated_at: new Date().toISOString()}).eq('id', item.id);
     await sb.from('estoque_movimentacoes').insert([{
       produto_id: item.id, produto_nome: item.produto,
-      tipo, quantidade: qtdMov, responsavel: user.nome, obs: obsMov
+      tipo, quantidade: qtdMov, responsavel: user.nome, obs: obsMov,
+      valor_unitario: (tipo==='entrada' && valorMov) ? +valorMov : null
     }]);
-    setModal(null); setQtdMov(1); setObsMov('');
+    setModal(null); setQtdMov(1); setObsMov(''); setValorMov('');
     await carregar();
     setBusy(false);
   };
@@ -1127,6 +1129,8 @@ function EstoqueTab({user, sb}) {
       setAvisoScan('');
       setModal({item, tipo:'entrada'});
       setQtdMov(1);
+      setObsMov('');
+      setValorMov('');
     } else {
       setAvisoScan(codigo);
     }
@@ -1190,8 +1194,8 @@ function EstoqueTab({user, sb}) {
                     <div style={{fontSize:10,color:corStatus(item.status),fontWeight:700}}>{item.status}</div>
                   </div>
                   {isSup && <div style={{display:'flex',gap:4}}>
-                    <button className="btn btn-sm btn-success" onClick={()=>{setModal({item,tipo:'entrada'});setQtdMov(1);}}>+ Entrada</button>
-                    <button className="btn btn-sm btn-danger" onClick={()=>{setModal({item,tipo:'saida'});setQtdMov(1);}}>− Saída</button>
+                    <button className="btn btn-sm btn-success" onClick={()=>{setModal({item,tipo:'entrada'});setQtdMov(1);setObsMov('');setValorMov('');}}>+ Entrada</button>
+                    <button className="btn btn-sm btn-danger" onClick={()=>{setModal({item,tipo:'saida'});setQtdMov(1);setObsMov('');setValorMov('');}}>− Saída</button>
                   </div>}
                 </div>
               </div>
@@ -1239,6 +1243,12 @@ function EstoqueTab({user, sb}) {
                 <button className="counter-btn" onClick={()=>setQtdMov(qtdMov+1)}>+</button>
               </div>
             </div>
+            {modal.tipo==='entrada' && (
+              <div style={{marginBottom:16}}>
+                <label className="inp-label">Valor unitário pago (opcional)</label>
+                <input type="number" className="inp" value={valorMov} onChange={e=>setValorMov(e.target.value)} min="0" step="0.01" placeholder="Ex: 12.50"/>
+              </div>
+            )}
             <div style={{marginBottom:16}}>
               <label className="inp-label">Observação (opcional)</label>
               <input className="inp" value={obsMov} onChange={e=>setObsMov(e.target.value)} placeholder="Ex: Compra NF 12345"/>
@@ -1529,6 +1539,142 @@ function NotasFiscaisTab({user, sb}) {
       {scannerAberto && (
         <BarcodeScannerModal onDetected={handleScanItem} onClose={()=>setScannerAberto(false)}/>
       )}
+    </div>
+  );
+}
+
+function ListaCompraTab({user, sb}) {
+  const {useState, useEffect, useMemo} = React;
+  const [itens, setItens]         = useState([]);
+  const [precos, setPrecos]       = useState({});
+  const [carregando, setCarregando] = useState(true);
+
+  const carregar = async () => {
+    if (!sb) return;
+    setCarregando(true);
+    const {data:e} = await sb.from('estoque').select('*').order('categoria').order('produto');
+    if (e) setItens(e);
+    const {data:m} = await sb.from('estoque_movimentacoes')
+      .select('produto_id,valor_unitario,created_at')
+      .eq('tipo','entrada')
+      .not('valor_unitario','is',null)
+      .order('created_at',{ascending:false});
+    if (m) {
+      const porProduto = {};
+      m.forEach(mv => {
+        if (!porProduto[mv.produto_id]) porProduto[mv.produto_id] = [];
+        if (porProduto[mv.produto_id].length < 2) porProduto[mv.produto_id].push(+mv.valor_unitario);
+      });
+      const resultado = {};
+      Object.entries(porProduto).forEach(([id, vals]) => {
+        resultado[id] = { ultimo: vals[0], penultimo: vals[1] != null ? vals[1] : null };
+      });
+      setPrecos(resultado);
+    }
+    setCarregando(false);
+  };
+
+  useEffect(() => { carregar(); }, []);
+
+  const listaCompra = useMemo(() => itens
+    .filter(i => i.status === 'COMPRAR' || i.status === 'CRÍTICO')
+    .map(i => {
+      const p = precos[i.id];
+      const variacao = (p && p.ultimo != null && p.penultimo) ? ((p.ultimo - p.penultimo) / p.penultimo * 100) : null;
+      return {
+        ...i,
+        sugestao: Math.max(i.minimo - i.quantidade, 0),
+        ultimoPreco: p ? p.ultimo : null,
+        variacao
+      };
+    })
+    .sort((a,b) => {
+      if (a.status !== b.status) return a.status === 'CRÍTICO' ? -1 : 1;
+      if (a.categoria !== b.categoria) return a.categoria.localeCompare(b.categoria);
+      return a.produto.localeCompare(b.produto);
+    }), [itens, precos]);
+
+  const exportarPDF = () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const hoje = new Date().toLocaleDateString('pt-BR');
+    doc.setFontSize(16);
+    doc.text('Lista de Compra — Reposição de Estoque', 14, 18);
+    doc.setFontSize(10);
+    doc.text(`HOC Hospital Odontológico · Gerado em ${hoje}`, 14, 25);
+
+    let y = 36;
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'bold');
+    doc.text('Produto', 14, y);
+    doc.text('Categoria', 80, y);
+    doc.text('Atual', 118, y);
+    doc.text('Mínimo', 134, y);
+    doc.text('Comprar', 152, y);
+    doc.text('Últ. preço', 176, y);
+    doc.setFont(undefined, 'normal');
+    y += 4;
+    doc.line(14, y, 196, y);
+    y += 5;
+
+    listaCompra.forEach(item => {
+      if (y > 280) { doc.addPage(); y = 20; }
+      doc.setTextColor(item.status === 'CRÍTICO' ? 200 : 0, 0, 0);
+      doc.text(String(item.produto).slice(0,34), 14, y);
+      doc.setTextColor(0,0,0);
+      doc.text(String(item.categoria).slice(0,20), 80, y);
+      doc.text(String(item.quantidade), 118, y);
+      doc.text(String(item.minimo), 134, y);
+      doc.text(`${item.sugestao} ${item.unidade||'un'}`, 152, y);
+      doc.text(item.ultimoPreco!=null ? `R$ ${item.ultimoPreco.toFixed(2)}` : '—', 176, y);
+      y += 6;
+    });
+
+    doc.save(`lista-compra-${hoje.replace(/\//g,'-')}.pdf`);
+  };
+
+  const corVariacao = v => v == null ? 'var(--text-muted)' : v > 0 ? 'var(--red)' : v < 0 ? 'var(--green)' : 'var(--text-muted)';
+
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexWrap:'wrap',gap:8}}>
+        <div style={{fontSize:13,color:'var(--text-muted)'}}>{listaCompra.length} item(ns) precisam de reposição</div>
+        <button className="btn btn-success btn-sm" onClick={exportarPDF} disabled={listaCompra.length===0}>📄 Exportar PDF</button>
+      </div>
+
+      {carregando && <div style={{textAlign:'center',color:'var(--text-muted)',padding:40}}>Carregando...</div>}
+      {!carregando && listaCompra.length === 0 && (
+        <div style={{textAlign:'center',color:'var(--text-muted)',padding:40}}>✅ Nenhum item abaixo do estoque mínimo no momento</div>
+      )}
+
+      <div style={{display:'flex',flexDirection:'column',gap:6}}>
+        {listaCompra.map(item => (
+          <div key={item.id} className="card-sm" style={{borderLeft:`3px solid ${item.status==='CRÍTICO'?'var(--red)':'var(--yellow)'}`}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
+              <div style={{flex:1,minWidth:150}}>
+                <div style={{fontWeight:600,fontSize:14}}>{item.produto}</div>
+                <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>
+                  {item.categoria} · Atual: {item.quantidade} {item.unidade||'un'} · Mín: {item.minimo}
+                </div>
+              </div>
+              <div style={{textAlign:'center'}}>
+                <div style={{fontSize:11,color:'var(--text-dim)'}}>Sugestão</div>
+                <div style={{fontSize:16,fontWeight:800,color:'var(--accent)'}}>{item.sugestao} {item.unidade||'un'}</div>
+              </div>
+              <div style={{textAlign:'center',minWidth:80}}>
+                <div style={{fontSize:11,color:'var(--text-dim)'}}>Últ. preço</div>
+                <div style={{fontSize:14,fontWeight:700}}>{item.ultimoPreco!=null ? `R$ ${item.ultimoPreco.toFixed(2)}` : '—'}</div>
+                {item.variacao != null && (
+                  <div style={{fontSize:11,fontWeight:700,color:corVariacao(item.variacao)}}>
+                    {item.variacao > 0 ? '▲' : '▼'} {Math.abs(item.variacao).toFixed(1)}%
+                  </div>
+                )}
+              </div>
+              <div style={{fontSize:10,fontWeight:800,color:item.status==='CRÍTICO'?'var(--red)':'var(--yellow)'}}>{item.status}</div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -2383,7 +2529,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.3 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.4 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -2477,7 +2623,7 @@ function App() {
               : user.area==='comercial'
               ? [['dash','📊 Dashboard'],['reg','📝 Registrar'],['hist','📋 Histórico']]
               : user.nivel===8
-              ? [['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas'],['guia','📚 Guia'],['estoque','📦 Estoque'],['notasfiscais','🧾 Notas Fiscais']]
+              ? [['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas'],['guia','📚 Guia'],['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais']]
               : [['reg','📝 Registrar'],['hist','📊 Histórico']]
             ).map(([k,l]) => (
               <button key={k} className={`tab ${aba===k?'active':''}`} onClick={()=>setAba(k)}>{l}</button>
@@ -2486,6 +2632,7 @@ function App() {
 
           {aba==='dash' && user.area==='comercial' && <ComercialDash regs={regs} user={user}/>}
           {aba==='estoque' && <EstoqueTab user={user} sb={sb}/>}
+          {aba==='listacompra' && <ListaCompraTab user={user} sb={sb}/>}
           {aba==='notasfiscais' && <NotasFiscaisTab user={user} sb={sb}/>}
 
           {aba==='reg' && <>
@@ -2668,7 +2815,7 @@ function App() {
 
         <div className="content">
           <div className="tabs" style={{marginBottom:24}}>
-            {[['usuarios','👥 Estagiários'],['dash','📊 Dashboard'],['aval','⭐ Avaliações'],['hist','📋 Histórico'],['niveis','📚 Níveis'],['estoque','📦 Estoque'],['notasfiscais','🧾 Notas Fiscais']].map(([k,l])=>(
+            {[['usuarios','👥 Estagiários'],['dash','📊 Dashboard'],['aval','⭐ Avaliações'],['hist','📋 Histórico'],['niveis','📚 Níveis'],['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais']].map(([k,l])=>(
               <button key={k} className={`tab ${abaA===k?'active':''}`} onClick={()=>setAbaA(k)}>{l}</button>
             ))}
           </div>
@@ -2857,6 +3004,7 @@ function App() {
 
           {abaA==='niveis' && <NiveisTab/>}
           {abaA==='estoque' && <EstoqueTab user={user} sb={sb}/>}
+          {abaA==='listacompra' && <ListaCompraTab user={user} sb={sb}/>}
           {abaA==='notasfiscais' && <NotasFiscaisTab user={user} sb={sb}/>}
 
         {modalAval && (
