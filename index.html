@@ -1290,7 +1290,7 @@ function EstoqueTab({user, sb}) {
   const [modalImportar, setModalImportar] = useState(false);
   const [vencFiltro, setVencFiltro]       = useState(''); // '' | 'vencido' | 'vencendo'
 
-  const isSup = user.nivel === 8 || user.tipo === 'admin';
+  const isSup = user.nivel === 8 || user.tipo === 'admin' || user.tipo === 'financeiro';
 
   const carregar = async () => {
     if (!sb) return;
@@ -1629,7 +1629,7 @@ function NotasFiscaisTab({user, sb}) {
   const [nfObs, setNfObs]               = useState('');
   const [itensNF, setItensNF]           = useState([]);
 
-  const isSup = user.nivel === 8 || user.tipo === 'admin';
+  const isSup = user.nivel === 8 || user.tipo === 'admin' || user.tipo === 'financeiro';
 
   const carregar = async () => {
     if (!sb) return;
@@ -2262,6 +2262,7 @@ function App() {
   const [aba, setAba]       = useState('reg');
 
   const [abaA, setAbaA]     = useState('usuarios');
+  const [abaFin, setAbaFin] = useState('estoque');
   const [fEst, setFEst]     = useState('');
   const [fArea, setFArea]   = useState('');
   const [fMes, setFMes]     = useState(new Date().getMonth());
@@ -2298,7 +2299,7 @@ function App() {
       if (sessao) {
         const u = JSON.parse(sessao);
         setUser(u);
-        setTela(u.tipo === 'admin' ? 'admin' : 'est');
+        setTela(u.tipo === 'admin' ? 'admin' : u.tipo === 'financeiro' ? 'financeiro' : 'est');
         if (u.tipo === 'estagiario') agendarAlertas(u);
       }
     } catch(e) {}
@@ -2376,7 +2377,7 @@ function App() {
         const data = arr && arr[0];
         if (data) {
           setUser(data);
-          setTela(data.tipo === 'admin' ? 'admin' : 'est');
+          setTela(data.tipo === 'admin' ? 'admin' : data.tipo === 'financeiro' ? 'financeiro' : 'est');
           if (data.tipo === 'estagiario') agendarAlertas(data);
           try { localStorage.setItem('hoc_sessao', JSON.stringify(data)); } catch(e) {}
         } else setErr('Usuário não encontrado. Faça login com senha.');
@@ -2395,7 +2396,7 @@ function App() {
     const data = arr && arr[0];
     if (data) {
       setUser(data);
-      setTela(data.tipo === 'admin' ? 'admin' : 'est');
+      setTela(data.tipo === 'admin' ? 'admin' : data.tipo === 'financeiro' ? 'financeiro' : 'est');
       if (data.tipo === 'estagiario') agendarAlertas(data);
       try { localStorage.setItem('hoc_sessao', JSON.stringify(data)); } catch(e) {}
       // Verificar se deve perguntar sobre biometria
@@ -2819,7 +2820,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.6.1 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.7 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -3072,6 +3073,33 @@ function App() {
   // ─────────────────────────────────────────────────────────────
   // TELA: ADMIN
   // ─────────────────────────────────────────────────────────────
+  if (tela === 'financeiro') {
+    return (
+      <div className="page">
+        <div className="header">
+          <div>
+            <div className="logo-sub" style={{fontWeight:800,fontSize:18}}>HOC — Financeiro</div>
+          </div>
+          <div style={{display:'flex',gap:10}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{setTela('login'); setModoTela('login'); try{localStorage.removeItem('hoc_sessao');}catch(e){};}}>Sair</button>
+          </div>
+        </div>
+
+        <div className="content">
+          <div className="tabs" style={{marginBottom:24}}>
+            {[['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais']].map(([k,l])=>(
+              <button key={k} className={`tab ${abaFin===k?'active':''}`} onClick={()=>setAbaFin(k)}>{l}</button>
+            ))}
+          </div>
+
+          {abaFin==='estoque' && <EstoqueTab user={user} sb={sb}/>}
+          {abaFin==='listacompra' && <ListaCompraTab user={user} sb={sb}/>}
+          {abaFin==='notasfiscais' && <NotasFiscaisTab user={user} sb={sb}/>}
+        </div>
+      </div>
+    );
+  }
+
   if (tela === 'admin') {
     const regsF = regs.filter(r => {
       const d = new Date(r.data);
@@ -3375,6 +3403,7 @@ function App() {
                 <label className="inp-label">Tipo de Acesso</label>
                 <select className="inp" value={nTipo} onChange={e=>setNTipo(e.target.value)} style={{cursor:'pointer'}}>
                   <option value="estagiario">Estagiário</option>
+                  <option value="financeiro">Financeiro (Estoque/Compras/NF)</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
