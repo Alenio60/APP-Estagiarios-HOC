@@ -18,6 +18,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
 <script>
@@ -977,6 +978,66 @@ function GuiaTab({user}) {
 
 
 
+function BarcodeScannerModal({onDetected, onClose}) {
+  const {useEffect, useRef, useState} = React;
+  const [erro, setErro] = useState('');
+  const scannerRef = useRef(null);
+  const divIdRef = useRef('barcode-scanner-'+Math.random().toString(36).slice(2));
+
+  useEffect(() => {
+    let cancelado = false;
+    let handled = false;
+    const scanner = new Html5Qrcode(divIdRef.current);
+    scannerRef.current = scanner;
+
+    scanner.start(
+      { facingMode: 'environment' },
+      {
+        fps: 10,
+        qrbox: { width: 260, height: 160 },
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.QR_CODE
+        ]
+      },
+      (decodedText) => {
+        if (handled || cancelado) return;
+        handled = true;
+        scanner.stop().then(()=>scanner.clear()).catch(()=>{}).finally(()=>{
+          if (!cancelado) onDetected(decodedText);
+        });
+      },
+      () => {}
+    ).catch(() => {
+      if (!cancelado) setErro('Não foi possível acessar a câmera. Verifique as permissões do navegador.');
+    });
+
+    return () => {
+      cancelado = true;
+      try {
+        scanner.stop().then(()=>scanner.clear()).catch(()=>{});
+      } catch(e) {}
+    };
+  }, []);
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:420}}>
+        <div className="modal-title">📷 Escanear código de barras</div>
+        {erro && <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#ef4444',marginBottom:12}}>{erro}</div>}
+        <div id={divIdRef.current} style={{width:'100%',borderRadius:8,overflow:'hidden',background:'#000'}}></div>
+        <div style={{fontSize:11,color:'var(--text-muted)',textAlign:'center',margin:'10px 0'}}>Aponte a câmera para o código de barras do produto</div>
+        <button className="btn btn-ghost" style={{width:'100%'}} onClick={onClose}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
 function EstoqueTab({user, sb}) {
   const {useState, useEffect, useMemo} = React;
   const [itens, setItens]       = useState([]);
@@ -996,6 +1057,10 @@ function EstoqueTab({user, sb}) {
   const [nQtd, setNQtd]         = useState(0);
   const [nMin, setNMin]         = useState(1);
   const [nUn, setNUn]           = useState('un');
+  const [nCodBarras, setNCodBarras] = useState('');
+  // Scanner
+  const [scannerAberto, setScannerAberto] = useState(null); // 'busca' | 'cadastro' | null
+  const [avisoScan, setAvisoScan]         = useState('');
 
   const isSup = user.nivel === 8 || user.tipo === 'admin';
 
@@ -1043,10 +1108,28 @@ function EstoqueTab({user, sb}) {
   const cadastrar = async () => {
     if (!nProd || !nCat) return;
     setBusy(true);
-    await sb.from('estoque').insert([{produto:nProd, categoria:nCat, quantidade:+nQtd, minimo:+nMin, unidade:nUn}]);
-    setModalCad(false); setNProd(''); setNCat(''); setNQtd(0); setNMin(1); setNUn('un');
+    await sb.from('estoque').insert([{produto:nProd, categoria:nCat, quantidade:+nQtd, minimo:+nMin, unidade:nUn, codigo_barras:nCodBarras||null}]);
+    setModalCad(false); setNProd(''); setNCat(''); setNQtd(0); setNMin(1); setNUn('un'); setNCodBarras('');
     await carregar();
     setBusy(false);
+  };
+
+  const handleScan = (codigo) => {
+    const origem = scannerAberto;
+    setScannerAberto(null);
+    if (origem === 'cadastro') {
+      setNCodBarras(codigo);
+      return;
+    }
+    // origem === 'busca': procura item pelo código de barras
+    const item = itens.find(i => i.codigo_barras === codigo);
+    if (item) {
+      setAvisoScan('');
+      setModal({item, tipo:'entrada'});
+      setQtdMov(1);
+    } else {
+      setAvisoScan(codigo);
+    }
   };
 
   const corStatus = s => s==='OK'?'var(--green)':s==='COMPRAR'?'var(--yellow)':'var(--red)';
@@ -1082,7 +1165,15 @@ function EstoqueTab({user, sb}) {
           </select>
           {statusFiltro && <button className="btn btn-ghost btn-sm" onClick={()=>setStatusFiltro('')}>✕ Limpar filtro</button>}
           {isSup && <button className="btn btn-success btn-sm" onClick={()=>setModalCad(true)}>+ Novo item</button>}
+          {isSup && <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={()=>{setAvisoScan('');setScannerAberto('busca');}}>📷 Bipar item</button>}
         </div>
+
+        {avisoScan && (
+          <div className="alert" style={{background:'#f59e0b18',border:'1px solid #f59e0b40',color:'#fbbf24',marginBottom:12,display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+            <span>⚠️ Código <b>{avisoScan}</b> não encontrado em nenhum item cadastrado.</span>
+            {isSup && <button className="btn btn-sm btn-success" onClick={()=>{setNCodBarras(avisoScan);setAvisoScan('');setModalCad(true);}}>Cadastrar item</button>}
+          </div>
+        )}
 
         {/* Lista */}
         <div style={{display:'flex',flexDirection:'column',gap:6}}>
@@ -1176,6 +1267,13 @@ function EstoqueTab({user, sb}) {
               <input className="inp" list="cats-list" value={nCat} onChange={e=>setNCat(e.target.value)} placeholder="Ex: EPI"/>
               <datalist id="cats-list">{cats.map(c=><option key={c} value={c}/>)}</datalist>
             </div>
+            <div style={{marginBottom:12}}>
+              <label className="inp-label">Código de barras (opcional)</label>
+              <div style={{display:'flex',gap:6}}>
+                <input className="inp" value={nCodBarras} onChange={e=>setNCodBarras(e.target.value)} placeholder="Escaneie ou digite o código" style={{flex:1}}/>
+                <button type="button" className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)'}} onClick={()=>setScannerAberto('cadastro')}>📷</button>
+              </div>
+            </div>
             <div style={{display:'flex',gap:8,marginBottom:12}}>
               <div style={{flex:1}}>
                 <label className="inp-label">Qtd Inicial</label>
@@ -1205,6 +1303,231 @@ function EstoqueTab({user, sb}) {
             </div>
           </div>
         </div>
+      )}
+
+      {scannerAberto && (
+        <BarcodeScannerModal onDetected={handleScan} onClose={()=>setScannerAberto(null)}/>
+      )}
+    </div>
+  );
+}
+
+function NotasFiscaisTab({user, sb}) {
+  const {useState, useEffect, useMemo} = React;
+  const [notas, setNotas]           = useState([]);
+  const [itensPorNF, setItensPorNF] = useState({});
+  const [estoqueItens, setEstoqueItens] = useState([]);
+  const [busca, setBusca]           = useState('');
+  const [expandido, setExpandido]   = useState(null);
+  const [modalNova, setModalNova]   = useState(false);
+  const [busy, setBusy]             = useState(false);
+  const [scannerAberto, setScannerAberto] = useState(false);
+
+  const [nfNumero, setNfNumero]         = useState('');
+  const [nfFornecedor, setNfFornecedor] = useState('');
+  const [nfData, setNfData]             = useState(new Date().toISOString().slice(0,10));
+  const [nfObs, setNfObs]               = useState('');
+  const [itensNF, setItensNF]           = useState([]);
+
+  const isSup = user.nivel === 8 || user.tipo === 'admin';
+
+  const carregar = async () => {
+    if (!sb) return;
+    const {data:n} = await sb.from('notas_fiscais').select('*').order('created_at',{ascending:false});
+    if (n) setNotas(n);
+    const {data:it} = await sb.from('notas_fiscais_itens').select('*');
+    if (it) {
+      const agrupado = {};
+      it.forEach(i => { (agrupado[i.nf_id] = agrupado[i.nf_id]||[]).push(i); });
+      setItensPorNF(agrupado);
+    }
+    const {data:e} = await sb.from('estoque').select('*').order('produto');
+    if (e) setEstoqueItens(e);
+  };
+
+  useEffect(() => { carregar(); }, []);
+
+  const notasFiltradas = useMemo(() => notas.filter(n =>
+    !busca || n.numero.toLowerCase().includes(busca.toLowerCase()) || n.fornecedor.toLowerCase().includes(busca.toLowerCase())
+  ), [notas, busca]);
+
+  const adicionarItem = () => setItensNF([...itensNF, {produtoId:'', produtoNome:'', quantidade:1, valorUnit:0}]);
+  const atualizarItem = (idx, campo, valor) => setItensNF(itensNF.map((it,i) => i===idx ? {...it, [campo]:valor} : it));
+  const removerItem   = (idx) => setItensNF(itensNF.filter((_,i)=>i!==idx));
+
+  const handleScanItem = (codigo) => {
+    setScannerAberto(false);
+    const item = estoqueItens.find(i => i.codigo_barras === codigo);
+    if (item) {
+      setItensNF([...itensNF, {produtoId:item.id, produtoNome:item.produto, quantidade:1, valorUnit:0}]);
+    } else {
+      alert('Código '+codigo+' não encontrado no estoque. Adicione o item manualmente.');
+    }
+  };
+
+  const valorTotalNF = useMemo(() => itensNF.reduce((s,i)=>s+((+i.quantidade||0)*(+i.valorUnit||0)),0), [itensNF]);
+
+  const resetForm = () => {
+    setNfNumero(''); setNfFornecedor(''); setNfData(new Date().toISOString().slice(0,10));
+    setNfObs(''); setItensNF([]);
+  };
+
+  const salvarNF = async () => {
+    if (!nfNumero || !nfFornecedor || itensNF.length===0) return;
+    if (itensNF.some(i=>!i.produtoNome || !(+i.quantidade>0))) return;
+    setBusy(true);
+    try {
+      const {data:nf, error} = await sb.from('notas_fiscais').insert([{
+        numero:nfNumero, fornecedor:nfFornecedor, data_emissao:nfData,
+        valor_total:valorTotalNF, observacao:nfObs, responsavel:user.nome
+      }]).select().single();
+      if (!error && nf) {
+        for (const it of itensNF) {
+          const valorTot = (+it.quantidade||0)*(+it.valorUnit||0);
+          await sb.from('notas_fiscais_itens').insert([{
+            nf_id: nf.id, produto_id: it.produtoId||null, produto_nome: it.produtoNome,
+            quantidade: +it.quantidade, valor_unitario: +it.valorUnit||0, valor_total: valorTot
+          }]);
+          if (it.produtoId) {
+            const itemAtual = estoqueItens.find(x=>x.id===it.produtoId);
+            const novaQtd = (itemAtual?.quantidade||0) + (+it.quantidade);
+            await sb.from('estoque').update({quantidade: novaQtd, updated_at: new Date().toISOString()}).eq('id', it.produtoId);
+            await sb.from('estoque_movimentacoes').insert([{
+              produto_id: it.produtoId, produto_nome: it.produtoNome,
+              tipo:'entrada', quantidade: +it.quantidade, responsavel: user.nome,
+              obs: `NF ${nfNumero} · ${nfFornecedor}`
+            }]);
+          }
+        }
+      }
+      setModalNova(false);
+      resetForm();
+      await carregar();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
+        <input className="inp" placeholder="🔍 Buscar por número ou fornecedor..." value={busca} onChange={e=>setBusca(e.target.value)} style={{flex:1,minWidth:200}}/>
+        {isSup && <button className="btn btn-success btn-sm" onClick={()=>{resetForm();setModalNova(true);}}>+ Nova Nota Fiscal</button>}
+      </div>
+
+      <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        {notasFiltradas.map(nf => {
+          const itensDaNF = itensPorNF[nf.id] || [];
+          const aberta = expandido === nf.id;
+          return (
+            <div key={nf.id} className="card-sm">
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer',flexWrap:'wrap',gap:8}} onClick={()=>setExpandido(aberta?null:nf.id)}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:14}}>NF {nf.numero} — {nf.fornecedor}</div>
+                  <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>
+                    {new Date(nf.data_emissao+'T00:00:00').toLocaleDateString('pt-BR')} · {itensDaNF.length} item(ns) · Lançado por {nf.responsavel}
+                  </div>
+                </div>
+                <div style={{textAlign:'right'}}>
+                  <div style={{fontWeight:800,color:'var(--accent)'}}>R$ {(+nf.valor_total).toFixed(2)}</div>
+                  <div style={{fontSize:11,color:'var(--text-muted)'}}>{aberta ? '▲ Fechar' : '▼ Detalhes'}</div>
+                </div>
+              </div>
+              {aberta && (
+                <div style={{marginTop:10,borderTop:'1px solid var(--border)',paddingTop:10}}>
+                  {itensDaNF.map(it => (
+                    <div key={it.id} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'4px 0'}}>
+                      <span>{it.produto_nome} × {it.quantidade}</span>
+                      <span style={{color:'var(--text-muted)'}}>R$ {(+it.valor_total).toFixed(2)}</span>
+                    </div>
+                  ))}
+                  {nf.observacao && <div style={{fontSize:11,color:'var(--text-dim)',marginTop:6}}>Obs: {nf.observacao}</div>}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {notasFiltradas.length===0 && <div style={{textAlign:'center',color:'var(--text-muted)',padding:40}}>Nenhuma nota fiscal registrada</div>}
+      </div>
+
+      {modalNova && (
+        <div className="overlay" onClick={()=>setModalNova(false)}>
+          <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:560,maxHeight:'85vh',overflowY:'auto'}}>
+            <div className="modal-title">+ Nova Nota Fiscal</div>
+            <div style={{display:'flex',gap:8,marginBottom:12}}>
+              <div style={{flex:1}}>
+                <label className="inp-label">Número da NF</label>
+                <input className="inp" value={nfNumero} onChange={e=>setNfNumero(e.target.value)} placeholder="Ex: 12345"/>
+              </div>
+              <div style={{flex:1}}>
+                <label className="inp-label">Data de emissão</label>
+                <input type="date" className="inp" value={nfData} onChange={e=>setNfData(e.target.value)}/>
+              </div>
+            </div>
+            <div style={{marginBottom:12}}>
+              <label className="inp-label">Fornecedor</label>
+              <input className="inp" value={nfFornecedor} onChange={e=>setNfFornecedor(e.target.value)} placeholder="Ex: Dental Cremer"/>
+            </div>
+
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',margin:'16px 0 8px'}}>
+              <label className="inp-label" style={{margin:0}}>Itens da nota</label>
+              <div style={{display:'flex',gap:6}}>
+                <button type="button" className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)'}} onClick={()=>setScannerAberto(true)}>📷 Bipar item</button>
+                <button type="button" className="btn btn-sm btn-success" onClick={adicionarItem}>+ Item</button>
+              </div>
+            </div>
+
+            {itensNF.map((it, idx) => (
+              <div key={idx} style={{border:'1px solid var(--border)',borderRadius:8,padding:10,marginBottom:8}}>
+                <div style={{marginBottom:8}}>
+                  <select className="inp" value={it.produtoId} onChange={e=>{
+                    const id = e.target.value;
+                    const prod = estoqueItens.find(p=>String(p.id)===String(id));
+                    atualizarItem(idx,'produtoId', id?+id:'');
+                    if (prod) atualizarItem(idx,'produtoNome', prod.produto);
+                  }}>
+                    <option value="">Selecione um item do estoque...</option>
+                    {estoqueItens.map(p => <option key={p.id} value={p.id}>{p.produto}</option>)}
+                  </select>
+                  <input className="inp" style={{marginTop:6}} value={it.produtoNome} onChange={e=>atualizarItem(idx,'produtoNome',e.target.value)} placeholder="Ou digite o nome do produto (item novo)"/>
+                </div>
+                <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
+                  <div style={{flex:1}}>
+                    <label className="inp-label">Qtd</label>
+                    <input type="number" className="inp" value={it.quantidade} min="0.01" step="0.01" onChange={e=>atualizarItem(idx,'quantidade',e.target.value)}/>
+                  </div>
+                  <div style={{flex:1}}>
+                    <label className="inp-label">Valor unit. (R$)</label>
+                    <input type="number" className="inp" value={it.valorUnit} min="0" step="0.01" onChange={e=>atualizarItem(idx,'valorUnit',e.target.value)}/>
+                  </div>
+                  <button type="button" className="btn btn-danger btn-sm" onClick={()=>removerItem(idx)}>✕</button>
+                </div>
+              </div>
+            ))}
+            {itensNF.length===0 && <div style={{textAlign:'center',color:'var(--text-muted)',padding:16,fontSize:12}}>Nenhum item adicionado ainda</div>}
+
+            <div style={{marginTop:8,marginBottom:12}}>
+              <label className="inp-label">Observação (opcional)</label>
+              <input className="inp" value={nfObs} onChange={e=>setNfObs(e.target.value)} placeholder="Ex: Compra mensal de EPIs"/>
+            </div>
+
+            <div style={{display:'flex',justifyContent:'space-between',fontWeight:800,fontSize:15,margin:'12px 0',padding:'8px 0',borderTop:'1px solid var(--border)'}}>
+              <span>Total</span>
+              <span style={{color:'var(--accent)'}}>R$ {valorTotalNF.toFixed(2)}</span>
+            </div>
+
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModalNova(false)}>Cancelar</button>
+              <button className="btn btn-success" style={{flex:1}} onClick={salvarNF} disabled={busy||!nfNumero||!nfFornecedor||itensNF.length===0}>
+                {busy?'Salvando...':'Salvar Nota Fiscal'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {scannerAberto && (
+        <BarcodeScannerModal onDetected={handleScanItem} onClose={()=>setScannerAberto(false)}/>
       )}
     </div>
   );
@@ -2060,7 +2383,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.2 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.3 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -2154,7 +2477,7 @@ function App() {
               : user.area==='comercial'
               ? [['dash','📊 Dashboard'],['reg','📝 Registrar'],['hist','📋 Histórico']]
               : user.nivel===8
-              ? [['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas'],['guia','📚 Guia'],['estoque','📦 Estoque']]
+              ? [['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas'],['guia','📚 Guia'],['estoque','📦 Estoque'],['notasfiscais','🧾 Notas Fiscais']]
               : [['reg','📝 Registrar'],['hist','📊 Histórico']]
             ).map(([k,l]) => (
               <button key={k} className={`tab ${aba===k?'active':''}`} onClick={()=>setAba(k)}>{l}</button>
@@ -2163,6 +2486,7 @@ function App() {
 
           {aba==='dash' && user.area==='comercial' && <ComercialDash regs={regs} user={user}/>}
           {aba==='estoque' && <EstoqueTab user={user} sb={sb}/>}
+          {aba==='notasfiscais' && <NotasFiscaisTab user={user} sb={sb}/>}
 
           {aba==='reg' && <>
             {user.area==='marketing' && <div className="alert alert-info" style={{marginBottom:16}}>📱 Estagiário de Marketing</div>}
@@ -2344,7 +2668,7 @@ function App() {
 
         <div className="content">
           <div className="tabs" style={{marginBottom:24}}>
-            {[['usuarios','👥 Estagiários'],['dash','📊 Dashboard'],['aval','⭐ Avaliações'],['hist','📋 Histórico'],['niveis','📚 Níveis'],['estoque','📦 Estoque']].map(([k,l])=>(
+            {[['usuarios','👥 Estagiários'],['dash','📊 Dashboard'],['aval','⭐ Avaliações'],['hist','📋 Histórico'],['niveis','📚 Níveis'],['estoque','📦 Estoque'],['notasfiscais','🧾 Notas Fiscais']].map(([k,l])=>(
               <button key={k} className={`tab ${abaA===k?'active':''}`} onClick={()=>setAbaA(k)}>{l}</button>
             ))}
           </div>
@@ -2533,6 +2857,7 @@ function App() {
 
           {abaA==='niveis' && <NiveisTab/>}
           {abaA==='estoque' && <EstoqueTab user={user} sb={sb}/>}
+          {abaA==='notasfiscais' && <NotasFiscaisTab user={user} sb={sb}/>}
 
         {modalAval && (
           <div className="overlay" onClick={()=>setModalAval(null)}>
