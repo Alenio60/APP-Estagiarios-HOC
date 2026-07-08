@@ -1048,8 +1048,24 @@ const MAPA_CABECALHO_ESTOQUE = {
   quantidade: ['quantidade','qtd','qtdinicial','estoqueinicial','estoque','quantidadeinicial'],
   minimo: ['minimo','min','estoqueminimo','qtdminima'],
   unidade: ['unidade','un','und'],
-  codigo_barras: ['codigobarras','codigo','ean','barcode','codbarras']
+  codigo_barras: ['codigobarras','codigo','ean','barcode','codbarras'],
+  lote: ['lote'],
+  vencimento: ['vencimento','validade','venc','datavencimento','datavalidade']
 };
+
+function parseDataImport(v) {
+  if (!v) return undefined;
+  const s = String(v).trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (m) {
+    let [_, d, mo, y] = m;
+    if (y.length===2) y = '20'+y;
+    return `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  }
+  return s;
+}
 
 function detectarDelimitador(linha) {
   if (linha.includes('\t')) return '\t';
@@ -1088,12 +1104,14 @@ function analisarTabelaEstoque(texto) {
     const minimo = parseNumeroImport(cols[indices.minimo], delim);
     const unidade = indices.unidade!==undefined ? ((cols[indices.unidade]||'').trim() || 'un') : undefined;
     const codigo_barras = indices.codigo_barras!==undefined ? ((cols[indices.codigo_barras]||'').trim() || null) : undefined;
+    const lote = indices.lote!==undefined ? ((cols[indices.lote]||'').trim() || null) : undefined;
+    const vencimento = indices.vencimento!==undefined ? parseDataImport(cols[indices.vencimento]) : undefined;
     let erro = '';
     if (!produto) erro = 'Produto vazio';
     else if (!categoria) erro = 'Categoria vazia';
     else if (isNaN(quantidade)) erro = 'Quantidade inválida';
     else if (isNaN(minimo)) erro = 'Mínimo inválido';
-    return { linha: i+2, produto, categoria, quantidade, minimo, unidade, codigo_barras, erro };
+    return { linha: i+2, produto, categoria, quantidade, minimo, unidade, codigo_barras, lote, vencimento, erro };
   });
   return {registros};
 }
@@ -1143,12 +1161,15 @@ function ImportarEstoqueModal({itensAtuais, sb, onClose, onImported}) {
           const campos = {quantidade:r.quantidade, minimo:r.minimo, updated_at:new Date().toISOString()};
           if (r.unidade !== undefined) campos.unidade = r.unidade;
           if (r.codigo_barras !== undefined) campos.codigo_barras = r.codigo_barras;
+          if (r.lote !== undefined) campos.lote = r.lote;
+          if (r.vencimento !== undefined) campos.vencimento = r.vencimento;
           await sb.from('estoque').update(campos).eq('id', r.existenteId);
           atualizados++;
         } else {
           await sb.from('estoque').insert([{
             produto:r.produto, categoria:r.categoria, quantidade:r.quantidade, minimo:r.minimo,
-            unidade: r.unidade||'un', codigo_barras: r.codigo_barras||null
+            unidade: r.unidade||'un', codigo_barras: r.codigo_barras||null,
+            lote: r.lote||null, vencimento: r.vencimento||null
           }]);
           criados++;
         }
@@ -1169,10 +1190,10 @@ function ImportarEstoqueModal({itensAtuais, sb, onClose, onImported}) {
         {etapa==='colar' && <>
           <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:10,lineHeight:1.5}}>
             Cole a tabela direto do Excel/Planilha (Ctrl+C na planilha, Ctrl+V aqui) ou um CSV.
-            A primeira linha precisa ser o cabeçalho, com colunas: <b>Produto, Categoria, Quantidade, Mínimo</b> (Unidade e Código de barras são opcionais).
+            A primeira linha precisa ser o cabeçalho, com colunas: <b>Produto, Categoria, Quantidade, Mínimo</b> (Unidade, Código de barras, Lote e Validade são opcionais).
           </div>
           {erroAnalise && <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#ef4444',marginBottom:12}}>{erroAnalise}</div>}
-          <textarea className="inp" value={texto} onChange={e=>setTexto(e.target.value)} placeholder={"Produto\tCategoria\tQuantidade\tMinimo\tUnidade\tCodigoBarras\nLuva estéril 7,0\tEPI\t50\t20\tcx\t7891234567890"} style={{width:'100%',minHeight:180,fontFamily:'monospace',fontSize:12,resize:'vertical'}}/>
+          <textarea className="inp" value={texto} onChange={e=>setTexto(e.target.value)} placeholder={"Produto\tCategoria\tQuantidade\tMinimo\tUnidade\tCodigoBarras\tLote\tVencimento\nLuva estéril 7,0\tEPI\t50\t20\tcx\t7891234567890\tL2026-08\t2027-08-01"} style={{width:'100%',minHeight:180,fontFamily:'monospace',fontSize:12,resize:'vertical'}}/>
           <div style={{display:'flex',gap:8,marginTop:16}}>
             <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancelar</button>
             <button className="btn btn-success" style={{flex:1}} onClick={analisar} disabled={!texto.trim()}>Analisar tabela</button>
@@ -1250,6 +1271,8 @@ function EstoqueTab({user, sb}) {
   const [qtdMov, setQtdMov]     = useState(1);
   const [obsMov, setObsMov]     = useState('');
   const [valorMov, setValorMov] = useState('');
+  const [loteMov, setLoteMov]   = useState('');
+  const [vencMov, setVencMov]   = useState('');
   const [busy, setBusy]         = useState(false);
   const [aba, setAba]           = useState('estoque'); // estoque | historico
   // Cadastro novo item
@@ -1259,10 +1282,13 @@ function EstoqueTab({user, sb}) {
   const [nMin, setNMin]         = useState(1);
   const [nUn, setNUn]           = useState('un');
   const [nCodBarras, setNCodBarras] = useState('');
+  const [nLote, setNLote]       = useState('');
+  const [nVenc, setNVenc]       = useState('');
   // Scanner
   const [scannerAberto, setScannerAberto] = useState(null); // 'busca' | 'cadastro' | null
   const [avisoScan, setAvisoScan]         = useState('');
   const [modalImportar, setModalImportar] = useState(false);
+  const [vencFiltro, setVencFiltro]       = useState(''); // '' | 'vencido' | 'vencendo'
 
   const isSup = user.nivel === 8 || user.tipo === 'admin';
 
@@ -1278,18 +1304,31 @@ function EstoqueTab({user, sb}) {
 
   const cats = useMemo(() => [...new Set(itens.map(i=>i.categoria))].sort(), [itens]);
 
+  const situacaoVencimento = (item) => {
+    if (!item.vencimento) return null;
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const venc = new Date(item.vencimento+'T00:00:00');
+    const dias = Math.round((venc - hoje) / 86400000);
+    if (dias < 0) return 'vencido';
+    if (dias <= 90) return 'vencendo';
+    return null;
+  };
+
   const itensFiltrados = useMemo(() => itens.filter(i => {
     const buscaOk = !busca || i.produto.toLowerCase().includes(busca.toLowerCase());
     const catOk   = !catFiltro || i.categoria === catFiltro;
     const stOk    = !statusFiltro || i.status === statusFiltro;
-    return buscaOk && catOk && stOk;
-  }), [itens, busca, catFiltro, statusFiltro]);
+    const vencOk  = !vencFiltro || situacaoVencimento(i) === vencFiltro;
+    return buscaOk && catOk && stOk && vencOk;
+  }), [itens, busca, catFiltro, statusFiltro, vencFiltro]);
 
   const stats = useMemo(() => ({
     total: itens.length,
     ok: itens.filter(i=>i.status==='OK').length,
     comprar: itens.filter(i=>i.status==='COMPRAR').length,
     critico: itens.filter(i=>i.status==='CRÍTICO').length,
+    vencido: itens.filter(i=>situacaoVencimento(i)==='vencido').length,
+    vencendo: itens.filter(i=>situacaoVencimento(i)==='vencendo').length,
   }), [itens]);
 
   const movimentar = async () => {
@@ -1297,13 +1336,18 @@ function EstoqueTab({user, sb}) {
     setBusy(true);
     const {item, tipo} = modal;
     const novaQtd = tipo==='entrada' ? item.quantidade + qtdMov : Math.max(0, item.quantidade - qtdMov);
-    await sb.from('estoque').update({quantidade: novaQtd, updated_at: new Date().toISOString()}).eq('id', item.id);
+    const camposEstoque = {quantidade: novaQtd, updated_at: new Date().toISOString()};
+    if (tipo==='entrada') {
+      if (loteMov) camposEstoque.lote = loteMov;
+      if (vencMov) camposEstoque.vencimento = vencMov;
+    }
+    await sb.from('estoque').update(camposEstoque).eq('id', item.id);
     await sb.from('estoque_movimentacoes').insert([{
       produto_id: item.id, produto_nome: item.produto,
       tipo, quantidade: qtdMov, responsavel: user.nome, obs: obsMov,
       valor_unitario: (tipo==='entrada' && valorMov) ? +valorMov : null
     }]);
-    setModal(null); setQtdMov(1); setObsMov(''); setValorMov('');
+    setModal(null); setQtdMov(1); setObsMov(''); setValorMov(''); setLoteMov(''); setVencMov('');
     await carregar();
     setBusy(false);
   };
@@ -1311,8 +1355,8 @@ function EstoqueTab({user, sb}) {
   const cadastrar = async () => {
     if (!nProd || !nCat) return;
     setBusy(true);
-    await sb.from('estoque').insert([{produto:nProd, categoria:nCat, quantidade:+nQtd, minimo:+nMin, unidade:nUn, codigo_barras:nCodBarras||null}]);
-    setModalCad(false); setNProd(''); setNCat(''); setNQtd(0); setNMin(1); setNUn('un'); setNCodBarras('');
+    await sb.from('estoque').insert([{produto:nProd, categoria:nCat, quantidade:+nQtd, minimo:+nMin, unidade:nUn, codigo_barras:nCodBarras||null, lote:nLote||null, vencimento:nVenc||null}]);
+    setModalCad(false); setNProd(''); setNCat(''); setNQtd(0); setNMin(1); setNUn('un'); setNCodBarras(''); setNLote(''); setNVenc('');
     await carregar();
     setBusy(false);
   };
@@ -1332,6 +1376,8 @@ function EstoqueTab({user, sb}) {
       setQtdMov(1);
       setObsMov('');
       setValorMov('');
+      setLoteMov('');
+      setVencMov('');
     } else {
       setAvisoScan(codigo);
     }
@@ -1344,9 +1390,14 @@ function EstoqueTab({user, sb}) {
       {/* KPIs */}
       <div className="stat-grid" style={{marginBottom:16}}>
         {[['Total',stats.total,'var(--accent)'],['✅ OK',stats.ok,'var(--green)'],
-          ['⚠️ Comprar',stats.comprar,'var(--yellow)'],['🚨 Crítico',stats.critico,'var(--red)']
+          ['⚠️ Comprar',stats.comprar,'var(--yellow)'],['🚨 Crítico',stats.critico,'var(--red)'],
+          ['⏰ Vencendo',stats.vencendo,'var(--yellow)'],['💀 Vencido',stats.vencido,'var(--red)']
         ].map(([l,v,c])=>(
-          <div key={l} className="stat-box" onClick={()=>setStatusFiltro(l.includes('OK')?'OK':l.includes('Comprar')?'COMPRAR':l.includes('Crítico')?'CRÍTICO':'')} style={{cursor:'pointer',borderColor:c+'44'}}>
+          <div key={l} className="stat-box" onClick={()=>{
+            if (l.includes('Vencendo')) { setVencFiltro(vencFiltro==='vencendo'?'':'vencendo'); setStatusFiltro(''); }
+            else if (l.includes('Vencido')) { setVencFiltro(vencFiltro==='vencido'?'':'vencido'); setStatusFiltro(''); }
+            else { setStatusFiltro(l.includes('OK')?'OK':l.includes('Comprar')?'COMPRAR':l.includes('Crítico')?'CRÍTICO':''); setVencFiltro(''); }
+          }} style={{cursor:'pointer',borderColor:c+'44'}}>
             <div className="stat-num" style={{color:c,fontSize:22}}>{v}</div>
             <div className="stat-lbl">{l}</div>
           </div>
@@ -1368,7 +1419,7 @@ function EstoqueTab({user, sb}) {
             <option value="">Todas categorias</option>
             {cats.map(c=><option key={c} value={c}>{c}</option>)}
           </select>
-          {statusFiltro && <button className="btn btn-ghost btn-sm" onClick={()=>setStatusFiltro('')}>✕ Limpar filtro</button>}
+          {(statusFiltro || vencFiltro) && <button className="btn btn-ghost btn-sm" onClick={()=>{setStatusFiltro('');setVencFiltro('');}}>✕ Limpar filtro</button>}
           {isSup && <button className="btn btn-success btn-sm" onClick={()=>setModalCad(true)}>+ Novo item</button>}
           {isSup && <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={()=>{setAvisoScan('');setScannerAberto('busca');}}>📷 Bipar item</button>}
           {isSup && <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={()=>setModalImportar(true)}>📥 Importar</button>}
@@ -1383,12 +1434,23 @@ function EstoqueTab({user, sb}) {
 
         {/* Lista */}
         <div style={{display:'flex',flexDirection:'column',gap:6}}>
-          {itensFiltrados.map(item=>(
+          {itensFiltrados.map(item=>{
+            const venc = situacaoVencimento(item);
+            return (
             <div key={item.id} className="card-sm" style={{borderLeft:`3px solid ${corStatus(item.status)}`}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
                 <div style={{flex:1,minWidth:150}}>
                   <div style={{fontWeight:600,fontSize:14}}>{item.produto}</div>
-                  <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>{item.categoria} · Mín: {item.minimo} {item.unidade||'un'}</div>
+                  <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>
+                    {item.categoria} · Mín: {item.minimo} {item.unidade||'un'}
+                    {item.lote && <> · Lote: {item.lote}</>}
+                  </div>
+                  {item.vencimento && (
+                    <div style={{fontSize:11,marginTop:2,fontWeight:700,color: venc==='vencido'?'var(--red)':venc==='vencendo'?'var(--yellow)':'var(--text-dim)'}}>
+                      {venc==='vencido'?'💀 Vencido em ':venc==='vencendo'?'⏰ Vence em ':'Val: '}
+                      {new Date(item.vencimento+'T00:00:00').toLocaleDateString('pt-BR')}
+                    </div>
+                  )}
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:10}}>
                   <div style={{textAlign:'center'}}>
@@ -1396,13 +1458,13 @@ function EstoqueTab({user, sb}) {
                     <div style={{fontSize:10,color:corStatus(item.status),fontWeight:700}}>{item.status}</div>
                   </div>
                   {isSup && <div style={{display:'flex',gap:4}}>
-                    <button className="btn btn-sm btn-success" onClick={()=>{setModal({item,tipo:'entrada'});setQtdMov(1);setObsMov('');setValorMov('');}}>+ Entrada</button>
-                    <button className="btn btn-sm btn-danger" onClick={()=>{setModal({item,tipo:'saida'});setQtdMov(1);setObsMov('');setValorMov('');}}>− Saída</button>
+                    <button className="btn btn-sm btn-success" onClick={()=>{setModal({item,tipo:'entrada'});setQtdMov(1);setObsMov('');setValorMov('');setLoteMov('');setVencMov('');}}>+ Entrada</button>
+                    <button className="btn btn-sm btn-danger" onClick={()=>{setModal({item,tipo:'saida'});setQtdMov(1);setObsMov('');setValorMov('');setLoteMov('');setVencMov('');}}>− Saída</button>
                   </div>}
                 </div>
               </div>
             </div>
-          ))}
+            );})}
           {itensFiltrados.length===0 && <div style={{textAlign:'center',color:'var(--text-muted)',padding:40}}>Nenhum item encontrado</div>}
         </div>
       </>}
@@ -1451,6 +1513,18 @@ function EstoqueTab({user, sb}) {
                 <input type="number" className="inp" value={valorMov} onChange={e=>setValorMov(e.target.value)} min="0" step="0.01" placeholder="Ex: 12.50"/>
               </div>
             )}
+            {modal.tipo==='entrada' && (
+              <div style={{display:'flex',gap:8,marginBottom:16}}>
+                <div style={{flex:1}}>
+                  <label className="inp-label">Lote (opcional)</label>
+                  <input className="inp" value={loteMov} onChange={e=>setLoteMov(e.target.value)} placeholder="Ex: L2026-08"/>
+                </div>
+                <div style={{flex:1}}>
+                  <label className="inp-label">Validade (opcional)</label>
+                  <input type="date" className="inp" value={vencMov} onChange={e=>setVencMov(e.target.value)}/>
+                </div>
+              </div>
+            )}
             <div style={{marginBottom:16}}>
               <label className="inp-label">Observação (opcional)</label>
               <input className="inp" value={obsMov} onChange={e=>setObsMov(e.target.value)} placeholder="Ex: Compra NF 12345"/>
@@ -1484,6 +1558,16 @@ function EstoqueTab({user, sb}) {
               <div style={{display:'flex',gap:6}}>
                 <input className="inp" value={nCodBarras} onChange={e=>setNCodBarras(e.target.value)} placeholder="Escaneie ou digite o código" style={{flex:1}}/>
                 <button type="button" className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)'}} onClick={()=>setScannerAberto('cadastro')}>📷</button>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:8,marginBottom:12}}>
+              <div style={{flex:1}}>
+                <label className="inp-label">Lote (opcional)</label>
+                <input className="inp" value={nLote} onChange={e=>setNLote(e.target.value)} placeholder="Ex: L2026-08"/>
+              </div>
+              <div style={{flex:1}}>
+                <label className="inp-label">Validade (opcional)</label>
+                <input type="date" className="inp" value={nVenc} onChange={e=>setNVenc(e.target.value)}/>
               </div>
             </div>
             <div style={{display:'flex',gap:8,marginBottom:12}}>
@@ -2735,7 +2819,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.5 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.6 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
