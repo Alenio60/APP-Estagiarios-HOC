@@ -2819,7 +2819,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.6 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.6.1 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -2908,12 +2908,12 @@ function App() {
           </div>
 
           <div className="tabs" style={{marginBottom:20}}>
-            {(user.area==='clinico'||!user.area
+            {(user.nivel===8 && (user.area==='clinico'||!user.area)
+              ? [['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas'],['guia','📚 Guia'],['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais']]
+              : user.area==='clinico'||!user.area
               ? [['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas'],['guia','📚 Guia']]
               : user.area==='comercial'
               ? [['dash','📊 Dashboard'],['reg','📝 Registrar'],['hist','📋 Histórico']]
-              : user.nivel===8
-              ? [['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas'],['guia','📚 Guia'],['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais']]
               : [['reg','📝 Registrar'],['hist','📊 Histórico']]
             ).map(([k,l]) => (
               <button key={k} className={`tab ${aba===k?'active':''}`} onClick={()=>setAba(k)}>{l}</button>
