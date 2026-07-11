@@ -18,6 +18,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.4/umd/index.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
@@ -1259,6 +1260,79 @@ function ImportarEstoqueModal({itensAtuais, sb, onClose, onImported}) {
   );
 }
 
+
+function ScannerEstoque({onScan, onClose}) {
+  const {useEffect, useRef} = React;
+  const videoRef = useRef(null);
+  const readerRef = useRef(null);
+
+  useEffect(() => {
+    let active = true;
+    const iniciar = async () => {
+      try {
+        const ZXing = window.ZXingBrowser;
+        if (!ZXing) { alert('Scanner não disponível. Tente buscar manualmente.'); onClose(); return; }
+        const hints = new Map();
+        const formats = [
+          ZXing.BarcodeFormat.EAN_13,
+          ZXing.BarcodeFormat.EAN_8,
+          ZXing.BarcodeFormat.CODE_128,
+          ZXing.BarcodeFormat.CODE_39,
+          ZXing.BarcodeFormat.QR_CODE,
+        ];
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+        const reader = new ZXing.BrowserMultiFormatReader(hints);
+        readerRef.current = reader;
+        const devices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
+        const device = devices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('rear')) || devices[devices.length-1];
+        if (!device) { alert('Câmera não encontrada.'); onClose(); return; }
+        await reader.decodeFromVideoDevice(device.deviceId, videoRef.current, (result, err) => {
+          if (result && active) {
+            active = false;
+            onScan(result.getText());
+          }
+        });
+      } catch(e) {
+        console.error('Scanner erro:', e);
+        alert('Erro ao iniciar câmera: ' + e.message);
+        onClose();
+      }
+    };
+    iniciar();
+    return () => {
+      active = false;
+      if (readerRef.current) {
+        try { readerRef.current.reset(); } catch(e) {}
+      }
+    };
+  }, []);
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" style={{maxWidth:380}} onClick={e=>e.stopPropagation()}>
+        <div className="modal-title" style={{display:'flex',justifyContent:'space-between'}}>
+          📷 Escanear Código de Barras
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+        </div>
+        <div style={{position:'relative',background:'#000',borderRadius:8,overflow:'hidden',marginBottom:12}}>
+          <video ref={videoRef} style={{width:'100%',maxHeight:280,display:'block'}} autoPlay muted playsInline/>
+          {/* Mira de leitura */}
+          <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:220,height:80,border:'2px solid var(--accent)',borderRadius:4,pointerEvents:'none'}}>
+            <div style={{position:'absolute',top:-2,left:-2,width:20,height:20,borderTop:'3px solid var(--cyan)',borderLeft:'3px solid var(--cyan)',borderRadius:'4px 0 0 0'}}/>
+            <div style={{position:'absolute',top:-2,right:-2,width:20,height:20,borderTop:'3px solid var(--cyan)',borderRight:'3px solid var(--cyan)',borderRadius:'0 4px 0 0'}}/>
+            <div style={{position:'absolute',bottom:-2,left:-2,width:20,height:20,borderBottom:'3px solid var(--cyan)',borderLeft:'3px solid var(--cyan)',borderRadius:'0 0 0 4px'}}/>
+            <div style={{position:'absolute',bottom:-2,right:-2,width:20,height:20,borderBottom:'3px solid var(--cyan)',borderRight:'3px solid var(--cyan)',borderRadius:'0 0 4px 0'}}/>
+          </div>
+        </div>
+        <div style={{textAlign:'center',color:'var(--text-muted)',fontSize:13,marginBottom:12}}>
+          Aponte a câmera para o código de barras do produto
+        </div>
+        <button className="btn btn-ghost btn-full" onClick={onClose}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
 function EstoqueTab({user, sb}) {
   const {useState, useEffect, useMemo} = React;
   const [itens, setItens]       = useState([]);
@@ -1268,6 +1342,8 @@ function EstoqueTab({user, sb}) {
   const [statusFiltro, setStatusFiltro] = useState('');
   const [modal, setModal]       = useState(null); // {item, tipo:'entrada'|'saida'}
   const [modalCad, setModalCad] = useState(false);
+  const [scanner, setScanner]   = useState(null); // 'busca' | 'entrada' | 'saida'
+  const [nCodBar, setNCodBar]   = useState('');
   const [qtdMov, setQtdMov]     = useState(1);
   const [obsMov, setObsMov]     = useState('');
   const [valorMov, setValorMov] = useState('');
@@ -1356,7 +1432,7 @@ function EstoqueTab({user, sb}) {
     if (!nProd || !nCat) return;
     setBusy(true);
     await sb.from('estoque').insert([{produto:nProd, categoria:nCat, quantidade:+nQtd, minimo:+nMin, unidade:nUn, codigo_barras:nCodBarras||null, lote:nLote||null, vencimento:nVenc||null}]);
-    setModalCad(false); setNProd(''); setNCat(''); setNQtd(0); setNMin(1); setNUn('un'); setNCodBarras(''); setNLote(''); setNVenc('');
+    setModalCad(false); setNProd(''); setNCat(''); setNQtd(0); setNMin(1); setNUn('un'); setNCodBar(''); setNCodBarras(''); setNLote(''); setNVenc('');
     await carregar();
     setBusy(false);
   };
@@ -1432,6 +1508,12 @@ function EstoqueTab({user, sb}) {
           </div>
         )}
 
+        {/* Scan rápido entrada/saída */}
+        {isSup && <div style={{display:'flex',gap:8,marginBottom:12}}>
+          <button className="btn btn-sm btn-success" style={{flex:1}} onClick={()=>setScanner('entrada')}>📷 Scan Entrada</button>
+          <button className="btn btn-sm btn-danger" style={{flex:1}} onClick={()=>setScanner('saida')}>📷 Scan Saída</button>
+        </div>}
+
         {/* Lista */}
         <div style={{display:'flex',flexDirection:'column',gap:6}}>
           {itensFiltrados.map(item=>{
@@ -1491,6 +1573,9 @@ function EstoqueTab({user, sb}) {
           {movs.length===0 && <div style={{textAlign:'center',color:'var(--text-muted)',padding:40}}>Nenhuma movimentação ainda</div>}
         </div>
       </>}
+
+      {/* Scanner */}
+      {scanner && <ScannerEstoque onScan={handleScan} onClose={()=>setScanner(null)}/>}
 
       {/* Modal Movimentação */}
       {modal && (
@@ -1569,6 +1654,10 @@ function EstoqueTab({user, sb}) {
                 <label className="inp-label">Validade (opcional)</label>
                 <input type="date" className="inp" value={nVenc} onChange={e=>setNVenc(e.target.value)}/>
               </div>
+            </div>
+            <div style={{marginBottom:12}}>
+              <label className="inp-label">Código de Barras (opcional)</label>
+              <input className="inp" value={nCodBar} onChange={e=>setNCodBar(e.target.value)} placeholder="Ex: 7891234567890"/>
             </div>
             <div style={{display:'flex',gap:8,marginBottom:12}}>
               <div style={{flex:1}}>
