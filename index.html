@@ -981,20 +981,24 @@ function GuiaTab({user}) {
 function BarcodeScannerModal({onDetected, onClose}) {
   const {useEffect, useRef, useState} = React;
   const [erro, setErro] = useState('');
+  const [manual, setManual] = useState('');
   const scannerRef = useRef(null);
   const divIdRef = useRef('barcode-scanner-'+Math.random().toString(36).slice(2));
 
   useEffect(() => {
     let cancelado = false;
     let handled = false;
-    const scanner = new Html5Qrcode(divIdRef.current);
+    const scanner = new Html5Qrcode(divIdRef.current, { verbose: false });
     scannerRef.current = scanner;
 
     scanner.start(
       { facingMode: 'environment' },
       {
-        fps: 10,
-        qrbox: { width: 260, height: 160 },
+        fps: 8,
+        qrbox: { width: 290, height: 130 },
+        aspectRatio: 1.5,
+        disableFlip: false,
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
         formatsToSupport: [
           Html5QrcodeSupportedFormats.EAN_13,
           Html5QrcodeSupportedFormats.EAN_8,
@@ -1031,7 +1035,11 @@ function BarcodeScannerModal({onDetected, onClose}) {
         <div className="modal-title">📷 Escanear código de barras</div>
         {erro && <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#ef4444',marginBottom:12}}>{erro}</div>}
         <div id={divIdRef.current} style={{width:'100%',borderRadius:8,overflow:'hidden',background:'#000'}}></div>
-        <div style={{fontSize:11,color:'var(--text-muted)',textAlign:'center',margin:'10px 0'}}>Aponte a câmera para o código de barras do produto</div>
+        <div style={{fontSize:11,color:'var(--text-muted)',textAlign:'center',margin:'10px 0'}}>Aponte a câmera para o código de barras do produto — mantenha reto e sem reflexo, preenchendo bem o quadro</div>
+        <div style={{display:'flex',gap:6,marginBottom:10}}>
+          <input className="inp" value={manual} onChange={e=>setManual(e.target.value)} placeholder="Não leu? Digite o código aqui" inputMode="numeric" style={{flex:1}}/>
+          <button className="btn btn-success btn-sm" disabled={!manual.trim()} onClick={()=>onDetected(manual.trim())}>Buscar</button>
+        </div>
         <button className="btn btn-ghost" style={{width:'100%'}} onClick={onClose}>Cancelar</button>
       </div>
     </div>
@@ -2820,7 +2828,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.7.1 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.7.2 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
