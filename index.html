@@ -72,6 +72,7 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .inp::placeholder{color:var(--text-dim)}
 .inp-label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:block}
 .btn{padding:11px 19px;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn:disabled{opacity:.35;cursor:not-allowed;filter:grayscale(.4)}
 .btn-primary{background:var(--accent);color:#fff;box-shadow:0 2px 12px var(--accent-glow)}
 .btn-primary:hover{background:var(--accent-dark)}
 .btn-primary:disabled{opacity:.5;cursor:not-allowed}
@@ -1967,6 +1968,9 @@ function NotasFiscaisTab({user, sb}) {
             {erroColar && <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#ef4444',marginBottom:12}}>{erroColar}</div>}
             <div style={{fontSize:12,color:'var(--accent)',marginBottom:6,fontWeight:600}}>👇 Toque aqui embaixo e cole ou digite:</div>
             <textarea className="inp" value={textoColar} onChange={e=>setTextoColar(e.target.value)} placeholder={"(exemplo)\nNumero: 000\nFornecedor: nome do fornecedor\nData: 01/01/2026\n\nProduto\tQuantidade\tValor\nnome do produto 1\t2\t10.00\nnome do produto 2\t1\t25.50"} style={{width:'100%',minHeight:200,fontFamily:'monospace',fontSize:12,resize:'vertical'}}/>
+            <div style={{fontSize:12,marginTop:6,fontWeight:700,color: textoColar.trim() ? 'var(--green)' : 'var(--text-muted)'}}>
+              {textoColar.trim() ? `✅ ${textoColar.trim().length} caracteres reconhecidos` : '○ Nada digitado ainda nessa caixa'}
+            </div>
             <div style={{display:'flex',gap:8,marginTop:16}}>
               <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModalColar(false)}>Cancelar</button>
               <button className="btn btn-success" style={{flex:1}} onClick={colarItens} disabled={!textoColar.trim()}>Adicionar à nota</button>
@@ -2965,7 +2969,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.10.1 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.10.2 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
