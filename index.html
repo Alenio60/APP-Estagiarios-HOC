@@ -1639,6 +1639,8 @@ function NotasFiscaisTab({user, sb}) {
   const [modalColar, setModalColar]     = useState(false);
   const [textoColar, setTextoColar]     = useState('');
   const [erroColar, setErroColar]       = useState('');
+  const [etapaNF, setEtapaNF]           = useState('form'); // 'form' | 'confirmarNovos'
+  const [novosPendentes, setNovosPendentes] = useState([]); // [{nome, categoria, minimo}]
 
   const isSup = user.nivel === 8 || user.tipo === 'admin' || user.tipo === 'financeiro';
 
@@ -1712,20 +1714,50 @@ function NotasFiscaisTab({user, sb}) {
 
   const resetForm = () => {
     setNfNumero(''); setNfFornecedor(''); setNfData(new Date().toISOString().slice(0,10));
-    setNfObs(''); setItensNF([]);
+    setNfObs(''); setItensNF([]); setEtapaNF('form'); setNovosPendentes([]);
+  };
+
+  const categoriasExistentes = useMemo(() => [...new Set(estoqueItens.map(i=>i.categoria))].sort(), [estoqueItens]);
+
+  const atualizarNovoPendente = (idx, campo, valor) =>
+    setNovosPendentes(novosPendentes.map((n,i)=> i===idx ? {...n, [campo]:valor} : n));
+
+  const iniciarSalvar = () => {
+    if (!nfNumero || !nfFornecedor || itensNF.length===0) return;
+    if (itensNF.some(i=>!i.produtoNome || !(+i.quantidade>0))) return;
+    if (etapaNF === 'form') {
+      const nomes = [...new Set(itensNF.filter(i=>!i.produtoId).map(i=>i.produtoNome))];
+      if (nomes.length > 0) {
+        setNovosPendentes(nomes.map(nome => ({nome, categoria:'', minimo:1})));
+        setEtapaNF('confirmarNovos');
+        return;
+      }
+    }
+    salvarNF();
   };
 
   const salvarNF = async () => {
-    if (!nfNumero || !nfFornecedor || itensNF.length===0) return;
-    if (itensNF.some(i=>!i.produtoNome || !(+i.quantidade>0))) return;
     setBusy(true);
     try {
+      // 1) cadastra automaticamente os produtos novos no estoque
+      const mapaNovoId = {};
+      for (const np of novosPendentes) {
+        const {data:novo, error} = await sb.from('estoque').insert([{
+          produto: np.nome, categoria: np.categoria.trim() || 'Diversos',
+          quantidade: 0, minimo: +np.minimo || 1, unidade: 'un'
+        }]).select().single();
+        if (!error && novo) mapaNovoId[normalizarTexto(np.nome)] = novo.id;
+      }
+      const itensResolvidos = itensNF.map(it => it.produtoId ? it : {
+        ...it, produtoId: mapaNovoId[normalizarTexto(it.produtoNome)] || ''
+      });
+
       const {data:nf, error} = await sb.from('notas_fiscais').insert([{
         numero:nfNumero, fornecedor:nfFornecedor, data_emissao:nfData,
         valor_total:valorTotalNF, observacao:nfObs, responsavel:user.nome
       }]).select().single();
       if (!error && nf) {
-        for (const it of itensNF) {
+        for (const it of itensResolvidos) {
           const valorTot = (+it.quantidade||0)*(+it.valorUnit||0);
           await sb.from('notas_fiscais_itens').insert([{
             nf_id: nf.id, produto_id: it.produtoId||null, produto_nome: it.produtoNome,
@@ -1822,39 +1854,67 @@ function NotasFiscaisTab({user, sb}) {
               </div>
             </div>
 
-            {itensNF.map((it, idx) => (
-              <div key={idx} style={{border:'1px solid var(--border)',borderRadius:8,padding:10,marginBottom:8}}>
-                <div style={{marginBottom:8}}>
-                  <select className="inp" value={it.produtoId} onChange={e=>{
-                    const id = e.target.value;
-                    const prod = estoqueItens.find(p=>String(p.id)===String(id));
-                    atualizarItem(idx,'produtoId', id?+id:'');
-                    if (prod) atualizarItem(idx,'produtoNome', prod.produto);
-                  }}>
-                    <option value="">Selecione um item do estoque...</option>
-                    {estoqueItens.map(p => <option key={p.id} value={p.id}>{p.produto}</option>)}
-                  </select>
-                  <input className="inp" style={{marginTop:6}} value={it.produtoNome} onChange={e=>atualizarItem(idx,'produtoNome',e.target.value)} placeholder="Ou digite o nome do produto (item novo)"/>
-                </div>
-                <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
-                  <div style={{flex:1}}>
-                    <label className="inp-label">Qtd</label>
-                    <input type="number" className="inp" value={it.quantidade} min="0.01" step="0.01" onChange={e=>atualizarItem(idx,'quantidade',e.target.value)}/>
+            {etapaNF === 'form' && <>
+              {itensNF.map((it, idx) => (
+                <div key={idx} style={{border:'1px solid var(--border)',borderRadius:8,padding:10,marginBottom:8}}>
+                  <div style={{marginBottom:8}}>
+                    <select className="inp" value={it.produtoId} onChange={e=>{
+                      const id = e.target.value;
+                      const prod = estoqueItens.find(p=>String(p.id)===String(id));
+                      atualizarItem(idx,'produtoId', id?+id:'');
+                      if (prod) atualizarItem(idx,'produtoNome', prod.produto);
+                    }}>
+                      <option value="">Selecione um item do estoque...</option>
+                      {estoqueItens.map(p => <option key={p.id} value={p.id}>{p.produto}</option>)}
+                    </select>
+                    <input className="inp" style={{marginTop:6}} value={it.produtoNome} onChange={e=>atualizarItem(idx,'produtoNome',e.target.value)} placeholder="Ou digite o nome do produto (item novo)"/>
+                    {!it.produtoId && it.produtoNome && (
+                      <div style={{fontSize:11,color:'var(--yellow)',marginTop:4}}>⚠️ Produto novo — será cadastrado automaticamente no estoque</div>
+                    )}
                   </div>
-                  <div style={{flex:1}}>
-                    <label className="inp-label">Valor unit. (R$)</label>
-                    <input type="number" className="inp" value={it.valorUnit} min="0" step="0.01" onChange={e=>atualizarItem(idx,'valorUnit',e.target.value)}/>
+                  <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
+                    <div style={{flex:1}}>
+                      <label className="inp-label">Qtd</label>
+                      <input type="number" className="inp" value={it.quantidade} min="0.01" step="0.01" onChange={e=>atualizarItem(idx,'quantidade',e.target.value)}/>
+                    </div>
+                    <div style={{flex:1}}>
+                      <label className="inp-label">Valor unit. (R$)</label>
+                      <input type="number" className="inp" value={it.valorUnit} min="0" step="0.01" onChange={e=>atualizarItem(idx,'valorUnit',e.target.value)}/>
+                    </div>
+                    <button type="button" className="btn btn-danger btn-sm" onClick={()=>removerItem(idx)}>✕</button>
                   </div>
-                  <button type="button" className="btn btn-danger btn-sm" onClick={()=>removerItem(idx)}>✕</button>
                 </div>
-              </div>
-            ))}
-            {itensNF.length===0 && <div style={{textAlign:'center',color:'var(--text-muted)',padding:16,fontSize:12}}>Nenhum item adicionado ainda</div>}
+              ))}
+              {itensNF.length===0 && <div style={{textAlign:'center',color:'var(--text-muted)',padding:16,fontSize:12}}>Nenhum item adicionado ainda</div>}
 
-            <div style={{marginTop:8,marginBottom:12}}>
-              <label className="inp-label">Observação (opcional)</label>
-              <input className="inp" value={nfObs} onChange={e=>setNfObs(e.target.value)} placeholder="Ex: Compra mensal de EPIs"/>
-            </div>
+              <div style={{marginTop:8,marginBottom:12}}>
+                <label className="inp-label">Observação (opcional)</label>
+                <input className="inp" value={nfObs} onChange={e=>setNfObs(e.target.value)} placeholder="Ex: Compra mensal de EPIs"/>
+              </div>
+            </>}
+
+            {etapaNF === 'confirmarNovos' && <>
+              <div className="alert" style={{background:'#f59e0b18',border:'1px solid #f59e0b40',color:'#fbbf24',marginBottom:12}}>
+                ⚠️ {novosPendentes.length} produto(s) dessa nota ainda não existem no estoque. Confira a categoria e o mínimo antes de cadastrar automaticamente:
+              </div>
+              {novosPendentes.map((np, idx) => (
+                <div key={idx} style={{border:'1px solid var(--border)',borderRadius:8,padding:10,marginBottom:8}}>
+                  <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>{np.nome}</div>
+                  <div style={{display:'flex',gap:8}}>
+                    <div style={{flex:2}}>
+                      <label className="inp-label">Categoria</label>
+                      <input className="inp" list="cats-nf-list" value={np.categoria} onChange={e=>atualizarNovoPendente(idx,'categoria',e.target.value)} placeholder="Ex: EPI e Descartáveis"/>
+                    </div>
+                    <div style={{flex:1}}>
+                      <label className="inp-label">Mínimo</label>
+                      <input type="number" className="inp" value={np.minimo} min="0" onChange={e=>atualizarNovoPendente(idx,'minimo',e.target.value)}/>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <datalist id="cats-nf-list">{categoriasExistentes.map(c=><option key={c} value={c}/>)}</datalist>
+              <div style={{fontSize:11,color:'var(--text-muted)',marginBottom:12}}>Deixando a categoria em branco, o item entra como "Diversos".</div>
+            </>}
 
             <div style={{display:'flex',justifyContent:'space-between',fontWeight:800,fontSize:15,margin:'12px 0',padding:'8px 0',borderTop:'1px solid var(--border)'}}>
               <span>Total</span>
@@ -1862,9 +1922,11 @@ function NotasFiscaisTab({user, sb}) {
             </div>
 
             <div style={{display:'flex',gap:8}}>
-              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModalNova(false)}>Cancelar</button>
-              <button className="btn btn-success" style={{flex:1}} onClick={salvarNF} disabled={busy||!nfNumero||!nfFornecedor||itensNF.length===0}>
-                {busy?'Salvando...':'Salvar Nota Fiscal'}
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>{ if(etapaNF==='confirmarNovos'){setEtapaNF('form');} else {setModalNova(false);} }}>
+                {etapaNF==='confirmarNovos' ? '← Voltar' : 'Cancelar'}
+              </button>
+              <button className="btn btn-success" style={{flex:1}} onClick={iniciarSalvar} disabled={busy||!nfNumero||!nfFornecedor||itensNF.length===0}>
+                {busy?'Salvando...':etapaNF==='confirmarNovos'?'Confirmar cadastro e salvar':'Salvar Nota Fiscal'}
               </button>
             </div>
           </div>
@@ -2882,7 +2944,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.8 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.9 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
