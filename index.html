@@ -1636,6 +1636,9 @@ function NotasFiscaisTab({user, sb}) {
   const [nfData, setNfData]             = useState(new Date().toISOString().slice(0,10));
   const [nfObs, setNfObs]               = useState('');
   const [itensNF, setItensNF]           = useState([]);
+  const [modalColar, setModalColar]     = useState(false);
+  const [textoColar, setTextoColar]     = useState('');
+  const [erroColar, setErroColar]       = useState('');
 
   const isSup = user.nivel === 8 || user.tipo === 'admin' || user.tipo === 'financeiro';
 
@@ -1675,6 +1678,38 @@ function NotasFiscaisTab({user, sb}) {
 
   const valorTotalNF = useMemo(() => itensNF.reduce((s,i)=>s+((+i.quantidade||0)*(+i.valorUnit||0)),0), [itensNF]);
 
+  const colarItens = () => {
+    const linhas = textoColar.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0);
+    if (linhas.length === 0) { setErroColar('Cole ao menos uma linha com Produto, Quantidade e Valor.'); return; }
+    const delim = linhas[0].includes('\t') ? '\t' : linhas[0].includes(';') ? ';' : ',';
+    const cab = linhas[0].split(delim).map(c=>normalizarTexto(c));
+    const temCabecalho = cab.some(c=>['produto','nome','item','descricao'].includes(c));
+    const dados = temCabecalho ? linhas.slice(1) : linhas;
+    let idxProd = 0, idxQtd = 1, idxValor = 2;
+    if (temCabecalho) {
+      const achar = (alts) => cab.findIndex(c=>alts.includes(c));
+      const p = achar(['produto','nome','item','descricao']);
+      const q = achar(['quantidade','qtd','qtde']);
+      const v = achar(['valorunitario','valor','preco','cdesconto','total']);
+      if (p>=0) idxProd = p;
+      if (q>=0) idxQtd = q;
+      if (v>=0) idxValor = v;
+    }
+    const novosItens = [];
+    for (const linha of dados) {
+      const cols = linha.split(delim);
+      const nome = (cols[idxProd]||'').trim();
+      if (!nome) continue;
+      const qtd = parseFloat((cols[idxQtd]||'1').replace(',','.').replace(/[^\d.\-]/g,'')) || 1;
+      const valor = parseFloat((cols[idxValor]||'0').replace(/[^\d,.\-]/g,'').replace(',','.')) || 0;
+      const match = estoqueItens.find(p => normalizarTexto(p.produto) === normalizarTexto(nome));
+      novosItens.push({ produtoId: match?match.id:'', produtoNome: match?match.produto:nome, quantidade: qtd, valorUnit: valor });
+    }
+    if (novosItens.length === 0) { setErroColar('Não consegui reconhecer nenhum item nessa tabela.'); return; }
+    setItensNF([...itensNF, ...novosItens]);
+    setModalColar(false); setTextoColar(''); setErroColar('');
+  };
+
   const resetForm = () => {
     setNfNumero(''); setNfFornecedor(''); setNfData(new Date().toISOString().slice(0,10));
     setNfObs(''); setItensNF([]);
@@ -1703,7 +1738,8 @@ function NotasFiscaisTab({user, sb}) {
             await sb.from('estoque_movimentacoes').insert([{
               produto_id: it.produtoId, produto_nome: it.produtoNome,
               tipo:'entrada', quantidade: +it.quantidade, responsavel: user.nome,
-              obs: `NF ${nfNumero} · ${nfFornecedor}`
+              obs: `NF ${nfNumero} · ${nfFornecedor}`,
+              valor_unitario: +it.valorUnit || null
             }]);
           }
         }
@@ -1779,7 +1815,8 @@ function NotasFiscaisTab({user, sb}) {
 
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',margin:'16px 0 8px'}}>
               <label className="inp-label" style={{margin:0}}>Itens da nota</label>
-              <div style={{display:'flex',gap:6}}>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                <button type="button" className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)'}} onClick={()=>{setErroColar('');setModalColar(true);}}>📋 Colar itens</button>
                 <button type="button" className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)'}} onClick={()=>setScannerAberto(true)}>📷 Bipar item</button>
                 <button type="button" className="btn btn-sm btn-success" onClick={adicionarItem}>+ Item</button>
               </div>
@@ -1836,6 +1873,23 @@ function NotasFiscaisTab({user, sb}) {
 
       {scannerAberto && (
         <BarcodeScannerModal onDetected={handleScanItem} onClose={()=>setScannerAberto(false)}/>
+      )}
+
+      {modalColar && (
+        <div className="overlay" onClick={()=>setModalColar(false)}>
+          <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:520}}>
+            <div className="modal-title">📋 Colar itens da cotação/nota</div>
+            <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:10,lineHeight:1.5}}>
+              Cole uma tabela com <b>Produto, Quantidade e Valor unitário</b> (do Excel, ou digitada com tab/vírgula entre colunas). Itens que já existem no estoque são reconhecidos pelo nome automaticamente.
+            </div>
+            {erroColar && <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#ef4444',marginBottom:12}}>{erroColar}</div>}
+            <textarea className="inp" value={textoColar} onChange={e=>setTextoColar(e.target.value)} placeholder={"Produto\tQuantidade\tValor\nTouca Descartável Sanfonada\t5\t8.27\nLâmina de Bisturi Nº 15C\t1\t35.28"} style={{width:'100%',minHeight:160,fontFamily:'monospace',fontSize:12,resize:'vertical'}}/>
+            <div style={{display:'flex',gap:8,marginTop:16}}>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModalColar(false)}>Cancelar</button>
+              <button className="btn btn-success" style={{flex:1}} onClick={colarItens} disabled={!textoColar.trim()}>Adicionar itens</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -2828,7 +2882,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.7.2 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.8 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
