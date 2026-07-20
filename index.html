@@ -1681,12 +1681,32 @@ function NotasFiscaisTab({user, sb}) {
   const valorTotalNF = useMemo(() => itensNF.reduce((s,i)=>s+((+i.quantidade||0)*(+i.valorUnit||0)),0), [itensNF]);
 
   const colarItens = () => {
-    const linhas = textoColar.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0);
-    if (linhas.length === 0) { setErroColar('Cole ao menos uma linha com Produto, Quantidade e Valor.'); return; }
-    const delim = linhas[0].includes('\t') ? '\t' : linhas[0].includes(';') ? ';' : ',';
-    const cab = linhas[0].split(delim).map(c=>normalizarTexto(c));
+    const todasLinhas = textoColar.split(/\r?\n/).map(l=>l.trim());
+    const linhasItens = [];
+    let achouNumero = false, achouFornecedor = false, achouData = false;
+
+    for (const linha of todasLinhas) {
+      if (!linha) continue;
+      const m = linha.match(/^(n[uú]mero(?:\s*da\s*nf)?|nf|fornecedor|data(?:\s*de\s*emiss[ãa]o)?)\s*[:\-]\s*(.+)$/i);
+      if (m) {
+        const chave = normalizarTexto(m[1]);
+        const valor = m[2].trim();
+        if ((chave==='numero'||chave==='numerodanf'||chave==='nf') && !achouNumero) { setNfNumero(valor); achouNumero = true; continue; }
+        if (chave==='fornecedor' && !achouFornecedor) { setNfFornecedor(valor); achouFornecedor = true; continue; }
+        if ((chave==='data'||chave==='datadeemissao') && !achouData) {
+          const d = parseDataImport(valor);
+          if (d) { setNfData(d); achouData = true; }
+          continue;
+        }
+      }
+      linhasItens.push(linha);
+    }
+
+    if (linhasItens.length === 0) { setErroColar('Cole ao menos uma linha com Produto, Quantidade e Valor.'); return; }
+    const delim = linhasItens[0].includes('\t') ? '\t' : linhasItens[0].includes(';') ? ';' : ',';
+    const cab = linhasItens[0].split(delim).map(c=>normalizarTexto(c));
     const temCabecalho = cab.some(c=>['produto','nome','item','descricao'].includes(c));
-    const dados = temCabecalho ? linhas.slice(1) : linhas;
+    const dados = temCabecalho ? linhasItens.slice(1) : linhasItens;
     let idxProd = 0, idxQtd = 1, idxValor = 2;
     if (temCabecalho) {
       const achar = (alts) => cab.findIndex(c=>alts.includes(c));
@@ -1848,7 +1868,7 @@ function NotasFiscaisTab({user, sb}) {
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',margin:'16px 0 8px'}}>
               <label className="inp-label" style={{margin:0}}>Itens da nota</label>
               <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                <button type="button" className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)'}} onClick={()=>{setErroColar('');setModalColar(true);}}>📋 Colar itens</button>
+                <button type="button" className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)'}} onClick={()=>{setErroColar('');setModalColar(true);}}>📋 Colar nota inteira</button>
                 <button type="button" className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)'}} onClick={()=>setScannerAberto(true)}>📷 Bipar item</button>
                 <button type="button" className="btn btn-sm btn-success" onClick={adicionarItem}>+ Item</button>
               </div>
@@ -1940,15 +1960,15 @@ function NotasFiscaisTab({user, sb}) {
       {modalColar && (
         <div className="overlay" onClick={()=>setModalColar(false)}>
           <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:520}}>
-            <div className="modal-title">📋 Colar itens da cotação/nota</div>
+            <div className="modal-title">📋 Colar nota fiscal inteira</div>
             <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:10,lineHeight:1.5}}>
-              Cole uma tabela com <b>Produto, Quantidade e Valor unitário</b> (do Excel, ou digitada com tab/vírgula entre colunas). Itens que já existem no estoque são reconhecidos pelo nome automaticamente.
+              Cole o <b>Número</b>, <b>Fornecedor</b> e <b>Data</b> (opcional, um por linha) seguidos da tabela de itens (<b>Produto, Quantidade, Valor unitário</b>). Itens que já existem no estoque são reconhecidos pelo nome automaticamente.
             </div>
             {erroColar && <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#ef4444',marginBottom:12}}>{erroColar}</div>}
-            <textarea className="inp" value={textoColar} onChange={e=>setTextoColar(e.target.value)} placeholder={"Produto\tQuantidade\tValor\nTouca Descartável Sanfonada\t5\t8.27\nLâmina de Bisturi Nº 15C\t1\t35.28"} style={{width:'100%',minHeight:160,fontFamily:'monospace',fontSize:12,resize:'vertical'}}/>
+            <textarea className="inp" value={textoColar} onChange={e=>setTextoColar(e.target.value)} placeholder={"Numero: 13884025\nFornecedor: Dental Cremer\nData: 14/07/2026\n\nProduto\tQuantidade\tValor\nTouca Descartável Sanfonada\t5\t8.27\nLâmina de Bisturi Nº 15C\t1\t35.28"} style={{width:'100%',minHeight:200,fontFamily:'monospace',fontSize:12,resize:'vertical'}}/>
             <div style={{display:'flex',gap:8,marginTop:16}}>
               <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModalColar(false)}>Cancelar</button>
-              <button className="btn btn-success" style={{flex:1}} onClick={colarItens} disabled={!textoColar.trim()}>Adicionar itens</button>
+              <button className="btn btn-success" style={{flex:1}} onClick={colarItens} disabled={!textoColar.trim()}>Adicionar à nota</button>
             </div>
           </div>
         </div>
@@ -2944,7 +2964,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.9 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.10 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
