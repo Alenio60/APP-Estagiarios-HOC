@@ -1757,19 +1757,29 @@ function NotasFiscaisTab({user, sb}) {
       if (q>=0) idxQtd = q;
       if (v>=0) idxValor = v;
     }
+    const RUIDO = /^(cota[cç][aã]o|or[cç]amento|c[oó]digo\s*de\s*cliente|cliente\s*:|endere[cç]o\s*:|telefone\s*:|e-?mail\s*:|consultor\s*:|validade\s*:|forma(s)?\s*de\s*pagamento|importante|boleto|cart[ãa]o\s*cr[ée]dito|total\s*(de|da)|www\.|cnpj)/i;
+
     const novosItens = [];
+    let ignoradas = 0;
     for (const linha of dados) {
       const cols = linha.split(delim);
+      if (cols.length < 2 || RUIDO.test(linha)) { ignoradas++; continue; }
       const nome = (cols[idxProd]||'').trim();
-      if (!nome) continue;
+      if (!nome || RUIDO.test(nome)) { ignoradas++; continue; }
       const qtd = parseFloat((cols[idxQtd]||'1').replace(',','.').replace(/[^\d.\-]/g,'')) || 1;
       const valor = parseFloat((cols[idxValor]||'0').replace(/[^\d,.\-]/g,'').replace(',','.')) || 0;
       const match = estoqueItens.find(p => nomeCorresponde(normalizarTexto(p.produto), normalizarTexto(nome)));
       novosItens.push({ produtoId: match?match.id:'', produtoNome: match?match.produto:nome, quantidade: qtd, valorUnit: valor });
     }
-    if (novosItens.length === 0) { setErroColar('Não consegui reconhecer nenhum item nessa tabela.'); return; }
+    if (novosItens.length === 0) {
+      setErroColar('Não consegui reconhecer nenhum item nessa tabela. Se copiou direto de um PDF, o texto pode ter perdido a formatação em colunas — nesse caso, é mais confiável colar uma tabela do Excel ou digitar/usar o "+ Item".');
+      return;
+    }
     setItensNF([...itensNF, ...novosItens]);
     setModalColar(false); setTextoColar(''); setErroColar('');
+    if (ignoradas > 0) {
+      alert(`✅ ${novosItens.length} item(ns) adicionado(s).\n\n⚠️ ${ignoradas} linha(s) foram ignoradas por não parecerem itens válidos (ex: cabeçalhos, endereço, condições de pagamento). Confira a lista antes de salvar.`);
+    }
   };
 
   const resetForm = () => {
@@ -3039,7 +3049,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.13 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.14 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
