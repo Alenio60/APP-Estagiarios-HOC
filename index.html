@@ -1051,6 +1051,16 @@ function normalizarTexto(s) {
   return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 }
 
+function nomeCorresponde(a, b) {
+  // a e b já devem vir normalizados (normalizarTexto)
+  if (a === b) return true;
+  const wa = a.split(/\s+/).filter(Boolean);
+  const wb = b.split(/\s+/).filter(Boolean);
+  if (wa.length === 0 || wb.length === 0) return false;
+  const [menor, maior] = wa.length <= wb.length ? [wa, wb] : [wb, wa];
+  return menor.every(p => maior.includes(p));
+}
+
 const MAPA_CABECALHO_ESTOQUE = {
   produto: ['produto','nome','item','material','descricao'],
   categoria: ['categoria','cat'],
@@ -1725,7 +1735,7 @@ function NotasFiscaisTab({user, sb}) {
       if (!nome) continue;
       const qtd = parseFloat((cols[idxQtd]||'1').replace(',','.').replace(/[^\d.\-]/g,'')) || 1;
       const valor = parseFloat((cols[idxValor]||'0').replace(/[^\d,.\-]/g,'').replace(',','.')) || 0;
-      const match = estoqueItens.find(p => normalizarTexto(p.produto) === normalizarTexto(nome));
+      const match = estoqueItens.find(p => nomeCorresponde(normalizarTexto(p.produto), normalizarTexto(nome)));
       novosItens.push({ produtoId: match?match.id:'', produtoNome: match?match.produto:nome, quantidade: qtd, valorUnit: valor });
     }
     if (novosItens.length === 0) { setErroColar('Não consegui reconhecer nenhum item nessa tabela.'); return; }
@@ -2969,7 +2979,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.10.2 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.11 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
