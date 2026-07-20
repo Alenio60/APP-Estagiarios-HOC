@@ -1965,7 +1965,8 @@ function NotasFiscaisTab({user, sb}) {
               Cole o <b>Número</b>, <b>Fornecedor</b> e <b>Data</b> (opcional, um por linha) seguidos da tabela de itens (<b>Produto, Quantidade, Valor unitário</b>). Itens que já existem no estoque são reconhecidos pelo nome automaticamente.
             </div>
             {erroColar && <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#ef4444',marginBottom:12}}>{erroColar}</div>}
-            <textarea className="inp" value={textoColar} onChange={e=>setTextoColar(e.target.value)} placeholder={"Numero: 13884025\nFornecedor: Dental Cremer\nData: 14/07/2026\n\nProduto\tQuantidade\tValor\nTouca Descartável Sanfonada\t5\t8.27\nLâmina de Bisturi Nº 15C\t1\t35.28"} style={{width:'100%',minHeight:200,fontFamily:'monospace',fontSize:12,resize:'vertical'}}/>
+            <div style={{fontSize:12,color:'var(--accent)',marginBottom:6,fontWeight:600}}>👇 Toque aqui embaixo e cole ou digite:</div>
+            <textarea className="inp" value={textoColar} onChange={e=>setTextoColar(e.target.value)} placeholder={"(exemplo)\nNumero: 000\nFornecedor: nome do fornecedor\nData: 01/01/2026\n\nProduto\tQuantidade\tValor\nnome do produto 1\t2\t10.00\nnome do produto 2\t1\t25.50"} style={{width:'100%',minHeight:200,fontFamily:'monospace',fontSize:12,resize:'vertical'}}/>
             <div style={{display:'flex',gap:8,marginTop:16}}>
               <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModalColar(false)}>Cancelar</button>
               <button className="btn btn-success" style={{flex:1}} onClick={colarItens} disabled={!textoColar.trim()}>Adicionar à nota</button>
@@ -2964,7 +2965,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.10 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.10.1 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
