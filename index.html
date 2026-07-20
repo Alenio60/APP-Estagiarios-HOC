@@ -1772,12 +1772,19 @@ function NotasFiscaisTab({user, sb}) {
     try {
       // 1) cadastra automaticamente os produtos novos no estoque
       const mapaNovoId = {};
+      const errosNovos = [];
       for (const np of novosPendentes) {
         const {data:novo, error} = await sb.from('estoque').insert([{
           produto: np.nome, categoria: np.categoria.trim() || 'Diversos',
           quantidade: 0, minimo: +np.minimo || 1, unidade: 'un'
         }]).select().single();
         if (!error && novo) mapaNovoId[normalizarTexto(np.nome)] = novo.id;
+        else errosNovos.push(`${np.nome}: ${error?.message || 'erro desconhecido'}`);
+      }
+      if (errosNovos.length > 0) {
+        alert('❌ Não foi possível cadastrar os produtos novos no estoque:\n\n' + errosNovos.join('\n') + '\n\nA nota NÃO foi salva. Corrija e tente novamente.');
+        setBusy(false);
+        return;
       }
       const itensResolvidos = itensNF.map(it => it.produtoId ? it : {
         ...it, produtoId: mapaNovoId[normalizarTexto(it.produtoNome)] || ''
@@ -1787,13 +1794,19 @@ function NotasFiscaisTab({user, sb}) {
         numero:nfNumero, fornecedor:nfFornecedor, data_emissao:nfData,
         valor_total:valorTotalNF, observacao:nfObs, responsavel:user.nome
       }]).select().single();
-      if (!error && nf) {
-        for (const it of itensResolvidos) {
+      if (error || !nf) {
+        alert('❌ Não foi possível salvar a nota fiscal.\n\nErro: ' + (error?.message || 'desconhecido') + '\n\nA nota NÃO foi salva. Verifique se as tabelas de Notas Fiscais existem no banco (migração pendente) e tente novamente.');
+        setBusy(false);
+        return;
+      }
+      const errosItens = [];
+      for (const it of itensResolvidos) {
           const valorTot = (+it.quantidade||0)*(+it.valorUnit||0);
-          await sb.from('notas_fiscais_itens').insert([{
+          const {error: errItem} = await sb.from('notas_fiscais_itens').insert([{
             nf_id: nf.id, produto_id: it.produtoId||null, produto_nome: it.produtoNome,
             quantidade: +it.quantidade, valor_unitario: +it.valorUnit||0, valor_total: valorTot
           }]);
+          if (errItem) errosItens.push(`${it.produtoNome}: ${errItem.message}`);
           if (it.produtoId) {
             const itemAtual = estoqueItens.find(x=>x.id===it.produtoId);
             const novaQtd = (itemAtual?.quantidade||0) + (+it.quantidade);
@@ -1805,7 +1818,9 @@ function NotasFiscaisTab({user, sb}) {
               valor_unitario: +it.valorUnit || null
             }]);
           }
-        }
+      }
+      if (errosItens.length > 0) {
+        alert('⚠️ A nota foi salva, mas alguns itens deram erro e podem não ter entrado no estoque:\n\n' + errosItens.join('\n'));
       }
       setModalNova(false);
       resetForm();
@@ -2979,7 +2994,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.11 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.11.1 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
