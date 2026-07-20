@@ -1753,10 +1753,21 @@ function NotasFiscaisTab({user, sb}) {
   const atualizarNovoPendente = (idx, campo, valor) =>
     setNovosPendentes(novosPendentes.map((n,i)=> i===idx ? {...n, [campo]:valor} : n));
 
-  const iniciarSalvar = () => {
+  const iniciarSalvar = async () => {
     if (!nfNumero || !nfFornecedor || itensNF.length===0) return;
     if (itensNF.some(i=>!i.produtoNome || !(+i.quantidade>0))) return;
+
     if (etapaNF === 'form') {
+      const { data: existentes } = await sb.from('notas_fiscais')
+        .select('id,numero,fornecedor,data_emissao')
+        .eq('numero', nfNumero.trim());
+      const duplicada = (existentes||[]).find(n => normalizarTexto(n.fornecedor) === normalizarTexto(nfFornecedor));
+      if (duplicada) {
+        const dataFmt = duplicada.data_emissao ? new Date(duplicada.data_emissao+'T00:00:00').toLocaleDateString('pt-BR') : '?';
+        const continuar = window.confirm(`⚠️ Já existe uma nota fiscal número "${duplicada.numero}" do fornecedor "${duplicada.fornecedor}" (lançada em ${dataFmt}).\n\nDeseja lançar esta mesmo assim? Isso pode gerar duplicidade de estoque.`);
+        if (!continuar) return;
+      }
+
       const nomes = [...new Set(itensNF.filter(i=>!i.produtoId).map(i=>i.produtoNome))];
       if (nomes.length > 0) {
         setNovosPendentes(nomes.map(nome => ({nome, categoria:'', minimo:1})));
@@ -2994,7 +3005,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.11.1 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.12 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
