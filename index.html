@@ -1675,6 +1675,35 @@ function NotasFiscaisTab({user, sb}) {
     !busca || n.numero.toLowerCase().includes(busca.toLowerCase()) || n.fornecedor.toLowerCase().includes(busca.toLowerCase())
   ), [notas, busca]);
 
+  const cancelarNF = async (nf) => {
+    const itensDaNF = itensPorNF[nf.id] || [];
+    if (!window.confirm(`Cancelar a nota fiscal ${nf.numero} (${nf.fornecedor})?\n\nIsso vai estornar a quantidade que essa nota deu de entrada no estoque (${itensDaNF.length} item(ns)) e apagar o lançamento. Essa ação não pode ser desfeita.`)) return;
+    setBusy(true);
+    try {
+      for (const it of itensDaNF) {
+        if (it.produto_id) {
+          const itemAtual = estoqueItens.find(x=>x.id===it.produto_id);
+          const novaQtd = Math.max(0, (itemAtual?.quantidade||0) - (+it.quantidade));
+          await sb.from('estoque').update({quantidade: novaQtd, updated_at: new Date().toISOString()}).eq('id', it.produto_id);
+          await sb.from('estoque_movimentacoes').insert([{
+            produto_id: it.produto_id, produto_nome: it.produto_nome,
+            tipo:'saida', quantidade: +it.quantidade, responsavel: user.nome,
+            obs: `Cancelamento NF ${nf.numero} · ${nf.fornecedor}`
+          }]);
+        }
+      }
+      const { error } = await sb.from('notas_fiscais').delete().eq('id', nf.id);
+      if (error) {
+        alert('❌ Erro ao cancelar a nota: ' + error.message);
+      } else {
+        setExpandido(null);
+        await carregar();
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const adicionarItem = () => setItensNF([...itensNF, {produtoId:'', produtoNome:'', quantidade:1, valorUnit:0}]);
   const atualizarItem = (idx, campo, valor) => setItensNF(itensNF.map((it,i) => i===idx ? {...it, [campo]:valor} : it));
   const removerItem   = (idx) => setItensNF(itensNF.filter((_,i)=>i!==idx));
@@ -1875,6 +1904,11 @@ function NotasFiscaisTab({user, sb}) {
                     </div>
                   ))}
                   {nf.observacao && <div style={{fontSize:11,color:'var(--text-dim)',marginTop:6}}>Obs: {nf.observacao}</div>}
+                  {isSup && (
+                    <button className="btn btn-danger btn-sm" style={{marginTop:12}} disabled={busy} onClick={(e)=>{e.stopPropagation(); cancelarNF(nf);}}>
+                      🗑️ Cancelar nota (estorna estoque)
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -3005,7 +3039,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.12 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.13 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
