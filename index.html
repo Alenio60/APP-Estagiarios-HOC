@@ -1282,6 +1282,7 @@ function EstoqueTab({user, sb}) {
   const {useState, useEffect, useMemo} = React;
   const [itens, setItens]       = useState([]);
   const [movs, setMovs]         = useState([]);
+  const [precos, setPrecos]     = useState({}); // produto_id -> ultimo valor_unitario pago
   const [busca, setBusca]       = useState('');
   const [catFiltro, setCatFiltro] = useState('');
   const [statusFiltro, setStatusFiltro] = useState('');
@@ -1317,6 +1318,16 @@ function EstoqueTab({user, sb}) {
     if (e) setItens(e);
     const {data:m} = await sb.from('estoque_movimentacoes').select('*').order('created_at',{ascending:false}).limit(100);
     if (m) setMovs(m);
+    const {data:mp} = await sb.from('estoque_movimentacoes')
+      .select('produto_id,valor_unitario,created_at')
+      .eq('tipo','entrada')
+      .not('valor_unitario','is',null)
+      .order('created_at',{ascending:false});
+    if (mp) {
+      const ultimo = {};
+      mp.forEach(mv => { if (ultimo[mv.produto_id]===undefined) ultimo[mv.produto_id] = +mv.valor_unitario; });
+      setPrecos(ultimo);
+    }
   };
 
   useEffect(() => { carregar(); }, []);
@@ -1349,6 +1360,16 @@ function EstoqueTab({user, sb}) {
     vencido: itens.filter(i=>situacaoVencimento(i)==='vencido').length,
     vencendo: itens.filter(i=>situacaoVencimento(i)==='vencendo').length,
   }), [itens]);
+
+  const valorEstoque = useMemo(() => {
+    let total = 0, comPreco = 0, semPreco = 0;
+    itens.forEach(i => {
+      const preco = precos[i.id];
+      if (preco != null) { total += (i.quantidade||0) * preco; comPreco++; }
+      else semPreco++;
+    });
+    return { total, comPreco, semPreco };
+  }, [itens, precos]);
 
   const movimentar = async () => {
     if (!modal || qtdMov <= 0) return;
@@ -1406,6 +1427,24 @@ function EstoqueTab({user, sb}) {
 
   return (
     <div>
+      {/* Valor total em estoque */}
+      <div style={{
+        background:'linear-gradient(135deg, #16a34a22, #16a34a08)',
+        border:'1px solid #16a34a55', borderRadius:12, padding:'18px 20px',
+        marginBottom:16, display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:10
+      }}>
+        <div>
+          <div style={{fontSize:12,color:'var(--text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:.5}}>💰 Valor total em estoque</div>
+          <div style={{fontSize:30,fontWeight:800,color:'var(--green)',marginTop:2}}>
+            R$ {valorEstoque.total.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}
+          </div>
+        </div>
+        <div style={{fontSize:11,color:'var(--text-muted)',textAlign:'right'}}>
+          {valorEstoque.comPreco} de {itens.length} itens com preço registrado
+          {valorEstoque.semPreco > 0 && <div style={{color:'var(--yellow)',marginTop:2}}>⚠️ {valorEstoque.semPreco} item(ns) sem preço não entram nessa soma</div>}
+        </div>
+      </div>
+
       {/* KPIs */}
       <div className="stat-grid" style={{marginBottom:16}}>
         {[['Total',stats.total,'var(--accent)'],['✅ OK',stats.ok,'var(--green)'],
@@ -3049,7 +3088,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.14.1 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.15 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
