@@ -2190,6 +2190,148 @@ function NotasFiscaisTab({user, sb}) {
   );
 }
 
+function AnaliseTab({user, sb}) {
+  const {useState, useEffect, useRef, useMemo} = React;
+  const [movs, setMovs]   = useState([]);
+  const [itens, setItens] = useState([]);
+  const chartGastosRef    = useRef(null);
+  const chartCategoriaRef = useRef(null);
+  const chartTopRef       = useRef(null);
+  const chartsRef         = useRef({});
+
+  const carregar = async () => {
+    if (!sb) return;
+    const {data:m} = await sb.from('estoque_movimentacoes').select('*').eq('tipo','entrada').not('valor_unitario','is',null).order('created_at');
+    if (m) setMovs(m);
+    const {data:e} = await sb.from('estoque').select('*');
+    if (e) setItens(e);
+  };
+  useEffect(() => { carregar(); }, []);
+
+  const precosPorProduto = useMemo(() => {
+    const mapa = {};
+    movs.forEach(m => {
+      const atual = mapa[m.produto_id];
+      if (!atual || new Date(m.created_at) > new Date(atual.data)) {
+        mapa[m.produto_id] = { valor: +m.valor_unitario, data: m.created_at };
+      }
+    });
+    return mapa;
+  }, [movs]);
+
+  const valorTotalEstoque = useMemo(() => {
+    let total = 0;
+    itens.forEach(i => {
+      const preco = precosPorProduto[i.id]?.valor;
+      if (preco != null) total += (i.quantidade||0) * preco;
+    });
+    return total;
+  }, [itens, precosPorProduto]);
+
+  const gastosPorMes = useMemo(() => {
+    const mapa = {};
+    movs.forEach(m => {
+      const mes = m.created_at.slice(0,7);
+      mapa[mes] = (mapa[mes]||0) + (+m.quantidade * +m.valor_unitario);
+    });
+    return Object.entries(mapa).sort((a,b)=>a[0].localeCompare(b[0]));
+  }, [movs]);
+
+  const valorPorCategoria = useMemo(() => {
+    const mapa = {};
+    itens.forEach(i => {
+      const preco = precosPorProduto[i.id]?.valor;
+      if (preco == null) return;
+      mapa[i.categoria] = (mapa[i.categoria]||0) + (i.quantidade||0)*preco;
+    });
+    return Object.entries(mapa).sort((a,b)=>b[1]-a[1]);
+  }, [itens, precosPorProduto]);
+
+  const topProdutos = useMemo(() => {
+    const mapa = {};
+    movs.forEach(m => {
+      mapa[m.produto_nome] = (mapa[m.produto_nome]||0) + (+m.quantidade * +m.valor_unitario);
+    });
+    return Object.entries(mapa).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  }, [movs]);
+
+  const mkChart = (ref, key, type, labels, data, colors, extraOpts={}) => {
+    if (!ref.current) return;
+    if (chartsRef.current[key]) chartsRef.current[key].destroy();
+    chartsRef.current[key] = new Chart(ref.current, {
+      type,
+      data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom', labels: { color: '#6b8aaa', font: { size: 11 } } } },
+        ...extraOpts
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (gastosPorMes.length) {
+      mkChart(chartGastosRef, 'gastos', 'bar',
+        gastosPorMes.map(([m]) => m),
+        gastosPorMes.map(([, v]) => v.toFixed(2)),
+        '#3b82f6',
+        { plugins: { legend: { display: false } }, scales: { y: { ticks: { color: '#6b8aaa' } }, x: { ticks: { color: '#6b8aaa' } } } }
+      );
+    }
+    if (valorPorCategoria.length) {
+      mkChart(chartCategoriaRef, 'categoria', 'doughnut',
+        valorPorCategoria.map(([c]) => c),
+        valorPorCategoria.map(([, v]) => v.toFixed(2)),
+        ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b']
+      );
+    }
+    if (topProdutos.length) {
+      mkChart(chartTopRef, 'top', 'bar',
+        topProdutos.map(([p]) => p.length > 26 ? p.slice(0, 26) + '…' : p),
+        topProdutos.map(([, v]) => v.toFixed(2)),
+        '#10b981',
+        { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#6b8aaa' } }, y: { ticks: { color: '#6b8aaa', font: { size: 10 } } } } }
+      );
+    }
+  }, [gastosPorMes, valorPorCategoria, topProdutos]);
+
+  return (
+    <div>
+      <div style={{
+        background:'linear-gradient(135deg, #16a34a22, #16a34a08)',
+        border:'1px solid #16a34a55', borderRadius:12, padding:'18px 20px', marginBottom:20
+      }}>
+        <div style={{fontSize:12,color:'var(--text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:.5}}>💰 Valor total em estoque</div>
+        <div style={{fontSize:30,fontWeight:800,color:'var(--green)',marginTop:2}}>
+          R$ {valorTotalEstoque.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}
+        </div>
+      </div>
+
+      <div className="card-sm" style={{marginBottom:20,padding:16}}>
+        <div style={{fontWeight:700,marginBottom:10}}>📅 Gastos por mês (compras registradas)</div>
+        {gastosPorMes.length===0
+          ? <div style={{color:'var(--text-muted)',fontSize:12}}>Ainda sem dados suficientes — registre entradas com valor unitário pra essa análise crescer.</div>
+          : <div style={{maxWidth:'100%'}}><canvas ref={chartGastosRef} height="220"></canvas></div>}
+      </div>
+
+      <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
+        <div className="card-sm" style={{flex:1,minWidth:280,padding:16}}>
+          <div style={{fontWeight:700,marginBottom:10}}>🗂️ Valor de estoque por categoria</div>
+          {valorPorCategoria.length===0
+            ? <div style={{color:'var(--text-muted)',fontSize:12}}>Ainda sem dados suficientes</div>
+            : <canvas ref={chartCategoriaRef} height="240"></canvas>}
+        </div>
+        <div className="card-sm" style={{flex:1,minWidth:280,padding:16}}>
+          <div style={{fontWeight:700,marginBottom:10}}>🏆 Top 10 produtos por valor investido</div>
+          {topProdutos.length===0
+            ? <div style={{color:'var(--text-muted)',fontSize:12}}>Ainda sem dados suficientes</div>
+            : <canvas ref={chartTopRef} height="280"></canvas>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ListaCompraTab({user, sb}) {
   const {useState, useEffect, useMemo} = React;
   const [itens, setItens]         = useState([]);
@@ -3177,7 +3319,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.0 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.1 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -3267,7 +3409,7 @@ function App() {
 
           <div className="tabs" style={{marginBottom:20}}>
             {(user.nivel===8 && (user.area==='clinico'||!user.area)
-              ? [['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas'],['guia','📚 Guia'],['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais']]
+              ? [['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas'],['guia','📚 Guia'],['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais'],['analise','📊 Análise']]
               : user.area==='clinico'||!user.area
               ? [['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas'],['guia','📚 Guia']]
               : user.area==='comercial'
@@ -3282,6 +3424,7 @@ function App() {
           {aba==='estoque' && <EstoqueTab user={user} sb={sb}/>}
           {aba==='listacompra' && <ListaCompraTab user={user} sb={sb}/>}
           {aba==='notasfiscais' && <NotasFiscaisTab user={user} sb={sb}/>}
+          {aba==='analise' && <AnaliseTab user={user} sb={sb}/>}
 
           {aba==='reg' && <>
             {user.area==='marketing' && <div className="alert alert-info" style={{marginBottom:16}}>📱 Estagiário de Marketing</div>}
@@ -3444,7 +3587,7 @@ function App() {
 
         <div className="content">
           <div className="tabs" style={{marginBottom:24}}>
-            {[['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais']].map(([k,l])=>(
+            {[['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais'],['analise','📊 Análise']].map(([k,l])=>(
               <button key={k} className={`tab ${abaFin===k?'active':''}`} onClick={()=>setAbaFin(k)}>{l}</button>
             ))}
           </div>
@@ -3452,6 +3595,7 @@ function App() {
           {abaFin==='estoque' && <EstoqueTab user={user} sb={sb}/>}
           {abaFin==='listacompra' && <ListaCompraTab user={user} sb={sb}/>}
           {abaFin==='notasfiscais' && <NotasFiscaisTab user={user} sb={sb}/>}
+          {abaFin==='analise' && <AnaliseTab user={user} sb={sb}/>}
         </div>
       </div>
     );
@@ -3490,7 +3634,7 @@ function App() {
 
         <div className="content">
           <div className="tabs" style={{marginBottom:24}}>
-            {[['usuarios','👥 Estagiários'],['dash','📊 Dashboard'],['aval','⭐ Avaliações'],['hist','📋 Histórico'],['niveis','📚 Níveis'],['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais']].map(([k,l])=>(
+            {[['usuarios','👥 Estagiários'],['dash','📊 Dashboard'],['aval','⭐ Avaliações'],['hist','📋 Histórico'],['niveis','📚 Níveis'],['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais'],['analise','📊 Análise']].map(([k,l])=>(
               <button key={k} className={`tab ${abaA===k?'active':''}`} onClick={()=>setAbaA(k)}>{l}</button>
             ))}
           </div>
@@ -3681,6 +3825,7 @@ function App() {
           {abaA==='estoque' && <EstoqueTab user={user} sb={sb}/>}
           {abaA==='listacompra' && <ListaCompraTab user={user} sb={sb}/>}
           {abaA==='notasfiscais' && <NotasFiscaisTab user={user} sb={sb}/>}
+          {abaA==='analise' && <AnaliseTab user={user} sb={sb}/>}
 
         {modalAval && (
           <div className="overlay" onClick={()=>setModalAval(null)}>
