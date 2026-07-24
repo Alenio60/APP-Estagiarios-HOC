@@ -1362,13 +1362,17 @@ function EstoqueTab({user, sb}) {
   }), [itens]);
 
   const valorEstoque = useMemo(() => {
-    let total = 0, comPreco = 0, semPreco = 0;
+    let total = 0, comPreco = 0, semPreco = 0, comReferencia = 0;
     itens.forEach(i => {
-      const preco = precos[i.id];
-      if (preco != null) { total += (i.quantidade||0) * preco; comPreco++; }
-      else semPreco++;
+      const precoReal = precos[i.id];
+      const preco = precoReal != null ? precoReal : (i.valor_unitario > 0 ? +i.valor_unitario : null);
+      if (preco != null) {
+        total += (i.quantidade||0) * preco;
+        comPreco++;
+        if (precoReal == null) comReferencia++;
+      } else semPreco++;
     });
-    return { total, comPreco, semPreco };
+    return { total, comPreco, semPreco, comReferencia };
   }, [itens, precos]);
 
   const movimentar = async () => {
@@ -1440,8 +1444,9 @@ function EstoqueTab({user, sb}) {
           </div>
         </div>
         <div style={{fontSize:11,color:'var(--text-muted)',textAlign:'right'}}>
-          {valorEstoque.comPreco} de {itens.length} itens com preço registrado
-          {valorEstoque.semPreco > 0 && <div style={{color:'var(--yellow)',marginTop:2}}>⚠️ {valorEstoque.semPreco} item(ns) sem preço não entram nessa soma</div>}
+          {valorEstoque.comPreco} de {itens.length} itens com valor conhecido
+          {valorEstoque.comReferencia > 0 && <div style={{marginTop:2}}>({valorEstoque.comReferencia} por valor de referência da planilha, {valorEstoque.comPreco-valorEstoque.comReferencia} por preço real de compra)</div>}
+          {valorEstoque.semPreco > 0 && <div style={{color:'var(--yellow)',marginTop:2}}>⚠️ {valorEstoque.semPreco} item(ns) sem nenhum valor não entram nessa soma</div>}
         </div>
       </div>
 
@@ -2219,10 +2224,16 @@ function AnaliseTab({user, sb}) {
     return mapa;
   }, [movs]);
 
+  const precoEfetivo = (i) => {
+    const real = precosPorProduto[i.id]?.valor;
+    if (real != null) return real;
+    return i.valor_unitario > 0 ? +i.valor_unitario : null;
+  };
+
   const valorTotalEstoque = useMemo(() => {
     let total = 0;
     itens.forEach(i => {
-      const preco = precosPorProduto[i.id]?.valor;
+      const preco = precoEfetivo(i);
       if (preco != null) total += (i.quantidade||0) * preco;
     });
     return total;
@@ -2240,7 +2251,7 @@ function AnaliseTab({user, sb}) {
   const valorPorCategoria = useMemo(() => {
     const mapa = {};
     itens.forEach(i => {
-      const preco = precosPorProduto[i.id]?.valor;
+      const preco = precoEfetivo(i);
       if (preco == null) return;
       mapa[i.categoria] = (mapa[i.categoria]||0) + (i.quantidade||0)*preco;
     });
@@ -3319,7 +3330,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.1 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.2 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
