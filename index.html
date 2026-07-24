@@ -1691,6 +1691,9 @@ function NotasFiscaisTab({user, sb}) {
   const [erroColar, setErroColar]       = useState('');
   const [etapaNF, setEtapaNF]           = useState('form'); // 'form' | 'confirmarNovos'
   const [novosPendentes, setNovosPendentes] = useState([]); // [{nome, categoria, minimo}]
+  const [processandoArquivo, setProcessandoArquivo] = useState(false);
+  const [erroArquivo, setErroArquivo]   = useState('');
+  const fileInputRef = React.useRef(null);
 
   const isSup = user.nivel === 8 || user.tipo === 'admin' || user.tipo === 'financeiro';
 
@@ -1821,9 +1824,76 @@ function NotasFiscaisTab({user, sb}) {
     }
   };
 
+  const arquivoParaBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const anexarArquivo = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = ''; // permite anexar o mesmo arquivo de novo depois
+    if (!file) return;
+
+    const tiposAceitos = ['application/pdf','image/png','image/jpeg','image/jpg','image/webp'];
+    if (!tiposAceitos.includes(file.type)) {
+      setErroArquivo('Formato não suportado. Envie um PDF ou uma foto (PNG/JPEG).');
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      setErroArquivo('Arquivo muito grande (máximo 15MB).');
+      return;
+    }
+
+    setErroArquivo('');
+    setProcessandoArquivo(true);
+    try {
+      const fileBase64 = await arquivoParaBase64(file);
+      const resp = await fetch('/api/ler-nota-fiscal', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ fileBase64, mimeType: file.type })
+      });
+      const dados = await resp.json();
+      if (!resp.ok || dados.error) {
+        setErroArquivo('❌ ' + (dados.error || 'Não foi possível ler o arquivo.'));
+        return;
+      }
+
+      if (dados.numero) setNfNumero(String(dados.numero));
+      if (dados.fornecedor) setNfFornecedor(String(dados.fornecedor));
+      if (dados.data && /^\d{4}-\d{2}-\d{2}$/.test(dados.data)) setNfData(dados.data);
+
+      const itensLidos = Array.isArray(dados.itens) ? dados.itens : [];
+      const novosItens = itensLidos
+        .filter(it => it && it.produto)
+        .map(it => {
+          const nome = String(it.produto).trim();
+          const match = estoqueItens.find(p => nomeCorresponde(normalizarTexto(p.produto), normalizarTexto(nome)));
+          return {
+            produtoId: match ? match.id : '',
+            produtoNome: match ? match.produto : nome,
+            quantidade: +it.quantidade || 1,
+            valorUnit: +it.valor_unitario || 0
+          };
+        });
+
+      if (novosItens.length === 0) {
+        setErroArquivo('⚠️ O arquivo foi lido, mas não encontrei itens reconhecíveis nele. Confira se é mesmo uma nota/cotação com tabela de produtos.');
+        return;
+      }
+      setItensNF([...itensNF, ...novosItens]);
+    } catch (err) {
+      setErroArquivo('❌ Erro ao processar o arquivo: ' + (err.message || 'erro desconhecido'));
+    } finally {
+      setProcessandoArquivo(false);
+    }
+  };
+
   const resetForm = () => {
     setNfNumero(''); setNfFornecedor(''); setNfData(new Date().toISOString().slice(0,10));
-    setNfObs(''); setItensNF([]); setEtapaNF('form'); setNovosPendentes([]);
+    setNfObs(''); setItensNF([]); setEtapaNF('form'); setNovosPendentes([]); setErroArquivo('');
   };
 
   const categoriasExistentes = useMemo(() => [...new Set(estoqueItens.map(i=>i.categoria))].sort(), [estoqueItens]);
@@ -2002,11 +2072,16 @@ function NotasFiscaisTab({user, sb}) {
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',margin:'16px 0 8px'}}>
               <label className="inp-label" style={{margin:0}}>Itens da nota</label>
               <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                <input type="file" ref={fileInputRef} accept="application/pdf,image/png,image/jpeg,image/webp" style={{display:'none'}} onChange={anexarArquivo}/>
+                <button type="button" className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} disabled={processandoArquivo} onClick={()=>fileInputRef.current && fileInputRef.current.click()}>
+                  {processandoArquivo ? '⏳ Lendo...' : '📎 Anexar arquivo'}
+                </button>
                 <button type="button" className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={()=>{setErroColar('');setModalColar(true);}}>📋 Colar nota inteira</button>
                 <button type="button" className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={()=>setScannerAberto(true)}>📷 Bipar item</button>
                 <button type="button" className="btn btn-sm btn-success" onClick={adicionarItem}>+ Item</button>
               </div>
             </div>
+            {erroArquivo && <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#ef4444',marginBottom:12,fontSize:12}}>{erroArquivo}</div>}
 
             {etapaNF === 'form' && <>
               {itensNF.map((it, idx) => (
@@ -3102,7 +3177,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.16 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.0 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
