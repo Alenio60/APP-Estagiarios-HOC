@@ -1836,6 +1836,17 @@ function NotasFiscaisTab({user, sb}) {
     if (itensNF.some(i=>!i.produtoNome || !(+i.quantidade>0))) return;
 
     if (etapaNF === 'form') {
+      // Antes de considerar "produto novo", tenta reconhecer pelo nome
+      // (cobre também quem foi digitado manualmente, sem usar o menu suspenso)
+      const itensResolvidos = itensNF.map(it => {
+        if (it.produtoId) return it;
+        const match = estoqueItens.find(p => nomeCorresponde(normalizarTexto(p.produto), normalizarTexto(it.produtoNome)));
+        return match ? {...it, produtoId: match.id, produtoNome: match.produto} : it;
+      });
+      if (itensResolvidos.some((it,i) => it.produtoId !== itensNF[i].produtoId)) {
+        setItensNF(itensResolvidos);
+      }
+
       const { data: existentes } = await sb.from('notas_fiscais')
         .select('id,numero,fornecedor,data_emissao')
         .eq('numero', nfNumero.trim());
@@ -1846,17 +1857,20 @@ function NotasFiscaisTab({user, sb}) {
         if (!continuar) return;
       }
 
-      const nomes = [...new Set(itensNF.filter(i=>!i.produtoId).map(i=>i.produtoNome))];
+      const nomes = [...new Set(itensResolvidos.filter(i=>!i.produtoId).map(i=>i.produtoNome))];
       if (nomes.length > 0) {
         setNovosPendentes(nomes.map(nome => ({nome, categoria:'', minimo:1})));
         setEtapaNF('confirmarNovos');
         return;
       }
+      salvarNF(itensResolvidos);
+      return;
     }
     salvarNF();
   };
 
-  const salvarNF = async () => {
+  const salvarNF = async (itensBase) => {
+    const baseItens = itensBase || itensNF;
     setBusy(true);
     try {
       // 1) cadastra automaticamente os produtos novos no estoque
@@ -1875,7 +1889,7 @@ function NotasFiscaisTab({user, sb}) {
         setBusy(false);
         return;
       }
-      const itensResolvidos = itensNF.map(it => it.produtoId ? it : {
+      const itensResolvidos = baseItens.map(it => it.produtoId ? it : {
         ...it, produtoId: mapaNovoId[normalizarTexto(it.produtoNome)] || ''
       });
 
@@ -2001,7 +2015,7 @@ function NotasFiscaisTab({user, sb}) {
                     <select className="inp" value={it.produtoId} onChange={e=>{
                       const id = e.target.value;
                       const prod = estoqueItens.find(p=>String(p.id)===String(id));
-                      atualizarItem(idx,'produtoId', id?+id:'');
+                      atualizarItem(idx,'produtoId', id||'');
                       if (prod) atualizarItem(idx,'produtoNome', prod.produto);
                     }}>
                       <option value="">Selecione um item do estoque...</option>
@@ -3088,7 +3102,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.15 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v8.16 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
