@@ -53,6 +53,20 @@
   --radius-sm:8px;
   --shadow:0 4px 32px rgba(0,0,0,0.8);
 }
+body.tema-claro{
+  --bg-base:#f3f6fb;
+  --bg-card:#ffffff;
+  --bg-card2:#eef3fa;
+  --border:#d8e2f0;
+  --border-light:#b8c9e2;
+  --text:#0f2038;
+  --text-muted:#4c6785;
+  --text-dim:#8aa0bd;
+  --accent:#2a7de0;
+  --accent-dark:#1c5fb0;
+  --accent-glow:rgba(42,125,224,0.18);
+  --shadow:0 4px 24px rgba(20,40,80,0.10);
+}
 body{font-family:'Inter',system-ui,sans-serif;background:var(--bg-base);min-height:100vh;color:var(--text);-webkit-font-smoothing:antialiased;font-size:15px}
 input,select,textarea,button{font-family:inherit;outline:none}
 ::-webkit-scrollbar{width:6px;height:6px}
@@ -1332,7 +1346,8 @@ function EstoqueTab({user, sb}) {
 
   useEffect(() => { carregar(); }, []);
 
-  const cats = useMemo(() => [...new Set(itens.map(i=>i.categoria))].sort(), [itens]);
+  const CATEGORIAS_PADRAO = ['Materiais Clínicos','Materiais Ortodônticos','Materiais Cirúrgicos','Material de Implante','Equipamentos','Instrumentais','Material de Escritório'];
+  const cats = useMemo(() => [...new Set([...CATEGORIAS_PADRAO, ...itens.map(i=>i.categoria)])].sort(), [itens]);
 
   const situacaoVencimento = (item) => {
     if (!item.vencimento) return null;
@@ -2731,6 +2746,11 @@ function ComercialDash({regs, user}) {
 function App() {
   const [tela, setTela]     = useState('login');
   const [user, setUser]     = useState(null);
+  const [tema, setTema]     = useState(() => { try { return localStorage.getItem('hoc_tema') || 'escuro'; } catch(e) { return 'escuro'; } });
+  useEffect(() => {
+    document.body.classList.toggle('tema-claro', tema === 'claro');
+    try { localStorage.setItem('hoc_tema', tema); } catch(e) {}
+  }, [tema]);
   const [usuarios, setUsr]  = useState([]);
   const [regs, setRegs]     = useState([]);
   const [busy, setBusy]     = useState(false);
@@ -3330,7 +3350,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.2 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.3 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -3364,6 +3384,7 @@ function App() {
             {(user.turno_inicio||user.turno_fim) && <span style={{fontSize:12,color:'var(--cyan)'}}>🕐 {user.turno_inicio||'?'}→{user.turno_fim||'?'}</span>}
             {user.nivel===8 && <span style={{fontSize:12,fontWeight:700,color:'var(--yellow)',background:'#f59e0b20',padding:'2px 8px',borderRadius:6}}>⭐ Supervisor</span>}
             <span style={{fontSize:13,color:'var(--text-muted)'}}>{user.nome.split(' ')[0]}</span>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setTema(tema==='claro'?'escuro':'claro')} title="Alternar tema">{tema==='claro'?'🌙':'☀️'}</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>{setTela('login'); setModoTela('login'); try{localStorage.removeItem('hoc_sessao');}catch(e){};}}>Sair</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>gerarRelatorio(user)}>📄 Relatório</button>
           </div>
@@ -3592,6 +3613,7 @@ function App() {
             <div className="logo-sub" style={{fontWeight:800,fontSize:18}}>HOC — Financeiro</div>
           </div>
           <div style={{display:'flex',gap:10}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setTema(tema==='claro'?'escuro':'claro')} title="Alternar tema">{tema==='claro'?'🌙':'☀️'}</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>{setTela('login'); setModoTela('login'); try{localStorage.removeItem('hoc_sessao');}catch(e){};}}>Sair</button>
           </div>
         </div>
@@ -3639,6 +3661,7 @@ function App() {
           </div>
           <div style={{display:'flex',gap:10}}>
             <button className="btn btn-ghost btn-sm" onClick={carregar}>🔄</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setTema(tema==='claro'?'escuro':'claro')} title="Alternar tema">{tema==='claro'?'🌙':'☀️'}</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>{setTela('login'); setModoTela('login'); try{localStorage.removeItem('hoc_sessao');}catch(e){};}}>Sair</button>
           </div>
         </div>
