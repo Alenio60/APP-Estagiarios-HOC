@@ -1346,7 +1346,7 @@ function EstoqueTab({user, sb}) {
 
   useEffect(() => { carregar(); }, []);
 
-  const CATEGORIAS_PADRAO = ['Materiais Clínicos','Materiais Ortodônticos','Materiais Cirúrgicos','Material de Implante','Equipamentos','Instrumentais','Material de Escritório'];
+  const CATEGORIAS_PADRAO = ['Materiais Clínicos','Materiais Ortodônticos','Materiais Cirúrgicos','Material de Implante','Material de Higiene e Limpeza','Equipamentos','Instrumentais','Material de Escritório'];
   const cats = useMemo(() => [...new Set([...CATEGORIAS_PADRAO, ...itens.map(i=>i.categoria)])].sort(), [itens]);
 
   const situacaoVencimento = (item) => {
@@ -3350,7 +3350,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.3 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.4 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
