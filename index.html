@@ -318,6 +318,19 @@ const ATIVIDADES_MARKETING = [
   {id:"mvia",n:"Criação de vídeos com IA",cat:"Conteúdo IA"},
 ];
 
+const ATIVIDADES_CS = [
+  {id:"csorto_manut",n:"Acompanhamento — pacientes em manutenção ortodôntica",cat:"Acompanhamento"},
+  {id:"cspontos",n:"Contato para agendamento de remoção de pontos pós-cirúrgicos",cat:"Acompanhamento"},
+  {id:"csorto_fim",n:"Acompanhamento pós-tratamento ortodôntico (incentivo à profilaxia)",cat:"Acompanhamento"},
+  {id:"csanivers",n:"Contato com pacientes aniversariantes",cat:"Relacionamento"},
+  {id:"cssuporte",n:"Suporte ao paciente na jornada de atendimento",cat:"Relacionamento"},
+  {id:"cscrm_reat",n:"Tarefas no RD CRM — reativação de pacientes",cat:"Reativação"},
+  {id:"cscrm_prev",n:"Tarefas no RD CRM — agendamento preventivo (6 em 6 meses)",cat:"Reativação"},
+  {id:"csinativos",n:"Contato com pacientes inativos (planilha)",cat:"Reativação"},
+  {id:"csagenda_rotina",n:"Agendamento e acompanhamento — consultas de rotina",cat:"Agendamento"},
+  {id:"csagenda_fechado",n:"Agendamento e acompanhamento — consultas de tratamento fechado",cat:"Agendamento"},
+];
+
 const ATIVIDADES_COMERCIAL = [
   // Leads por tipo
   {id:"clea_part",n:"Leads Particular",cat:"Leads por Tipo"},
@@ -3201,6 +3214,7 @@ function App() {
   const salvar = async () => {
     const listaBase = user.area==='marketing' ? ATIVIDADES_MARKETING :
                        user.area==='comercial' ? ATIVIDADES_COMERCIAL :
+                       user.area==='cs' ? ATIVIDADES_CS :
                        user.nivel===8 ? ATIVIDADES_SUPERVISOR :
                        ATIVIDADES[user.nivel]||[];
     const ativs = Object.entries(qtds).filter(([,v]) => v>0).map(([id,q]) => {
@@ -3350,7 +3364,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.4 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.5 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -3461,6 +3475,7 @@ function App() {
           {aba==='reg' && <>
             {user.area==='marketing' && <div className="alert alert-info" style={{marginBottom:16}}>📱 Estagiário de Marketing</div>}
             {user.area==='comercial' && <div className="alert" style={{background:'#f59e0b18',border:'1px solid #f59e0b40',color:'#fbbf24',marginBottom:16}}>💼 Estagiário Comercial</div>}
+            {user.area==='cs' && <div className="alert" style={{background:'#06b6d418',border:'1px solid #06b6d440',color:'#06b6d4',marginBottom:16}}>🤝 Estagiário CS (Customer Success)</div>}
             {(user.area==='clinico'||!user.area) && user.nivel > 1 && (
               <div style={{marginBottom:16,background:'var(--bg-card2)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 14px'}}>
                 <label className="inp-label" style={{marginBottom:8}}>Registrar atividades do nível:</label>
@@ -3492,6 +3507,7 @@ function App() {
               const nivelAtivo = (user.area==='clinico'||!user.area) ? (nivelReg||Math.min(user.nivel,8)) : user.nivel;
               const listaAtivs = user.area==='marketing' ? ATIVIDADES_MARKETING :
                                  user.area==='comercial' ? ATIVIDADES_COMERCIAL :
+                       user.area==='cs' ? ATIVIDADES_CS :
                                  nivelAtivo===8 ? ATIVIDADES_SUPERVISOR :
                                  ATIVIDADES[nivelAtivo]||[];
               const catMap = listaAtivs.reduce((acc,a)=>{if(!acc[a.cat])acc[a.cat]=[];acc[a.cat].push(a);return acc},{});
@@ -3709,6 +3725,7 @@ function App() {
                       {u.area==='clinico' && <><NivelBadge n={u.nivel}/> <span style={{fontSize:11,color:'var(--text-dim)',marginLeft:8}}>{meses} meses no nível</span></>}
               {u.area==='marketing' && <span className="badge" style={{background:'#ec489920',color:'#ec4899',fontSize:12}}>📱 Marketing</span>}
               {u.area==='comercial' && <span className="badge" style={{background:'#f59e0b20',color:'#f59e0b',fontSize:12}}>💼 Comercial</span>}
+              {u.area==='cs' && <span className="badge" style={{background:'#06b6d420',color:'#06b6d4',fontSize:12}}>🤝 CS</span>}
               {u.nivel===8 && <span className="badge" style={{background:'#f59e0b30',color:'#f59e0b',fontSize:12,marginLeft:6}}>⭐ Supervisor</span>}
               {(!u.area||u.area==='clinico') && u.area!=='marketing' && u.area!=='comercial' && u.area && false && null}
               {(u.turno_inicio||u.turno_fim) && <span style={{fontSize:11,color:'var(--cyan)',marginLeft:8}}>🕐 {u.turno_inicio||'?'} → {u.turno_fim||'?'}</span>}
@@ -3834,6 +3851,7 @@ function App() {
                           {(r.hora_entrada||r.hora_saida) && <span style={{fontSize:12,color:'var(--text-muted)',marginLeft:10}}>🕐 {r.hora_entrada||'--:--'} → {r.hora_saida||'--:--'}</span>}
                           {(r.area==='marketing') && <span style={{fontSize:11,background:'#ec489920',color:'#ec4899',borderRadius:6,padding:'2px 7px',marginLeft:8}}>📱 Mkt</span>}
                           {(r.area==='comercial') && <span style={{fontSize:11,background:'#f59e0b20',color:'#f59e0b',borderRadius:6,padding:'2px 7px',marginLeft:8}}>💼 Com</span>}
+                          {(r.area==='cs') && <span style={{fontSize:11,background:'#06b6d420',color:'#06b6d4',borderRadius:6,padding:'2px 7px',marginLeft:8}}>🤝 CS</span>}
                           {(!r.area||r.area==='clinico') && <span style={{fontSize:11,background:'#3b82f620',color:'#3b82f6',borderRadius:6,padding:'2px 7px',marginLeft:8}}>🦷 Clín</span>}
                         </div>
                         <NivelBadge n={r.nivel}/>
@@ -3950,6 +3968,7 @@ function App() {
                   <option value="clinico">🦷 Clínico</option>
                   <option value="marketing">📱 Marketing</option>
                   <option value="comercial">💼 Comercial</option>
+                  <option value="cs">🤝 CS (Customer Success)</option>
                 </select>
               </div>
               {nArea==='clinico' && <Sel label="Nível Inicial"
