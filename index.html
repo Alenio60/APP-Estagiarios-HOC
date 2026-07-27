@@ -2422,12 +2422,23 @@ function ListaCompraTab({user, sb}) {
       return a.produto.localeCompare(b.produto);
     }), [itens, precos]);
 
-  const exportarPDF = () => {
+  const listaPorCategoria = useMemo(() => {
+    const mapa = {};
+    listaCompra.forEach(item => {
+      if (!mapa[item.categoria]) mapa[item.categoria] = [];
+      mapa[item.categoria].push(item);
+    });
+    return Object.entries(mapa).sort((a,b) => a[0].localeCompare(b[0]));
+  }, [listaCompra]);
+
+  const slug = (s) => normalizarTexto(s).replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+
+  const exportarPDF = (itensParaExportar, tituloCategoria) => {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     const hoje = new Date().toLocaleDateString('pt-BR');
     doc.setFontSize(16);
-    doc.text('Lista de Compra — Reposição de Estoque', 14, 18);
+    doc.text(tituloCategoria ? `Lista de Compra — ${tituloCategoria}` : 'Lista de Compra — Reposição de Estoque', 14, 18);
     doc.setFontSize(10);
     doc.text(`HOC Hospital Odontológico · Gerado em ${hoje}`, 14, 25);
 
@@ -2435,7 +2446,7 @@ function ListaCompraTab({user, sb}) {
     doc.setFontSize(9);
     doc.setFont(undefined, 'bold');
     doc.text('Produto', 14, y);
-    doc.text('Categoria', 80, y);
+    if (!tituloCategoria) doc.text('Categoria', 80, y);
     doc.text('Atual', 118, y);
     doc.text('Mínimo', 134, y);
     doc.text('Comprar', 152, y);
@@ -2445,12 +2456,12 @@ function ListaCompraTab({user, sb}) {
     doc.line(14, y, 196, y);
     y += 5;
 
-    listaCompra.forEach(item => {
+    itensParaExportar.forEach(item => {
       if (y > 280) { doc.addPage(); y = 20; }
       doc.setTextColor(item.status === 'CRÍTICO' ? 200 : 0, 0, 0);
-      doc.text(String(item.produto).slice(0,34), 14, y);
+      doc.text(String(item.produto).slice(0,tituloCategoria?46:34), 14, y);
       doc.setTextColor(0,0,0);
-      doc.text(String(item.categoria).slice(0,20), 80, y);
+      if (!tituloCategoria) doc.text(String(item.categoria).slice(0,20), 80, y);
       doc.text(String(item.quantidade), 118, y);
       doc.text(String(item.minimo), 134, y);
       doc.text(`${item.sugestao} ${item.unidade||'un'}`, 152, y);
@@ -2458,7 +2469,8 @@ function ListaCompraTab({user, sb}) {
       y += 6;
     });
 
-    doc.save(`lista-compra-${hoje.replace(/\//g,'-')}.pdf`);
+    const nomeArquivo = tituloCategoria ? `lista-compra-${slug(tituloCategoria)}-${hoje.replace(/\//g,'-')}.pdf` : `lista-compra-${hoje.replace(/\//g,'-')}.pdf`;
+    doc.save(nomeArquivo);
   };
 
   const corVariacao = v => v == null ? 'var(--text-muted)' : v > 0 ? 'var(--red)' : v < 0 ? 'var(--green)' : 'var(--text-muted)';
@@ -2466,8 +2478,8 @@ function ListaCompraTab({user, sb}) {
   return (
     <div>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexWrap:'wrap',gap:8}}>
-        <div style={{fontSize:13,color:'var(--text-muted)'}}>{listaCompra.length} item(ns) precisam de reposição</div>
-        <button className="btn btn-success btn-sm" onClick={exportarPDF} disabled={listaCompra.length===0}>📄 Exportar PDF</button>
+        <div style={{fontSize:13,color:'var(--text-muted)'}}>{listaCompra.length} item(ns) precisam de reposição, em {listaPorCategoria.length} categoria(s)</div>
+        <button className="btn btn-success btn-sm" onClick={()=>exportarPDF(listaCompra, null)} disabled={listaCompra.length===0}>📄 Exportar tudo em PDF</button>
       </div>
 
       {carregando && <div style={{textAlign:'center',color:'var(--text-muted)',padding:40}}>Carregando...</div>}
@@ -2475,34 +2487,42 @@ function ListaCompraTab({user, sb}) {
         <div style={{textAlign:'center',color:'var(--text-muted)',padding:40}}>✅ Nenhum item abaixo do estoque mínimo no momento</div>
       )}
 
-      <div style={{display:'flex',flexDirection:'column',gap:6}}>
-        {listaCompra.map(item => (
-          <div key={item.id} className="card-sm" style={{borderLeft:`3px solid ${item.status==='CRÍTICO'?'var(--red)':'var(--yellow)'}`}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
-              <div style={{flex:1,minWidth:150}}>
-                <div style={{fontWeight:600,fontSize:14}}>{item.produto}</div>
-                <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>
-                  {item.categoria} · Atual: {item.quantidade} {item.unidade||'un'} · Mín: {item.minimo}
+      {listaPorCategoria.map(([categoria, itensCategoria]) => (
+        <div key={categoria} style={{marginBottom:24}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8,paddingBottom:6,borderBottom:'1px solid var(--border)'}}>
+            <div style={{fontWeight:700,fontSize:14}}>{categoria} <span style={{color:'var(--text-muted)',fontWeight:400,fontSize:12}}>({itensCategoria.length})</span></div>
+            <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={()=>exportarPDF(itensCategoria, categoria)}>📄 PDF desta categoria</button>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:6}}>
+            {itensCategoria.map(item => (
+              <div key={item.id} className="card-sm" style={{borderLeft:`3px solid ${item.status==='CRÍTICO'?'var(--red)':'var(--yellow)'}`}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
+                  <div style={{flex:1,minWidth:150}}>
+                    <div style={{fontWeight:600,fontSize:14}}>{item.produto}</div>
+                    <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>
+                      Atual: {item.quantidade} {item.unidade||'un'} · Mín: {item.minimo}
+                    </div>
+                  </div>
+                  <div style={{textAlign:'center'}}>
+                    <div style={{fontSize:11,color:'var(--text-dim)'}}>Sugestão</div>
+                    <div style={{fontSize:16,fontWeight:800,color:'var(--accent)'}}>{item.sugestao} {item.unidade||'un'}</div>
+                  </div>
+                  <div style={{textAlign:'center',minWidth:80}}>
+                    <div style={{fontSize:11,color:'var(--text-dim)'}}>Últ. preço</div>
+                    <div style={{fontSize:14,fontWeight:700}}>{item.ultimoPreco!=null ? `R$ ${item.ultimoPreco.toFixed(2)}` : '—'}</div>
+                    {item.variacao != null && (
+                      <div style={{fontSize:11,fontWeight:700,color:corVariacao(item.variacao)}}>
+                        {item.variacao > 0 ? '▲' : '▼'} {Math.abs(item.variacao).toFixed(1)}%
+                      </div>
+                    )}
+                  </div>
+                  <div style={{fontSize:10,fontWeight:800,color:item.status==='CRÍTICO'?'var(--red)':'var(--yellow)'}}>{item.status}</div>
                 </div>
               </div>
-              <div style={{textAlign:'center'}}>
-                <div style={{fontSize:11,color:'var(--text-dim)'}}>Sugestão</div>
-                <div style={{fontSize:16,fontWeight:800,color:'var(--accent)'}}>{item.sugestao} {item.unidade||'un'}</div>
-              </div>
-              <div style={{textAlign:'center',minWidth:80}}>
-                <div style={{fontSize:11,color:'var(--text-dim)'}}>Últ. preço</div>
-                <div style={{fontSize:14,fontWeight:700}}>{item.ultimoPreco!=null ? `R$ ${item.ultimoPreco.toFixed(2)}` : '—'}</div>
-                {item.variacao != null && (
-                  <div style={{fontSize:11,fontWeight:700,color:corVariacao(item.variacao)}}>
-                    {item.variacao > 0 ? '▲' : '▼'} {Math.abs(item.variacao).toFixed(1)}%
-                  </div>
-                )}
-              </div>
-              <div style={{fontSize:10,fontWeight:800,color:item.status==='CRÍTICO'?'var(--red)':'var(--yellow)'}}>{item.status}</div>
-            </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -3364,7 +3384,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.5 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.6 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
