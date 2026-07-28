@@ -3384,7 +3384,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.6 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.6.1 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -3713,7 +3713,7 @@ function App() {
             <div style={{display:'flex',gap:12,marginBottom:20,alignItems:'flex-end',flexWrap:'wrap'}}>
               <button className="btn btn-success" onClick={()=>setModal('cadastro')}>+ Cadastrar</button>
               <div style={{display:'flex',gap:6}}>
-                {[['','Todos'],['clinico','🦷 Clínico'],['marketing','📱 Marketing'],['comercial','💼 Comercial']].map(([v,l])=>(
+                {[['','Todos'],['clinico','🦷 Clínico'],['marketing','📱 Marketing'],['comercial','💼 Comercial'],['cs','🤝 CS']].map(([v,l])=>(
                   <button key={v} onClick={()=>setFArea(v)} className="btn btn-sm" style={{
                     background: fArea===v ? 'var(--accent)' : 'var(--bg-card2)',
                     color: fArea===v ? '#fff' : 'var(--text-muted)',
