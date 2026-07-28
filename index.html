@@ -76,9 +76,13 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .header{background:var(--bg-card);border-bottom:1px solid var(--border);padding:0 28px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(8px)}
 .logo-text{font-size:22px;font-weight:800;letter-spacing:-0.5px;background:linear-gradient(135deg,#60a5fa,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .logo-sub{font-size:11px;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin-top:1px}
-.content{flex:1;max-width:960px;margin:0 auto;width:100%;padding:28px 20px}
+.content{flex:1;max-width:1280px;margin:0 auto;width:100%;padding:28px 24px}
 .card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:24px}
 .card-sm{background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px}
+.item-lista-compra{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+@media (min-width:820px){
+  .item-lista-compra{display:grid;grid-template-columns:2.2fr 90px 90px 120px 130px 90px;align-items:center;gap:14px}
+}
 .card-hover{transition:border-color .2s,transform .1s}
 .card-hover:hover{border-color:var(--border-light);transform:translateY(-1px)}
 .inp{width:100%;padding:13px 15px;background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:15px;transition:border-color .2s}
@@ -2496,12 +2500,17 @@ function ListaCompraTab({user, sb}) {
           <div style={{display:'flex',flexDirection:'column',gap:6}}>
             {itensCategoria.map(item => (
               <div key={item.id} className="card-sm" style={{borderLeft:`3px solid ${item.status==='CRÍTICO'?'var(--red)':'var(--yellow)'}`}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
-                  <div style={{flex:1,minWidth:150}}>
+                <div className="item-lista-compra">
+                  <div style={{minWidth:150}}>
                     <div style={{fontWeight:600,fontSize:14}}>{item.produto}</div>
-                    <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>
-                      Atual: {item.quantidade} {item.unidade||'un'} · Mín: {item.minimo}
-                    </div>
+                  </div>
+                  <div style={{textAlign:'center'}}>
+                    <div style={{fontSize:11,color:'var(--text-dim)'}}>Atual</div>
+                    <div style={{fontSize:14,fontWeight:700}}>{item.quantidade} {item.unidade||'un'}</div>
+                  </div>
+                  <div style={{textAlign:'center'}}>
+                    <div style={{fontSize:11,color:'var(--text-dim)'}}>Mínimo</div>
+                    <div style={{fontSize:14,fontWeight:700}}>{item.minimo}</div>
                   </div>
                   <div style={{textAlign:'center'}}>
                     <div style={{fontSize:11,color:'var(--text-dim)'}}>Sugestão</div>
@@ -2516,7 +2525,7 @@ function ListaCompraTab({user, sb}) {
                       </div>
                     )}
                   </div>
-                  <div style={{fontSize:10,fontWeight:800,color:item.status==='CRÍTICO'?'var(--red)':'var(--yellow)'}}>{item.status}</div>
+                  <div style={{textAlign:'center',fontSize:10,fontWeight:800,color:item.status==='CRÍTICO'?'var(--red)':'var(--yellow)'}}>{item.status}</div>
                 </div>
               </div>
             ))}
@@ -3384,7 +3393,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.6.1 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.7 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
