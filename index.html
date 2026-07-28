@@ -1316,6 +1316,7 @@ function EstoqueTab({user, sb}) {
   const [itens, setItens]       = useState([]);
   const [movs, setMovs]         = useState([]);
   const [precos, setPrecos]     = useState({}); // produto_id -> ultimo valor_unitario pago
+  const [genesisEdit, setGenesisEdit] = useState({}); // produto_id -> valor sendo editado
   const [busca, setBusca]       = useState('');
   const [catFiltro, setCatFiltro] = useState('');
   const [statusFiltro, setStatusFiltro] = useState('');
@@ -1408,6 +1409,16 @@ function EstoqueTab({user, sb}) {
     });
     return { total, comPreco, semPreco, comReferencia };
   }, [itens, precos]);
+
+  const salvarGenesis = async (itemId) => {
+    const valor = genesisEdit[itemId];
+    if (valor === undefined) return;
+    const num = +valor;
+    if (isNaN(num) || num < 0) return;
+    await sb.from('estoque').update({estoque_genesis: num, updated_at: new Date().toISOString()}).eq('id', itemId);
+    setGenesisEdit(prev => { const p = {...prev}; delete p[itemId]; return p; });
+    await carregar();
+  };
 
   const movimentar = async () => {
     if (!modal || qtdMov <= 0) return;
@@ -1546,6 +1557,20 @@ function EstoqueTab({user, sb}) {
                     <div style={{fontSize:11,marginTop:2,fontWeight:700,color: venc==='vencido'?'var(--red)':venc==='vencendo'?'var(--yellow)':'var(--text-dim)'}}>
                       {venc==='vencido'?'💀 Vencido em ':venc==='vencendo'?'⏰ Vence em ':'Val: '}
                       {new Date(item.vencimento+'T00:00:00').toLocaleDateString('pt-BR')}
+                    </div>
+                  )}
+                  {item.categoria === 'Material de Implante' && (
+                    <div style={{display:'flex',alignItems:'center',gap:6,marginTop:6}}>
+                      <span style={{fontSize:11,color:'var(--purple)',fontWeight:700}}>🏥 Estoque Genesis:</span>
+                      <input
+                        type="number" min="0"
+                        value={genesisEdit[item.id] !== undefined ? genesisEdit[item.id] : (item.estoque_genesis||0)}
+                        onChange={e=>setGenesisEdit(prev=>({...prev,[item.id]:e.target.value}))}
+                        style={{width:60,padding:'2px 6px',fontSize:12,background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)'}}
+                      />
+                      {genesisEdit[item.id] !== undefined && +genesisEdit[item.id] !== (item.estoque_genesis||0) && (
+                        <button className="btn btn-sm btn-success" style={{padding:'2px 8px',fontSize:11}} onClick={()=>salvarGenesis(item.id)}>💾</button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -3395,7 +3420,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.7.1 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.8 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
