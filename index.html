@@ -1560,7 +1560,7 @@ function EstoqueTab({user, sb}) {
                     </div>
                   )}
                   {item.categoria === 'Material de Implante' && (
-                    <div style={{display:'flex',alignItems:'center',gap:6,marginTop:6}}>
+                    <div style={{display:'flex',alignItems:'center',gap:6,marginTop:6,flexWrap:'wrap'}}>
                       <span style={{fontSize:11,color:'var(--purple)',fontWeight:700}}>🏥 Estoque Genesis:</span>
                       <input
                         type="number" min="0"
@@ -1571,6 +1571,7 @@ function EstoqueTab({user, sb}) {
                       {genesisEdit[item.id] !== undefined && +genesisEdit[item.id] !== (item.estoque_genesis||0) && (
                         <button className="btn btn-sm btn-success" style={{padding:'2px 8px',fontSize:11}} onClick={()=>salvarGenesis(item.id)}>💾</button>
                       )}
+                      <span style={{fontSize:11,color:'var(--text-dim)'}}>· Total (HOC+Genesis): <b style={{color:'var(--text-muted)'}}>{item.quantidade + (+(genesisEdit[item.id]!==undefined?genesisEdit[item.id]:item.estoque_genesis)||0)}</b></span>
                     </div>
                   )}
                 </div>
@@ -2442,7 +2443,7 @@ function ListaCompraTab({user, sb}) {
       const variacao = (p && p.ultimo != null && p.penultimo) ? ((p.ultimo - p.penultimo) / p.penultimo * 100) : null;
       return {
         ...i,
-        sugestao: Math.max(i.minimo - i.quantidade, 0),
+        sugestao: Math.max(i.minimo - (i.quantidade + (+i.estoque_genesis||0)), 0),
         ultimoPreco: p ? p.ultimo : null,
         variacao
       };
@@ -3420,7 +3421,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.8 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.9 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
