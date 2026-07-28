@@ -67,21 +67,23 @@ body.tema-claro{
   --accent-glow:rgba(42,125,224,0.18);
   --shadow:0 4px 24px rgba(20,40,80,0.10);
 }
-body{font-family:'Inter',system-ui,sans-serif;background:var(--bg-base);min-height:100vh;color:var(--text);-webkit-font-smoothing:antialiased;font-size:15px}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg-base);min-height:100vh;color:var(--text);-webkit-font-smoothing:antialiased;font-size:15px;overflow-x:hidden}
+html{overflow-x:hidden}
 input,select,textarea,button{font-family:inherit;outline:none}
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:var(--bg-base)}
 ::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:4px}
-.page{min-height:100vh;display:flex;flex-direction:column}
+.page{min-height:100vh;display:flex;flex-direction:column;max-width:100vw}
 .header{background:var(--bg-card);border-bottom:1px solid var(--border);padding:0 28px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(8px)}
 .logo-text{font-size:22px;font-weight:800;letter-spacing:-0.5px;background:linear-gradient(135deg,#60a5fa,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .logo-sub{font-size:11px;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin-top:1px}
-.content{flex:1;max-width:1280px;margin:0 auto;width:100%;padding:28px 24px}
+.content{flex:1;max-width:1280px;margin:0 auto;width:100%;padding:28px 24px;min-width:0}
 .card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:24px}
-.card-sm{background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px}
-.item-lista-compra{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.card-sm{background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;min-width:0}
+.item-lista-compra{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;min-width:0}
+.item-lista-compra>div:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (min-width:820px){
-  .item-lista-compra{display:grid;grid-template-columns:2.2fr 90px 90px 120px 130px 90px;align-items:center;gap:14px}
+  .item-lista-compra{display:grid;grid-template-columns:minmax(0,2.2fr) 90px 90px 120px 130px 90px;align-items:center;gap:14px}
 }
 .card-hover{transition:border-color .2s,transform .1s}
 .card-hover:hover{border-color:var(--border-light);transform:translateY(-1px)}
@@ -3393,7 +3395,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.7 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.7.1 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
