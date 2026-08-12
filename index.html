@@ -1343,6 +1343,7 @@ function EstoqueTab({user, sb}) {
   const [avisoScan, setAvisoScan]         = useState('');
   const [modalImportar, setModalImportar] = useState(false);
   const [vencFiltro, setVencFiltro]       = useState(''); // '' | 'vencido' | 'vencendo'
+  const [semPrecoFiltro, setSemPrecoFiltro] = useState(false);
 
   const isSup = user.nivel === 8 || user.tipo === 'admin' || user.tipo === 'financeiro';
 
@@ -1384,8 +1385,9 @@ function EstoqueTab({user, sb}) {
     const catOk   = !catFiltro || i.categoria === catFiltro;
     const stOk    = !statusFiltro || i.status === statusFiltro;
     const vencOk  = !vencFiltro || situacaoVencimento(i) === vencFiltro;
-    return buscaOk && catOk && stOk && vencOk;
-  }), [itens, busca, catFiltro, statusFiltro, vencFiltro]);
+    const semPrecoOk = !semPrecoFiltro || (precos[i.id] == null && !(i.valor_unitario > 0));
+    return buscaOk && catOk && stOk && vencOk && semPrecoOk;
+  }), [itens, busca, catFiltro, statusFiltro, vencFiltro, semPrecoFiltro, precos]);
 
   const stats = useMemo(() => ({
     total: itens.length,
@@ -1527,10 +1529,11 @@ function EstoqueTab({user, sb}) {
             <option value="">Todas categorias</option>
             {cats.map(c=><option key={c} value={c}>{c}</option>)}
           </select>
-          {(statusFiltro || vencFiltro) && <button className="btn btn-ghost btn-sm" onClick={()=>{setStatusFiltro('');setVencFiltro('');}}>✕ Limpar filtro</button>}
+          {(statusFiltro || vencFiltro || semPrecoFiltro) && <button className="btn btn-ghost btn-sm" onClick={()=>{setStatusFiltro('');setVencFiltro('');setSemPrecoFiltro(false);}}>✕ Limpar filtro</button>}
           {isSup && <button className="btn btn-success btn-sm" onClick={()=>setModalCad(true)}>+ Novo item</button>}
           {isSup && <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={()=>{setAvisoScan('');setScannerAberto('busca');}}>📷 Bipar item</button>}
           {isSup && <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={()=>setModalImportar(true)}>📥 Importar</button>}
+          <button className="btn btn-sm" style={{background: semPrecoFiltro?'#f59e0b30':'var(--bg-card2)',border:'1px solid '+(semPrecoFiltro?'var(--yellow)':'var(--border)'),color: semPrecoFiltro?'var(--yellow)':'var(--text-muted)'}} onClick={()=>setSemPrecoFiltro(v=>!v)}>💲 Sem preço ({valorEstoque.semPreco})</button>
         </div>
 
         {avisoScan && (
@@ -3421,7 +3424,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.9 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.10 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
