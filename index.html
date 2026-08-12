@@ -1317,6 +1317,8 @@ function EstoqueTab({user, sb}) {
   const [movs, setMovs]         = useState([]);
   const [precos, setPrecos]     = useState({}); // produto_id -> ultimo valor_unitario pago
   const [genesisEdit, setGenesisEdit] = useState({}); // produto_id -> valor sendo editado
+  const [nomeEditId, setNomeEditId]   = useState(null); // id do item cujo nome esta sendo editado
+  const [nomeEditValor, setNomeEditValor] = useState('');
   const [busca, setBusca]       = useState('');
   const [catFiltro, setCatFiltro] = useState('');
   const [statusFiltro, setStatusFiltro] = useState('');
@@ -1411,6 +1413,14 @@ function EstoqueTab({user, sb}) {
     });
     return { total, comPreco, semPreco, comReferencia };
   }, [itens, precos]);
+
+  const salvarNome = async (itemId) => {
+    const novoNome = nomeEditValor.trim();
+    if (!novoNome) return;
+    await sb.from('estoque').update({produto: novoNome, updated_at: new Date().toISOString()}).eq('id', itemId);
+    setNomeEditId(null); setNomeEditValor('');
+    await carregar();
+  };
 
   const salvarGenesis = async (itemId) => {
     const valor = genesisEdit[itemId];
@@ -1551,7 +1561,18 @@ function EstoqueTab({user, sb}) {
             <div key={item.id} className="card-sm" style={{borderLeft:`3px solid ${corStatus(item.status)}`}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
                 <div style={{flex:1,minWidth:150}}>
-                  <div style={{fontWeight:600,fontSize:14}}>{item.produto}</div>
+                  {nomeEditId === item.id ? (
+                    <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:2}}>
+                      <input className="inp" value={nomeEditValor} onChange={e=>setNomeEditValor(e.target.value)} style={{padding:'4px 8px',fontSize:13,flex:1}} autoFocus/>
+                      <button className="btn btn-sm btn-success" style={{padding:'3px 9px'}} onClick={()=>salvarNome(item.id)}>💾</button>
+                      <button className="btn btn-sm btn-ghost" style={{padding:'3px 9px'}} onClick={()=>{setNomeEditId(null);setNomeEditValor('');}}>✕</button>
+                    </div>
+                  ) : (
+                    <div style={{fontWeight:600,fontSize:14,display:'flex',alignItems:'center',gap:6}}>
+                      {item.produto}
+                      {isSup && <span onClick={()=>{setNomeEditId(item.id);setNomeEditValor(item.produto);}} style={{cursor:'pointer',fontSize:12,color:'var(--text-dim)'}} title="Editar nome">✏️</span>}
+                    </div>
+                  )}
                   <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>
                     {item.categoria} · Mín: {item.minimo} {item.unidade||'un'}
                     {item.lote && <> · Lote: {item.lote}</>}
@@ -3424,7 +3445,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.10 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.11 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
