@@ -1347,7 +1347,7 @@ function EstoqueTab({user, sb}) {
   const [vencFiltro, setVencFiltro]       = useState(''); // '' | 'vencido' | 'vencendo'
   const [semPrecoFiltro, setSemPrecoFiltro] = useState(false);
 
-  const isSup = user.nivel === 8 || user.tipo === 'admin' || user.tipo === 'financeiro';
+  const isSup = user.nivel === 8 || user.tipo === 'admin' || user.tipo === 'financeiro' || user.tipo === 'genesis';
 
   const carregar = async () => {
     if (!sb) return;
@@ -1784,7 +1784,7 @@ function NotasFiscaisTab({user, sb}) {
   const [erroArquivo, setErroArquivo]   = useState('');
   const fileInputRef = React.useRef(null);
 
-  const isSup = user.nivel === 8 || user.tipo === 'admin' || user.tipo === 'financeiro';
+  const isSup = user.nivel === 8 || user.tipo === 'admin' || user.tipo === 'financeiro' || user.tipo === 'genesis';
 
   const carregar = async () => {
     if (!sb) return;
@@ -2923,7 +2923,7 @@ function App() {
       if (sessao) {
         const u = JSON.parse(sessao);
         setUser(u);
-        setTela(u.tipo === 'admin' ? 'admin' : u.tipo === 'financeiro' ? 'financeiro' : 'est');
+        setTela(u.tipo === 'admin' ? 'admin' : u.tipo === 'financeiro' ? 'financeiro' : u.tipo === 'genesis' ? 'genesis' : 'est');
         if (u.tipo === 'estagiario') agendarAlertas(u);
       }
     } catch(e) {}
@@ -3001,7 +3001,7 @@ function App() {
         const data = arr && arr[0];
         if (data) {
           setUser(data);
-          setTela(data.tipo === 'admin' ? 'admin' : data.tipo === 'financeiro' ? 'financeiro' : 'est');
+          setTela(data.tipo === 'admin' ? 'admin' : data.tipo === 'financeiro' ? 'financeiro' : data.tipo === 'genesis' ? 'genesis' : 'est');
           if (data.tipo === 'estagiario') agendarAlertas(data);
           try { localStorage.setItem('hoc_sessao', JSON.stringify(data)); } catch(e) {}
         } else setErr('Usuário não encontrado. Faça login com senha.');
@@ -3020,7 +3020,7 @@ function App() {
     const data = arr && arr[0];
     if (data) {
       setUser(data);
-      setTela(data.tipo === 'admin' ? 'admin' : data.tipo === 'financeiro' ? 'financeiro' : 'est');
+      setTela(data.tipo === 'admin' ? 'admin' : data.tipo === 'financeiro' ? 'financeiro' : data.tipo === 'genesis' ? 'genesis' : 'est');
       if (data.tipo === 'estagiario') agendarAlertas(data);
       try { localStorage.setItem('hoc_sessao', JSON.stringify(data)); } catch(e) {}
       // Verificar se deve perguntar sobre biometria
@@ -3445,7 +3445,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.11 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.12 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -3726,6 +3726,26 @@ function App() {
           {abaFin==='listacompra' && <ListaCompraTab user={user} sb={sb}/>}
           {abaFin==='notasfiscais' && <NotasFiscaisTab user={user} sb={sb}/>}
           {abaFin==='analise' && <AnaliseTab user={user} sb={sb}/>}
+        </div>
+      </div>
+    );
+  }
+
+  if (tela === 'genesis') {
+    return (
+      <div className="page">
+        <div className="header">
+          <div>
+            <div className="logo-sub" style={{fontWeight:800,fontSize:18}}>HOC — Controle de Estoque Genesis</div>
+          </div>
+          <div style={{display:'flex',gap:10}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setTema(tema==='claro'?'escuro':'claro')} title="Alternar tema">{tema==='claro'?'🌙':'☀️'}</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{setTela('login'); setModoTela('login'); try{localStorage.removeItem('hoc_sessao');}catch(e){};}}>Sair</button>
+          </div>
+        </div>
+
+        <div className="content">
+          <EstoqueTab user={user} sb={sb}/>
         </div>
       </div>
     );
@@ -4039,6 +4059,7 @@ function App() {
                 <select className="inp" value={nTipo} onChange={e=>setNTipo(e.target.value)} style={{cursor:'pointer'}}>
                   <option value="estagiario">Estagiário</option>
                   <option value="financeiro">Financeiro (Estoque/Compras/NF)</option>
+                  <option value="genesis">Controle de Estoque Genesis (só Estoque)</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
