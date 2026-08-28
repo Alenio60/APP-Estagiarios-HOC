@@ -2432,6 +2432,7 @@ function ListaCompraTab({user, sb}) {
   const [itens, setItens]         = useState([]);
   const [precos, setPrecos]       = useState({});
   const [carregando, setCarregando] = useState(true);
+  const [selecionados, setSelecionados] = useState({}); // id -> true
 
   const carregar = async () => {
     if (!sb) return;
@@ -2489,6 +2490,27 @@ function ListaCompraTab({user, sb}) {
 
   const slug = (s) => normalizarTexto(s).replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
 
+  const toggleSelecionado = (id) => setSelecionados(prev => ({...prev, [id]: !prev[id]}));
+  const selecionarTodos = () => { const t={}; listaCompra.forEach(i=>{t[i.id]=true;}); setSelecionados(t); };
+  const selecionarCategoria = (itensCategoria) => setSelecionados(prev => {
+    const t = {...prev};
+    const todosJaMarcados = itensCategoria.every(i => t[i.id]);
+    itensCategoria.forEach(i => { t[i.id] = !todosJaMarcados; });
+    return t;
+  });
+  const limparSelecao = () => setSelecionados({});
+
+  const itensSelecionados = useMemo(() => listaCompra.filter(i => selecionados[i.id]), [listaCompra, selecionados]);
+
+  const totalEstimado = useMemo(() => {
+    let total = 0, comPreco = 0, semPreco = 0;
+    itensSelecionados.forEach(i => {
+      if (i.ultimoPreco != null) { total += i.sugestao * i.ultimoPreco; comPreco++; }
+      else semPreco++;
+    });
+    return { total, comPreco, semPreco };
+  }, [itensSelecionados]);
+
   const exportarPDF = (itensParaExportar, tituloCategoria) => {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
@@ -2535,8 +2557,31 @@ function ListaCompraTab({user, sb}) {
     <div>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16,flexWrap:'wrap',gap:8}}>
         <div style={{fontSize:13,color:'var(--text-muted)'}}>{listaCompra.length} item(ns) precisam de reposição, em {listaPorCategoria.length} categoria(s)</div>
-        <button className="btn btn-success btn-sm" onClick={()=>exportarPDF(listaCompra, null)} disabled={listaCompra.length===0}>📄 Exportar tudo em PDF</button>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={selecionarTodos} disabled={listaCompra.length===0}>☑️ Selecionar todos</button>
+          <button className="btn btn-success btn-sm" onClick={()=>exportarPDF(listaCompra, null)} disabled={listaCompra.length===0}>📄 Exportar tudo em PDF</button>
+        </div>
       </div>
+
+      {itensSelecionados.length > 0 && (
+        <div style={{
+          background:'linear-gradient(135deg, #2a7de022, #2a7de008)',
+          border:'1px solid var(--accent)', borderRadius:12, padding:'16px 20px',
+          marginBottom:20, display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:12
+        }}>
+          <div>
+            <div style={{fontSize:12,color:'var(--text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:.5}}>🛒 {itensSelecionados.length} item(ns) selecionado(s) — verba estimada</div>
+            <div style={{fontSize:28,fontWeight:800,color:'var(--accent)',marginTop:2}}>
+              R$ {totalEstimado.total.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}
+            </div>
+            {totalEstimado.semPreco > 0 && <div style={{fontSize:11,color:'var(--yellow)',marginTop:2}}>⚠️ {totalEstimado.semPreco} item(ns) selecionado(s) sem preço não entram nesse total</div>}
+          </div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            <button className="btn btn-ghost btn-sm" onClick={limparSelecao}>✕ Limpar seleção</button>
+            <button className="btn btn-success btn-sm" onClick={()=>exportarPDF(itensSelecionados, 'Selecionados')}>📄 Exportar selecionados</button>
+          </div>
+        </div>
+      )}
 
       {carregando && <div style={{textAlign:'center',color:'var(--text-muted)',padding:40}}>Carregando...</div>}
       {!carregando && listaCompra.length === 0 && (
@@ -2547,12 +2592,21 @@ function ListaCompraTab({user, sb}) {
         <div key={categoria} style={{marginBottom:24}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8,paddingBottom:6,borderBottom:'1px solid var(--border)'}}>
             <div style={{fontWeight:700,fontSize:14}}>{categoria} <span style={{color:'var(--text-muted)',fontWeight:400,fontSize:12}}>({itensCategoria.length})</span></div>
-            <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={()=>exportarPDF(itensCategoria, categoria)}>📄 PDF desta categoria</button>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+              <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={()=>selecionarCategoria(itensCategoria)}>☑️ Selecionar categoria</button>
+              <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={()=>exportarPDF(itensCategoria, categoria)}>📄 PDF desta categoria</button>
+            </div>
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:6}}>
             {itensCategoria.map(item => (
-              <div key={item.id} className="card-sm" style={{borderLeft:`3px solid ${item.status==='CRÍTICO'?'var(--red)':'var(--yellow)'}`}}>
-                <div className="item-lista-compra">
+              <div key={item.id} className="card-sm" style={{
+                borderLeft:`3px solid ${item.status==='CRÍTICO'?'var(--red)':'var(--yellow)'}`,
+                background: selecionados[item.id] ? 'var(--accent-glow)' : undefined,
+                outline: selecionados[item.id] ? '1px solid var(--accent)' : undefined,
+                cursor:'pointer', display:'flex', alignItems:'center', gap:10
+              }} onClick={()=>toggleSelecionado(item.id)}>
+                <input type="checkbox" checked={!!selecionados[item.id]} onChange={()=>toggleSelecionado(item.id)} onClick={e=>e.stopPropagation()} style={{width:18,height:18,cursor:'pointer',flexShrink:0}}/>
+                <div className="item-lista-compra" style={{flex:1,minWidth:0}}>
                   <div style={{minWidth:150}}>
                     <div style={{fontWeight:600,fontSize:14}}>{item.produto}</div>
                   </div>
@@ -3445,7 +3499,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.12 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.13 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
