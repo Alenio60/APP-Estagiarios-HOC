@@ -2428,11 +2428,13 @@ function AnaliseTab({user, sb}) {
 }
 
 function ListaCompraTab({user, sb}) {
-  const {useState, useEffect, useMemo} = React;
+  const {useState, useEffect, useMemo, useRef} = React;
   const [itens, setItens]         = useState([]);
   const [precos, setPrecos]       = useState({});
   const [carregando, setCarregando] = useState(true);
   const [selecionados, setSelecionados] = useState({}); // id -> true
+  const [barraAltura, setBarraAltura] = useState(110);
+  const barraRef = useRef(null);
 
   const carregar = async () => {
     if (!sb) return;
@@ -2502,6 +2504,13 @@ function ListaCompraTab({user, sb}) {
 
   const itensSelecionados = useMemo(() => listaCompra.filter(i => selecionados[i.id]), [listaCompra, selecionados]);
 
+  useEffect(() => {
+    if (barraRef.current) {
+      const h = barraRef.current.offsetHeight + 12;
+      if (h !== barraAltura) setBarraAltura(h);
+    }
+  });
+
   const totalEstimado = useMemo(() => {
     let total = 0, comPreco = 0, semPreco = 0;
     itensSelecionados.forEach(i => {
@@ -2563,23 +2572,27 @@ function ListaCompraTab({user, sb}) {
         </div>
       </div>
 
+      {itensSelecionados.length > 0 && <div style={{height:barraAltura}}/>}
       {itensSelecionados.length > 0 && (
-        <div style={{
-          background:'linear-gradient(135deg, #2a7de0ee, #2a7de0dd)',
-          border:'1px solid var(--accent)', borderRadius:12, padding:'16px 20px',
-          marginBottom:20, display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:12,
-          position:'sticky', top:64, zIndex:50, backdropFilter:'blur(8px)', boxShadow:'0 8px 24px rgba(0,0,0,0.35)'
-        }}>
-          <div>
-            <div style={{fontSize:12,color:'#fff',fontWeight:700,textTransform:'uppercase',letterSpacing:.5,opacity:.85}}>🛒 {itensSelecionados.length} item(ns) selecionado(s) — verba estimada</div>
-            <div style={{fontSize:28,fontWeight:800,color:'#fff',marginTop:2}}>
-              R$ {totalEstimado.total.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}
+        <div style={{position:'fixed', top:64, left:0, right:0, zIndex:80, display:'flex', justifyContent:'center', padding:'0 16px', pointerEvents:'none'}}>
+          <div ref={barraRef} id="barra-selecao-lista-compra" style={{
+            width:'100%', maxWidth:1232, pointerEvents:'auto',
+            background:'linear-gradient(135deg, #2a7de0ee, #2a7de0dd)',
+            border:'1px solid var(--accent)', borderRadius:12, padding:'16px 20px', margin:'12px 0',
+            display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:12,
+            backdropFilter:'blur(8px)', boxShadow:'0 8px 24px rgba(0,0,0,0.35)'
+          }}>
+            <div>
+              <div style={{fontSize:12,color:'#fff',fontWeight:700,textTransform:'uppercase',letterSpacing:.5,opacity:.85}}>🛒 {itensSelecionados.length} item(ns) selecionado(s) — verba estimada</div>
+              <div style={{fontSize:28,fontWeight:800,color:'#fff',marginTop:2}}>
+                R$ {totalEstimado.total.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}
+              </div>
+              {totalEstimado.semPreco > 0 && <div style={{fontSize:11,color:'#fef08a',marginTop:2}}>⚠️ {totalEstimado.semPreco} item(ns) selecionado(s) sem preço não entram nesse total</div>}
             </div>
-            {totalEstimado.semPreco > 0 && <div style={{fontSize:11,color:'#fef08a',marginTop:2}}>⚠️ {totalEstimado.semPreco} item(ns) selecionado(s) sem preço não entram nesse total</div>}
-          </div>
-          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-            <button className="btn btn-ghost btn-sm" style={{background:'rgba(255,255,255,0.15)',color:'#fff',border:'1px solid rgba(255,255,255,0.3)'}} onClick={limparSelecao}>✕ Limpar seleção</button>
-            <button className="btn btn-sm" style={{background:'#fff',color:'var(--accent-dark)',fontWeight:700}} onClick={()=>exportarPDF(itensSelecionados, 'Selecionados')}>📄 Exportar selecionados</button>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+              <button className="btn btn-ghost btn-sm" style={{background:'rgba(255,255,255,0.15)',color:'#fff',border:'1px solid rgba(255,255,255,0.3)'}} onClick={limparSelecao}>✕ Limpar seleção</button>
+              <button className="btn btn-sm" style={{background:'#fff',color:'var(--accent-dark)',fontWeight:700}} onClick={()=>exportarPDF(itensSelecionados, 'Selecionados')}>📄 Exportar selecionados</button>
+            </div>
           </div>
         </div>
       )}
@@ -3500,7 +3513,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.14 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.15 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
