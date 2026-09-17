@@ -3192,7 +3192,7 @@ function App() {
 
   const promover = async (id, n) => {
     if (n >= 8) { alert('Nível máximo já atingido'); return; }
-    if (!confirm(`Promover para ${n+1===8?'Supervisor Clínico ⭐':'Nível '+(n+1)}?`)) return;
+    if (!confirm(`Nível atual: ${n}. Promover para ${n+1===8?'Supervisor Clínico ⭐':'Nível '+(n+1)}?`)) return;
     await sb.from('usuarios').update({nivel:n+1}).eq('id',id);
     alert(`✅ Promovido para Nível ${n+1}`);
     carregar();
@@ -3966,7 +3966,7 @@ function App() {
                     <div style={{display:'flex',flexDirection:'column',gap:6}}>
                       <button className="btn btn-sm" style={{background:'var(--purple)',color:'#fff'}} onClick={()=>{setModalAval(u);setAvalComp({});setAvalObs('');setAvalRec('manter');setAvalMes(new Date().getMonth());setAvalAno(new Date().getFullYear());}}>⭐ Avaliar</button>
                       <button className="btn btn-sm" style={{background:'var(--cyan)',color:'#fff'}} onClick={()=>gerarRelatorio(u)}>📄 Relatório</button>
-                      {u.nivel < 8 && <button className="btn btn-warn btn-sm" onClick={()=>promover(u.id,u.nivel)}>{u.nivel===7?'⭐ Supervisor':'↑ Promover'}</button>}
+                      {u.nivel < 8 && <button className="btn btn-warn btn-sm" onClick={()=>promover(u.id,u.nivel)}>{u.nivel===7?'⭐ Supervisor':'↑ Promover'} <span style={{opacity:0.85,fontWeight:400}}>(atual: N{u.nivel})</span></button>}
                       <button className="btn btn-danger btn-sm" onClick={()=>desativar(u.id)}>✕ Desativar</button>
                     </div>
                   </div>
