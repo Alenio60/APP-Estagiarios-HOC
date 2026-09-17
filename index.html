@@ -2997,9 +2997,17 @@ function App() {
       const sessao = localStorage.getItem('hoc_sessao');
       if (sessao) {
         const u = JSON.parse(sessao);
-        setUser(u);
-        setTela(u.tipo === 'admin' ? 'admin' : u.tipo === 'financeiro' ? 'financeiro' : u.tipo === 'genesis' ? 'genesis' : 'est');
-        if (u.tipo === 'estagiario') agendarAlertas(u);
+        // Revalidar no banco se a conta continua ativa
+        sb.from('usuarios').select('ativo').eq('id', u.id).single().then(({data:chk}) => {
+          if (chk && chk.ativo === false) {
+            localStorage.removeItem('hoc_sessao');
+            setTela('login');
+            return;
+          }
+          setUser(u);
+          setTela(u.tipo === 'admin' ? 'admin' : u.tipo === 'financeiro' ? 'financeiro' : u.tipo === 'genesis' ? 'genesis' : 'est');
+          if (u.tipo === 'estagiario') agendarAlertas(u);
+        });
       }
     } catch(e) {}
   }, []);
@@ -3093,6 +3101,11 @@ function App() {
     setErr(''); setBusy(true);
     const {data:arr} = await sb.from('usuarios').select('*').eq('email',email).eq('senha_hash',hash(senha));
     const data = arr && arr[0];
+    if (data && data.ativo === false) {
+      setErr('Esta conta foi desativada. Fale com o gestor.');
+      setBusy(false);
+      return;
+    }
     if (data) {
       setUser(data);
       setTela(data.tipo === 'admin' ? 'admin' : data.tipo === 'financeiro' ? 'financeiro' : data.tipo === 'genesis' ? 'genesis' : 'est');
