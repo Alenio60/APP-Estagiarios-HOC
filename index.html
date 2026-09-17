@@ -2943,6 +2943,7 @@ function App() {
   const [cArea,  setCArea]  = useState('clinico');
   const [cTurnoI, setCTurnoI] = useState('08:00');
   const [cTurnoF, setCTurnoF] = useState('17:00');
+  const [cSemestre, setCSemestre] = useState('');
   const [cErr, setCErr]     = useState('');
 
   const [qtds, setQtds]     = useState({});
@@ -2967,6 +2968,7 @@ function App() {
   const [nNivel, setNNv]    = useState(1);
   const [nTurnoI, setNTI]   = useState('08:00');
   const [nTurnoF, setNTF]   = useState('17:00');
+  const [nSemestre, setNSemestre] = useState('');
   const [nArea,  setNArea]  = useState('clinico');
   const [nTipo,  setNTipo]  = useState('estagiario');
 
@@ -3159,6 +3161,7 @@ function App() {
       tipo: 'estagiario',
       turno_inicio: cTurnoI,
       turno_fim: cTurnoF,
+      semestre_faculdade: cSemestre || null,
       ativo: true
     }]).select();
 
@@ -3178,8 +3181,8 @@ function App() {
   const cadastrar = async () => {
     if (!nNome || !nEmail || !nSenha) { alert('Preencha todos os campos'); return; }
     setBusy(true);
-    const {error} = await sb.from('usuarios').insert([{nome:nNome,email:nEmail,senha_hash:hash(nSenha),nivel:+nNivel,area:nArea,turno_inicio:nTurnoI,turno_fim:nTurnoF,tipo:nTipo,ativo:true}]);
-    if (!error) { alert('✅ Cadastro realizado!'); setNN(''); setNE(''); setNS(''); setNNv(1); setNArea('clinico'); setNTipo('estagiario'); setNTI('08:00'); setNTF('17:00'); setModal(null); carregar(); }
+    const {error} = await sb.from('usuarios').insert([{nome:nNome,email:nEmail,senha_hash:hash(nSenha),nivel:+nNivel,area:nArea,turno_inicio:nTurnoI,turno_fim:nTurnoF,semestre_faculdade:nSemestre||null,tipo:nTipo,ativo:true}]);
+    if (!error) { alert('✅ Cadastro realizado!'); setNN(''); setNE(''); setNS(''); setNNv(1); setNArea('clinico'); setNTipo('estagiario'); setNTI('08:00'); setNTF('17:00'); setNSemestre(''); setModal(null); carregar(); }
     else alert('Erro: ' + error.message);
     setBusy(false);
   };
@@ -3224,6 +3227,17 @@ function App() {
       await sb.from('acessos_dentistaon').insert([{estagiario_id: u.id, estagiario_nome: u.nome}]);
     } catch(e) {}
     window.open('https://www.dentistaon.com.br', '_blank');
+  };
+
+  const atualizarSemestre = async (novoSemestre) => {
+    if (!user) return;
+    const {error} = await sb.from('usuarios').update({semestre_faculdade: novoSemestre || null}).eq('id', user.id);
+    if (!error) {
+      const uAtualizado = {...user, semestre_faculdade: novoSemestre};
+      setUser(uAtualizado);
+      try { localStorage.setItem('hoc_sessao', JSON.stringify(uAtualizado)); } catch(e) {}
+      carregar();
+    }
   };
 
   const desativar = async id => {
@@ -3509,6 +3523,15 @@ function App() {
                 </div>
                 <div style={{fontSize:11,color:'var(--text-dim)',marginTop:5}}>Você receberá alertas 10 min antes de entrar e na hora de sair.</div>
               </div>
+              <div style={{marginBottom:16}}>
+                <label className="inp-label">Semestre da Faculdade</label>
+                <select className="inp" value={cSemestre} onChange={e=>setCSemestre(e.target.value)} style={{cursor:'pointer'}}>
+                  <option value="">Não informado</option>
+                  {[1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={n+'º semestre'}>{n}º semestre</option>)}
+                  <option value="Formado(a)">Formado(a)</option>
+                  <option value="Não curso faculdade">Não curso faculdade</option>
+                </select>
+              </div>
               {cErr && <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#f87171',marginBottom:16}}>{cErr}</div>}
               <button className="btn btn-success btn-full" onClick={autocadastrar} disabled={busy}>
                 {busy ? <><span className="spinner" style={{width:16,height:16}}/> Criando conta...</> : '✓ Criar conta e entrar'}
@@ -3561,6 +3584,12 @@ function App() {
             <button className="btn btn-ghost btn-sm" onClick={()=>{setTela('login'); setModoTela('login'); try{localStorage.removeItem('hoc_sessao');}catch(e){};}}>Sair</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>gerarRelatorio(user)}>📄 Relatório</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>acessarDentistaOn(user)} title="Acessar plataforma DentistaOn (use o mesmo e-mail e senha)">🎓 DentistaOn</button>
+            <select value={user.semestre_faculdade||''} onChange={e=>atualizarSemestre(e.target.value)} className="inp" style={{width:'auto',fontSize:12,padding:'4px 8px'}} title="Seu semestre atual da faculdade">
+              <option value="">Semestre?</option>
+              {[1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={n+'º semestre'}>{n}º semestre</option>)}
+              <option value="Formado(a)">Formado(a)</option>
+              <option value="Não curso faculdade">Não curso</option>
+            </select>
           </div>
         </div>
 
@@ -3909,6 +3938,7 @@ function App() {
               {u.nivel===8 && <span className="badge" style={{background:'#f59e0b30',color:'#f59e0b',fontSize:12,marginLeft:6}}>⭐ Supervisor</span>}
               {(!u.area||u.area==='clinico') && u.area!=='marketing' && u.area!=='comercial' && u.area && false && null}
               {(u.turno_inicio||u.turno_fim) && <span style={{fontSize:11,color:'var(--cyan)',marginLeft:8}}>🕐 {u.turno_inicio||'?'} → {u.turno_fim||'?'}</span>}
+              {u.semestre_faculdade && <span style={{fontSize:11,color:'var(--purple)',marginLeft:8}}>🎓 {u.semestre_faculdade}</span>}
               {(() => { const acU = acessosDon.filter(a=>a.estagiario_id===u.id); return acU.length
                 ? <span style={{fontSize:11,color:'var(--green)',marginLeft:8}}>🎓 DentistaOn: {acU.length}x (última {new Date(acU[0].clicado_em).toLocaleDateString('pt-BR')})</span>
                 : <span style={{fontSize:11,color:'var(--red)',marginLeft:8}}>🎓 DentistaOn: nunca acessou</span>; })()}
@@ -4172,6 +4202,9 @@ function App() {
                   </div>
                 </div>
               </div>
+              <Sel label="Semestre da Faculdade"
+                value={nSemestre} onChange={e=>setNSemestre(e.target.value)}
+                options={[['','Não informado'],...[1,2,3,4,5,6,7,8,9,10].map(n=>[n+'º semestre',n+'º semestre']),['Formado(a)','Formado(a)'],['Não curso faculdade','Não curso faculdade']]}/>
               </>}
               <div style={{display:'flex',gap:10,marginTop:4}}>
                 <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModal(null)}>Cancelar</button>
