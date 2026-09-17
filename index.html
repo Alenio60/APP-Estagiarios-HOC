@@ -2918,6 +2918,7 @@ function App() {
   const [busy, setBusy]     = useState(false);
   const [modal, setModal]   = useState(null);
   const [avaliacoes, setAvaliacoes] = useState([]);
+  const [acessosDon, setAcessosDon] = useState([]);
   const [modalAval, setModalAval] = useState(null); // {usuario}
   const [avalComp, setAvalComp]   = useState({});
   const [avalObs, setAvalObs]     = useState('');
@@ -2972,14 +2973,16 @@ function App() {
   const carregar = async () => {
     if (!sb) return;
     setBusy(true);
-    const [u, r, av] = await Promise.all([
+    const [u, r, av, don] = await Promise.all([
       sb.from('usuarios').select('*').eq('ativo',true).order('nome'),
       sb.from('registros').select('*').order('data',{ascending:false}),
-      sb.from('avaliacoes').select('*').order('ano',{ascending:false}).order('mes',{ascending:false})
+      sb.from('avaliacoes').select('*').order('ano',{ascending:false}).order('mes',{ascending:false}),
+      sb.from('acessos_dentistaon').select('*').order('clicado_em',{ascending:false})
     ]);
     if (u.data) setUsr(u.data);
     if (r.data) setRegs(r.data);
     if (av.data) setAvaliacoes(av.data);
+    if (don.data) setAcessosDon(don.data);
     setBusy(false);
   };
 
@@ -3214,6 +3217,13 @@ function App() {
       carregar();
     } else alert('Erro: ' + error.message);
     setBusy(false);
+  };
+
+  const acessarDentistaOn = async (u) => {
+    try {
+      await sb.from('acessos_dentistaon').insert([{estagiario_id: u.id, estagiario_nome: u.nome}]);
+    } catch(e) {}
+    window.open('https://www.dentistaon.com.br', '_blank');
   };
 
   const desativar = async id => {
@@ -3550,6 +3560,7 @@ function App() {
             <button className="btn btn-ghost btn-sm" onClick={()=>setTema(tema==='claro'?'escuro':'claro')} title="Alternar tema">{tema==='claro'?'🌙':'☀️'}</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>{setTela('login'); setModoTela('login'); try{localStorage.removeItem('hoc_sessao');}catch(e){};}}>Sair</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>gerarRelatorio(user)}>📄 Relatório</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>acessarDentistaOn(user)} title="Acessar plataforma DentistaOn (use o mesmo e-mail e senha)">🎓 DentistaOn</button>
           </div>
         </div>
 
@@ -3898,6 +3909,9 @@ function App() {
               {u.nivel===8 && <span className="badge" style={{background:'#f59e0b30',color:'#f59e0b',fontSize:12,marginLeft:6}}>⭐ Supervisor</span>}
               {(!u.area||u.area==='clinico') && u.area!=='marketing' && u.area!=='comercial' && u.area && false && null}
               {(u.turno_inicio||u.turno_fim) && <span style={{fontSize:11,color:'var(--cyan)',marginLeft:8}}>🕐 {u.turno_inicio||'?'} → {u.turno_fim||'?'}</span>}
+              {(() => { const acU = acessosDon.filter(a=>a.estagiario_id===u.id); return acU.length
+                ? <span style={{fontSize:11,color:'var(--green)',marginLeft:8}}>🎓 DentistaOn: {acU.length}x (última {new Date(acU[0].clicado_em).toLocaleDateString('pt-BR')})</span>
+                : <span style={{fontSize:11,color:'var(--red)',marginLeft:8}}>🎓 DentistaOn: nunca acessou</span>; })()}
                     </div>
                     <div style={{display:'flex',flexDirection:'column',gap:6}}>
                       <button className="btn btn-sm" style={{background:'var(--purple)',color:'#fff'}} onClick={()=>{setModalAval(u);setAvalComp({});setAvalObs('');setAvalRec('manter');setAvalMes(new Date().getMonth());setAvalAno(new Date().getFullYear());}}>⭐ Avaliar</button>
