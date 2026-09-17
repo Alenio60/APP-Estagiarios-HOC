@@ -2944,6 +2944,7 @@ function App() {
   const [cTurnoI, setCTurnoI] = useState('08:00');
   const [cTurnoF, setCTurnoF] = useState('17:00');
   const [cSemestre, setCSemestre] = useState('');
+  const [cFormatura, setCFormatura] = useState('');
   const [cErr, setCErr]     = useState('');
 
   const [qtds, setQtds]     = useState({});
@@ -2969,6 +2970,7 @@ function App() {
   const [nTurnoI, setNTI]   = useState('08:00');
   const [nTurnoF, setNTF]   = useState('17:00');
   const [nSemestre, setNSemestre] = useState('');
+  const [nFormatura, setNFormatura] = useState('');
   const [nArea,  setNArea]  = useState('clinico');
   const [nTipo,  setNTipo]  = useState('estagiario');
 
@@ -3162,6 +3164,7 @@ function App() {
       turno_inicio: cTurnoI,
       turno_fim: cTurnoF,
       semestre_faculdade: cSemestre || null,
+      previsao_formatura: cFormatura || null,
       ativo: true
     }]).select();
 
@@ -3181,8 +3184,8 @@ function App() {
   const cadastrar = async () => {
     if (!nNome || !nEmail || !nSenha) { alert('Preencha todos os campos'); return; }
     setBusy(true);
-    const {error} = await sb.from('usuarios').insert([{nome:nNome,email:nEmail,senha_hash:hash(nSenha),nivel:+nNivel,area:nArea,turno_inicio:nTurnoI,turno_fim:nTurnoF,semestre_faculdade:nSemestre||null,tipo:nTipo,ativo:true}]);
-    if (!error) { alert('✅ Cadastro realizado!'); setNN(''); setNE(''); setNS(''); setNNv(1); setNArea('clinico'); setNTipo('estagiario'); setNTI('08:00'); setNTF('17:00'); setNSemestre(''); setModal(null); carregar(); }
+    const {error} = await sb.from('usuarios').insert([{nome:nNome,email:nEmail,senha_hash:hash(nSenha),nivel:+nNivel,area:nArea,turno_inicio:nTurnoI,turno_fim:nTurnoF,semestre_faculdade:nSemestre||null,previsao_formatura:nFormatura||null,tipo:nTipo,ativo:true}]);
+    if (!error) { alert('✅ Cadastro realizado!'); setNN(''); setNE(''); setNS(''); setNNv(1); setNArea('clinico'); setNTipo('estagiario'); setNTI('08:00'); setNTF('17:00'); setNSemestre(''); setNFormatura(''); setModal(null); carregar(); }
     else alert('Erro: ' + error.message);
     setBusy(false);
   };
@@ -3234,6 +3237,17 @@ function App() {
     const {error} = await sb.from('usuarios').update({semestre_faculdade: novoSemestre || null}).eq('id', user.id);
     if (!error) {
       const uAtualizado = {...user, semestre_faculdade: novoSemestre};
+      setUser(uAtualizado);
+      try { localStorage.setItem('hoc_sessao', JSON.stringify(uAtualizado)); } catch(e) {}
+      carregar();
+    }
+  };
+
+  const atualizarFormatura = async (novaData) => {
+    if (!user) return;
+    const {error} = await sb.from('usuarios').update({previsao_formatura: novaData || null}).eq('id', user.id);
+    if (!error) {
+      const uAtualizado = {...user, previsao_formatura: novaData};
       setUser(uAtualizado);
       try { localStorage.setItem('hoc_sessao', JSON.stringify(uAtualizado)); } catch(e) {}
       carregar();
@@ -3532,6 +3546,10 @@ function App() {
                   <option value="Não curso faculdade">Não curso faculdade</option>
                 </select>
               </div>
+              <div style={{marginBottom:16}}>
+                <label className="inp-label">Previsão de Formatura</label>
+                <input type="date" className="inp" value={cFormatura} onChange={e=>setCFormatura(e.target.value)}/>
+              </div>
               {cErr && <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#f87171',marginBottom:16}}>{cErr}</div>}
               <button className="btn btn-success btn-full" onClick={autocadastrar} disabled={busy}>
                 {busy ? <><span className="spinner" style={{width:16,height:16}}/> Criando conta...</> : '✓ Criar conta e entrar'}
@@ -3590,6 +3608,7 @@ function App() {
               <option value="Formado(a)">Formado(a)</option>
               <option value="Não curso faculdade">Não curso</option>
             </select>
+            <input type="date" value={user.previsao_formatura||''} onChange={e=>atualizarFormatura(e.target.value)} className="inp" style={{width:'auto',fontSize:12,padding:'4px 8px'}} title="Previsão de formatura"/>
           </div>
         </div>
 
@@ -3939,6 +3958,7 @@ function App() {
               {(!u.area||u.area==='clinico') && u.area!=='marketing' && u.area!=='comercial' && u.area && false && null}
               {(u.turno_inicio||u.turno_fim) && <span style={{fontSize:11,color:'var(--cyan)',marginLeft:8}}>🕐 {u.turno_inicio||'?'} → {u.turno_fim||'?'}</span>}
               {u.semestre_faculdade && <span style={{fontSize:11,color:'var(--purple)',marginLeft:8}}>🎓 {u.semestre_faculdade}</span>}
+              {u.previsao_formatura && <span style={{fontSize:11,color:'var(--purple)',marginLeft:8}}>📅 Formatura: {new Date(u.previsao_formatura+'T12:00').toLocaleDateString('pt-BR')}</span>}
               {(() => { const acU = acessosDon.filter(a=>a.estagiario_id===u.id); return acU.length
                 ? <span style={{fontSize:11,color:'var(--green)',marginLeft:8}}>🎓 DentistaOn: {acU.length}x (última {new Date(acU[0].clicado_em).toLocaleDateString('pt-BR')})</span>
                 : <span style={{fontSize:11,color:'var(--red)',marginLeft:8}}>🎓 DentistaOn: nunca acessou</span>; })()}
@@ -4205,6 +4225,10 @@ function App() {
               <Sel label="Semestre da Faculdade"
                 value={nSemestre} onChange={e=>setNSemestre(e.target.value)}
                 options={[['','Não informado'],...[1,2,3,4,5,6,7,8,9,10].map(n=>[n+'º semestre',n+'º semestre']),['Formado(a)','Formado(a)'],['Não curso faculdade','Não curso faculdade']]}/>
+              <div style={{marginBottom:16}}>
+                <label className="inp-label">Previsão de Formatura</label>
+                <input type="date" className="inp" value={nFormatura} onChange={e=>setNFormatura(e.target.value)}/>
+              </div>
               </>}
               <div style={{display:'flex',gap:10,marginTop:4}}>
                 <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModal(null)}>Cancelar</button>
