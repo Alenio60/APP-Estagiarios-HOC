@@ -2963,6 +2963,7 @@ function App() {
   const [abaFin, setAbaFin] = useState('estoque');
   const [fEst, setFEst]     = useState('');
   const [fArea, setFArea]   = useState('');
+  const [fGestor, setFGestor] = useState('');
   const [fMes, setFMes]     = useState(new Date().getMonth());
   const [fAno, setFAno]     = useState(new Date().getFullYear());
 
@@ -3946,12 +3947,36 @@ function App() {
           </div>
           <div style={{display:'flex',gap:10}}>
             <button className="btn btn-ghost btn-sm" onClick={carregar}>🔄</button>
+            {isAvaliador && <button className="btn btn-ghost btn-sm" onClick={()=>acessarDentistaOn(user)} title="Acessar plataforma DentistaOn (use o mesmo e-mail e senha)">🎓 DentistaOn</button>}
             <button className="btn btn-ghost btn-sm" onClick={()=>setTema(tema==='claro'?'escuro':'claro')} title="Alternar tema">{tema==='claro'?'🌙':'☀️'}</button>
             <button className="btn btn-ghost btn-sm" onClick={()=>{setTela('login'); setModoTela('login'); try{localStorage.removeItem('hoc_sessao');}catch(e){};}}>Sair</button>
           </div>
         </div>
 
         <div className="content">
+          {isAvaliador && (() => {
+            const agora = new Date();
+            const mesAtual = agora.getMonth(), anoAtual = agora.getFullYear();
+            const MESES_LABEL2 = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+            const clinicos = usuarios.filter(u=>u.tipo==='estagiario' && (u.area||'clinico')==='clinico');
+            const jaAvaliadosEsteMes = new Set(avaliacoes.filter(av=>av.gestor===user.nome && av.mes===mesAtual && av.ano===anoAtual).map(av=>av.estagiario_id||av.estagiario));
+            const faltam = clinicos.filter(u=>!jaAvaliadosEsteMes.has(u.id) && !jaAvaliadosEsteMes.has(u.nome));
+            if (!faltam.length) return null;
+            return (
+              <div style={{background:'rgba(245,158,11,0.1)',border:'1px solid rgba(245,158,11,0.3)',borderRadius:12,padding:'14px 18px',marginBottom:20}}>
+                <div style={{fontWeight:700,color:'var(--yellow)',marginBottom:6}}>⏰ Avaliação mensal pendente — {MESES_LABEL2[mesAtual]}/{anoAtual}</div>
+                <div style={{fontSize:13,color:'var(--text-muted)',marginBottom:8}}>Você ainda não avaliou {faltam.length} estagiário(s) da área clínica este mês (Marketing/Comercial não entram nessa cobrança):</div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                  {faltam.map(u=>(
+                    <button key={u.id} className="btn btn-sm" style={{background:'var(--purple)',color:'#fff'}}
+                      onClick={()=>{setAbaA('usuarios');setModalAval(u);setAvalComp({});setAvalObs('');setAvalRec('manter');setAvalMes(mesAtual);setAvalAno(anoAtual);}}>
+                      ⭐ {u.nome.split(' ')[0]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           <div className="tabs" style={{marginBottom:24}}>
             {(isAvaliador
               ? [['usuarios','👥 Estagiários'],['aval','⭐ Avaliações']]
@@ -4006,6 +4031,13 @@ function App() {
               {(() => { const acU = acessosDon.filter(a=>a.estagiario_id===u.id); return acU.length
                 ? <span style={{fontSize:11,color:'var(--green)',marginLeft:8}}>🎓 DentistaOn: {acU.length}x (última {new Date(acU[0].clicado_em).toLocaleDateString('pt-BR')})</span>
                 : <span style={{fontSize:11,color:'var(--red)',marginLeft:8}}>🎓 DentistaOn: nunca acessou</span>; })()}
+              {(() => {
+                const avsEst = avaliacoes.filter(av => av.estagiario_id===u.id || av.estagiario===u.nome);
+                if (!avsEst.length) return <span style={{fontSize:11,color:'var(--text-dim)',marginLeft:8}}>⭐ Sem avaliações ainda</span>;
+                const medias = avsEst.map(av => av.comportamento ? Object.values(av.comportamento).reduce((s,v)=>s+(+v),0)/Object.values(av.comportamento).length : 0);
+                const geral = (medias.reduce((s,v)=>s+v,0)/medias.length).toFixed(1);
+                return <span style={{fontSize:11,color:'var(--yellow)',marginLeft:8}}>⭐ Média geral: {geral}/5 ({avsEst.length} avaliaç{avsEst.length===1?'ão':'ões'})</span>;
+              })()}
                     </div>
                     <div style={{display:'flex',flexDirection:'column',gap:6}}>
                       <button className="btn btn-sm" style={{background:'var(--purple)',color:'#fff'}} onClick={()=>{setModalAval(u);setAvalComp({});setAvalObs('');setAvalRec('manter');setAvalMes(new Date().getMonth());setAvalAno(new Date().getFullYear());}}>⭐ Avaliar</button>
@@ -4069,19 +4101,29 @@ function App() {
             const MESES_LABEL = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
             return (
               <>
-                <div style={{marginBottom:20}}>
+                <div style={{marginBottom:20,display:'flex',gap:12,flexWrap:'wrap',alignItems:'flex-end'}}>
                   <button className="btn" style={{background:'var(--purple)',color:'#fff'}} onClick={()=>{
-                    if(!usuarios.length){alert('Nenhum estagiário cadastrado');return;}
-                    setModalAval(usuarios[0]);setAvalComp({});setAvalObs('');setAvalRec('manter');
+                    const ests = usuarios.filter(u=>u.tipo==='estagiario');
+                    if(!ests.length){alert('Nenhum estagiário cadastrado');return;}
+                    setModalAval(ests[0]);setAvalComp({});setAvalObs('');setAvalRec('manter');
                     setAvalMes(new Date().getMonth());setAvalAno(new Date().getFullYear());
                   }}>⭐ Nova Avaliação Mensal</button>
+                  {!isAvaliador && [...new Set(avaliacoes.map(av=>av.gestor))].length>1 && (
+                    <div>
+                      <label className="inp-label">Filtrar por avaliador</label>
+                      <select className="inp" value={fGestor} onChange={e=>setFGestor(e.target.value)} style={{width:'auto'}}>
+                        <option value="">Todos</option>
+                        {[...new Set(avaliacoes.map(av=>av.gestor))].sort().map(g=><option key={g} value={g}>{g}</option>)}
+                      </select>
+                    </div>
+                  )}
                 </div>
-                {avaliacoes.length===0
+                {avaliacoes.filter(av=>!fGestor || av.gestor===fGestor).length===0
                   ? <div style={{textAlign:'center',padding:'60px 20px',color:'var(--text-dim)'}}>
                       <div style={{fontSize:48,marginBottom:12}}>⭐</div>
                       <div>Nenhuma avaliação registrada ainda</div>
                     </div>
-                  : avaliacoes.map(av => {
+                  : avaliacoes.filter(av=>!fGestor || av.gestor===fGestor).map(av => {
                       const mediaComp = av.comportamento ? +(Object.values(av.comportamento).reduce((s,v)=>s+(+v),0)/Object.values(av.comportamento).length).toFixed(1) : 0;
                       const recCor = av.recomendacao==='promover'?'var(--green)':av.recomendacao==='atencao'?'var(--yellow)':'var(--accent)';
                       const recLabel = av.recomendacao==='promover'?'↑ Promover':av.recomendacao==='atencao'?'⚠️ Atenção':'✓ Manter Nível';
