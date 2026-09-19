@@ -3955,7 +3955,7 @@ function App() {
           <div className="tabs" style={{marginBottom:24}}>
             {(isAvaliador
               ? [['usuarios','👥 Estagiários'],['aval','⭐ Avaliações']]
-              : [['usuarios','👥 Estagiários'],['dash','📊 Dashboard'],['aval','⭐ Avaliações'],['hist','📋 Histórico'],['niveis','📚 Níveis'],['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais'],['analise','📊 Análise']]
+              : [['usuarios','👥 Estagiários'],['dentistas','🦷 Dentistas'],['dash','📊 Dashboard'],['aval','⭐ Avaliações'],['hist','📋 Histórico'],['niveis','📚 Níveis'],['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais'],['analise','📊 Análise']]
             ).map(([k,l])=>(
               <button key={k} className={`tab ${abaA===k?'active':''}`} onClick={()=>setAbaA(k)}>{l}</button>
             ))}
@@ -4018,6 +4018,45 @@ function App() {
                     {[['Registros',st.n],['Atividades',st.tot],['Dias',st.dias]].map(([l,v])=>(
                       <div key={l} className="stat-box"><div className="stat-num" style={{fontSize:18}}>{v}</div><div className="stat-lbl">{l}</div></div>
                     ))}
+                  </div>
+                </div>
+              );
+            })}
+          </>}
+
+          {abaA==='dentistas' && <>
+            <div style={{display:'flex',gap:12,marginBottom:20,alignItems:'flex-end',flexWrap:'wrap'}}>
+              <button className="btn btn-success" onClick={()=>{setNTipo('avaliador'); setModal('cadastro');}}>+ Cadastrar Dentista</button>
+            </div>
+            {usuarios.filter(u=>u.tipo==='avaliador').length===0 && (
+              <div style={{textAlign:'center',padding:'60px 20px',color:'var(--text-dim)'}}>
+                <div style={{fontSize:48,marginBottom:12}}>🦷</div>
+                <div>Nenhum dentista cadastrado ainda</div>
+              </div>
+            )}
+            {usuarios.filter(u=>u.tipo==='avaliador').map(u => {
+              const acU = acessosDon.filter(a=>a.estagiario_id===u.id);
+              const avsU = avaliacoes.filter(av=>av.gestor===u.nome);
+              return (
+                <div key={u.id} className="user-card">
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:12}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:16}}>{u.nome}</div>
+                      <div style={{fontSize:13,color:'var(--text-muted)'}}>{u.email}</div>
+                      <div style={{marginTop:6,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+                        <span className="badge" style={{background:'var(--purple)'}}>🦷 {u.especialidade||'Especialidade não informada'}</span>
+                        {u.cro && <span style={{fontSize:11,color:'var(--text-muted)'}}>{u.cro}</span>}
+                        {acU.length
+                          ? <span style={{fontSize:11,color:'var(--green)'}}>🎓 DentistaOn: {acU.length}x (última {new Date(acU[0].clicado_em).toLocaleDateString('pt-BR')})</span>
+                          : <span style={{fontSize:11,color:'var(--red)'}}>🎓 DentistaOn: nunca acessou</span>}
+                      </div>
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                      <button className="btn btn-danger btn-sm" onClick={()=>desativar(u.id)}>✕ Desativar</button>
+                    </div>
+                  </div>
+                  <div className="stat-grid" style={{gridTemplateColumns:'1fr',marginTop:12}}>
+                    <div className="stat-box"><div className="stat-num" style={{fontSize:18}}>{avsU.length}</div><div className="stat-lbl">Avaliações realizadas</div></div>
                   </div>
                 </div>
               );
