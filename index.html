@@ -3975,13 +3975,13 @@ function App() {
               </div>
             </div>
             {busy && <div style={{textAlign:'center',padding:40,color:'var(--text-muted)'}}><div className="spinner" style={{margin:'0 auto 12px'}}/></div>}
-            {usuarios.length===0 && !busy && (
+            {usuarios.filter(u=>u.tipo==='estagiario').length===0 && !busy && (
               <div style={{textAlign:'center',padding:'60px 20px',color:'var(--text-dim)'}}>
                 <div style={{fontSize:48,marginBottom:12}}>👥</div>
                 <div>Nenhum estagiário cadastrado</div>
               </div>
             )}
-            {usuarios.filter(u => !fArea || (u.area||'clinico')===fArea).map(u => {
+            {usuarios.filter(u => u.tipo==='estagiario' && (!fArea || (u.area||'clinico')===fArea)).map(u => {
               const meses = mesesNoNivel(u.id);
               const pronto = meses >= NIVEIS[u.nivel].dur && u.nivel < 7;
               const ur = regs.filter(r => r.estagiario===u.nome);
@@ -4024,7 +4024,7 @@ function App() {
             })}
           </>}
 
-          {abaA==='dash' && <DashTab regs={regs} usuarios={usuarios} regsF={regsF} fMes={fMes} fAno={fAno} setFMes={setFMes} setFAno={setFAno} rankAtivs={rankAtivs} maxRank={maxRank} statsOf={statsOf}/>}
+          {abaA==='dash' && <DashTab regs={regs} usuarios={usuarios.filter(u=>u.tipo==='estagiario')} regsF={regsF} fMes={fMes} fAno={fAno} setFMes={setFMes} setFAno={setFAno} rankAtivs={rankAtivs} maxRank={maxRank} statsOf={statsOf}/>}
 
           {abaA==='aval' && (() => {
             const MESES_LABEL = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -4166,7 +4166,7 @@ function App() {
                 <div>
                   <label className="inp-label">Estagiário</label>
                   <select className="inp" value={modalAval.id} onChange={e=>setModalAval(usuarios.find(u=>u.id===+e.target.value))}>
-                    {usuarios.map(u=><option key={u.id} value={u.id}>{u.nome.split(' ')[0]} — Nível {u.nivel}</option>)}
+                    {usuarios.filter(u=>u.tipo==='estagiario').map(u=><option key={u.id} value={u.id}>{u.nome.split(' ')[0]} — Nível {u.nivel}</option>)}
                   </select>
                 </div>
                 <div>
