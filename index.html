@@ -1991,8 +1991,14 @@ function NotasFiscaisTab({user, sb}) {
     setNovosPendentes(novosPendentes.map((n,i)=> i===idx ? {...n, [campo]:valor} : n));
 
   const iniciarSalvar = async () => {
-    if (!nfNumero || !nfFornecedor || itensNF.length===0) return;
-    if (itensNF.some(i=>!i.produtoNome || !(+i.quantidade>0))) return;
+    if (!nfNumero) { alert('⚠️ Preencha o número da nota fiscal.'); return; }
+    if (!nfFornecedor) { alert('⚠️ Preencha o nome do fornecedor.'); return; }
+    if (itensNF.length===0) { alert('⚠️ Adicione pelo menos um item à nota (clique em "+ Item", "Colar nota inteira" ou "Anexar arquivo").'); return; }
+    const itemInvalido = itensNF.findIndex(i=>!i.produtoNome || !(+i.quantidade>0));
+    if (itemInvalido !== -1) {
+      alert(`⚠️ O item ${itemInvalido+1} está incompleto: verifique se o nome do produto foi preenchido e se a quantidade é maior que zero.`);
+      return;
+    }
 
     if (etapaNF === 'form') {
       // Antes de considerar "produto novo", tenta reconhecer pelo nome
