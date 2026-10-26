@@ -1346,6 +1346,10 @@ function EstoqueTab({user, sb}) {
   const [modalImportar, setModalImportar] = useState(false);
   const [vencFiltro, setVencFiltro]       = useState(''); // '' | 'vencido' | 'vencendo'
   const [semPrecoFiltro, setSemPrecoFiltro] = useState(false);
+  const [catEditId, setCatEditId]         = useState(null); // id do item cuja categoria esta sendo editada
+  const [catEditValor, setCatEditValor]   = useState('');
+  const [modalDup, setModalDup]           = useState(false);
+  const [modalValorArea, setModalValorArea] = useState(false);
 
   const isSup = user.nivel === 8 || user.tipo === 'admin' || user.tipo === 'financeiro' || user.tipo === 'genesis';
 
@@ -1400,11 +1404,101 @@ function EstoqueTab({user, sb}) {
     vencendo: itens.filter(i=>situacaoVencimento(i)==='vencendo').length,
   }), [itens]);
 
+  const precoDe = (i) => {
+    const precoReal = precos[i.id];
+    return precoReal != null ? precoReal : (i.valor_unitario > 0 ? +i.valor_unitario : null);
+  };
+
+  const valorPorArea = useMemo(() => {
+    const m = {};
+    itens.forEach(i => {
+      const c = i.categoria || '(sem categoria)';
+      if (!m[c]) m[c] = {cat:c, valor:0, itens:0, semPreco:0};
+      m[c].itens++;
+      const preco = precoDe(i);
+      if (preco != null) m[c].valor += (i.quantidade||0) * preco; else m[c].semPreco++;
+    });
+    return Object.values(m).sort((a,b)=>b.valor-a.valor);
+  }, [itens, precos]);
+
+  const normTxt = (t) => (t||'').trim().replace(/\s+/g,' ').toLowerCase();
+
+  // Detecta categorias repetidas (diferem só por espaços/maiúsculas) e itens repetidos (mesmo nome)
+  const duplicados = useMemo(() => {
+    const gruposCat = {};
+    itens.forEach(i => {
+      const k = normTxt(i.categoria); if (!k) return;
+      if (!gruposCat[k]) gruposCat[k] = {};
+      gruposCat[k][i.categoria] = (gruposCat[k][i.categoria]||0) + 1;
+    });
+    const categorias = [];
+    Object.values(gruposCat).forEach(variantes => {
+      const nomes = Object.keys(variantes);
+      const precisaLimpar = nomes.length > 1 || nomes[0] !== nomes[0].trim().replace(/\s+/g,' ');
+      if (!precisaLimpar) return;
+      const base = nomes.sort((a,b)=>variantes[b]-variantes[a])[0].trim().replace(/\s+/g,' ');
+      const alterar = nomes.filter(n=>n!==base);
+      categorias.push({destino: base, variantes: alterar.map(n=>({nome:n, qtd:variantes[n]}))});
+    });
+    const gruposItem = {};
+    itens.forEach(i => { const k = normTxt(i.produto); if (!k) return; (gruposItem[k] = gruposItem[k] || []).push(i); });
+    const produtos = Object.values(gruposItem).filter(g=>g.length>1).map(g => {
+      const ordenado = [...g].sort((a,b) => (b.codigo_barras?1:0)-(a.codigo_barras?1:0) || new Date(a.created_at)-new Date(b.created_at));
+      return {manter: ordenado[0], remover: ordenado.slice(1)};
+    });
+    return {categorias, produtos, total: categorias.length + produtos.length};
+  }, [itens]);
+
+  const unificarDuplicados = async () => {
+    setBusy(true);
+    try {
+      const agora = new Date().toISOString();
+      for (const c of duplicados.categorias) {
+        for (const v of c.variantes) {
+          const {error} = await sb.from('estoque').update({categoria: c.destino, updated_at: agora}).eq('categoria', v.nome);
+          if (error) throw error;
+        }
+      }
+      for (const g of duplicados.produtos) {
+        const k = g.manter;
+        const campos = {
+          quantidade: g.remover.reduce((s,r)=>s+(r.quantidade||0), k.quantidade||0),
+          estoque_genesis: g.remover.reduce((s,r)=>s+(+r.estoque_genesis||0), +k.estoque_genesis||0),
+          minimo: Math.max(k.minimo||0, ...g.remover.map(r=>r.minimo||0)),
+          updated_at: agora,
+        };
+        ['codigo_barras','lote','vencimento','valor_unitario','unidade'].forEach(f => {
+          if (!k[f]) { const r = g.remover.find(x=>x[f]); if (r) campos[f] = r[f]; }
+        });
+        const idsRem = g.remover.map(r=>r.id);
+        let r1 = await sb.from('estoque_movimentacoes').update({produto_id: k.id}).in('produto_id', idsRem); if (r1.error) throw r1.error;
+        let r2 = await sb.from('notas_fiscais_itens').update({produto_id: k.id}).in('produto_id', idsRem); if (r2.error) throw r2.error;
+        let r3 = await sb.from('estoque').update(campos).eq('id', k.id); if (r3.error) throw r3.error;
+        let r4 = await sb.from('estoque').delete().in('id', idsRem); if (r4.error) throw r4.error;
+      }
+      setModalDup(false);
+      alert('Duplicados unificados com sucesso.');
+    } catch (e) {
+      alert('Erro ao unificar duplicados: ' + (e.message || e));
+    }
+    await carregar();
+    setBusy(false);
+  };
+
+  const salvarCategoria = async (itemId) => {
+    const nova = catEditValor.trim().replace(/\s+/g,' ');
+    if (!nova) return;
+    const {error} = await sb.from('estoque').update({categoria: nova, updated_at: new Date().toISOString()}).eq('id', itemId);
+    if (error) { alert('Erro ao salvar categoria: ' + error.message); return; }
+    setCatEditId(null); setCatEditValor('');
+    await carregar();
+  };
+
   const valorEstoque = useMemo(() => {
     let total = 0, comPreco = 0, semPreco = 0, comReferencia = 0;
     itens.forEach(i => {
       const precoReal = precos[i.id];
-      const preco = precoReal != null ? precoReal : (i.valor_unitario > 0 ? +i.valor_unitario : null);
+      const preco = precoDe(i);
       if (preco != null) {
         total += (i.quantidade||0) * preco;
         comPreco++;
@@ -1543,6 +1637,8 @@ function EstoqueTab({user, sb}) {
           {isSup && <button className="btn btn-success btn-sm" onClick={()=>setModalCad(true)}>+ Novo item</button>}
           {isSup && <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={()=>{setAvisoScan('');setScannerAberto('busca');}}>📷 Bipar item</button>}
           {isSup && <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={()=>setModalImportar(true)}>📥 Importar</button>}
+          <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={()=>setModalValorArea(true)}>📊 Valor por área</button>
+          {isSup && <button className="btn btn-sm" style={{background: duplicados.total?'#f59e0b20':'var(--bg-card2)',border:'1px solid '+(duplicados.total?'var(--yellow)':'var(--border)'),color: duplicados.total?'var(--yellow)':'var(--text-muted)'}} onClick={()=>setModalDup(true)}>🧹 Duplicados ({duplicados.total})</button>}
           <button className="btn btn-sm" style={{background: semPrecoFiltro?'#f59e0b30':'var(--bg-card2)',border:'1px solid '+(semPrecoFiltro?'var(--yellow)':'var(--border)'),color: semPrecoFiltro?'var(--yellow)':'var(--text-muted)'}} onClick={()=>setSemPrecoFiltro(v=>!v)}>💲 Sem preço ({valorEstoque.semPreco})</button>
         </div>
 
@@ -1573,10 +1669,20 @@ function EstoqueTab({user, sb}) {
                       {isSup && <span onClick={()=>{setNomeEditId(item.id);setNomeEditValor(item.produto);}} style={{cursor:'pointer',fontSize:12,color:'var(--text-dim)'}} title="Editar nome">✏️</span>}
                     </div>
                   )}
+                  {catEditId === item.id ? (
+                    <div style={{display:'flex',gap:6,alignItems:'center',marginTop:4}}>
+                      <input className="inp" list="cats-list-edit" value={catEditValor} onChange={e=>setCatEditValor(e.target.value)} style={{padding:'3px 8px',fontSize:12,flex:1}} autoFocus placeholder="Categoria"/>
+                      <button className="btn btn-sm btn-success" style={{padding:'3px 9px'}} onClick={()=>salvarCategoria(item.id)}>💾</button>
+                      <button className="btn btn-sm btn-ghost" style={{padding:'3px 9px'}} onClick={()=>{setCatEditId(null);setCatEditValor('');}}>✕</button>
+                    </div>
+                  ) : (
                   <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>
-                    {item.categoria} · Mín: {item.minimo} {item.unidade||'un'}
+                    {item.categoria}
+                    {isSup && <span onClick={()=>{setCatEditId(item.id);setCatEditValor(item.categoria||'');}} style={{cursor:'pointer',fontSize:11,marginLeft:4}} title="Editar categoria">✏️</span>}
+                    {' '}· Mín: {item.minimo} {item.unidade||'un'}
                     {item.lote && <> · Lote: {item.lote}</>}
                   </div>
+                  )}
                   {item.vencimento && (
                     <div style={{fontSize:11,marginTop:2,fontWeight:700,color: venc==='vencido'?'var(--red)':venc==='vencendo'?'var(--yellow)':'var(--text-dim)'}}>
                       {venc==='vencido'?'💀 Vencido em ':venc==='vencendo'?'⏰ Vence em ':'Val: '}
@@ -1743,6 +1849,81 @@ function EstoqueTab({user, sb}) {
               <button className="btn btn-success" style={{flex:1}} onClick={cadastrar} disabled={busy||!nProd||!nCat}>
                 {busy?'Salvando...':'Cadastrar'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <datalist id="cats-list-edit">{cats.map(c=><option key={c} value={c}/>)}</datalist>
+
+      {/* Modal Valor por área */}
+      {modalValorArea && (
+        <div className="overlay" onClick={()=>setModalValorArea(false)}>
+          <div className="modal" onClick={e=>e.stopPropagation()} style={{maxHeight:'85vh',overflowY:'auto'}}>
+            <div className="modal-title">📊 Valor do estoque por área</div>
+            <div style={{background:'#16a34a18',border:'1px solid #16a34a55',borderRadius:10,padding:'12px 14px',marginBottom:12}}>
+              <div style={{fontSize:11,color:'var(--text-muted)',fontWeight:700,textTransform:'uppercase'}}>Valor geral</div>
+              <div style={{fontSize:24,fontWeight:800,color:'var(--green)'}}>R$ {valorEstoque.total.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+            </div>
+            <div style={{fontSize:11,color:'var(--text-dim)',marginBottom:8}}>Toque em uma área para filtrar a lista.</div>
+            <div style={{display:'flex',flexDirection:'column',gap:6}}>
+              {valorPorArea.map(a => {
+                const pct = valorEstoque.total > 0 ? a.valor / valorEstoque.total * 100 : 0;
+                return (
+                  <div key={a.cat} className="card-sm" style={{cursor:'pointer',borderColor: catFiltro===a.cat?'var(--accent)':undefined}}
+                    onClick={()=>{ setCatFiltro(catFiltro===a.cat?'':a.cat); setAba('estoque'); setModalValorArea(false); }}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+                      <div>
+                        <div style={{fontWeight:600,fontSize:13}}>{a.cat}</div>
+                        <div style={{fontSize:11,color:'var(--text-muted)'}}>{a.itens} item(ns){a.semPreco>0 && <span style={{color:'var(--yellow)'}}> · {a.semPreco} sem preço</span>}</div>
+                      </div>
+                      <div style={{textAlign:'right'}}>
+                        <div style={{fontWeight:800,color:'var(--green)',fontSize:14}}>R$ {a.valor.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+                        <div style={{fontSize:10,color:'var(--text-dim)'}}>{pct.toFixed(1)}%</div>
+                      </div>
+                    </div>
+                    <div style={{height:4,background:'var(--bg-card2)',borderRadius:2,marginTop:6,overflow:'hidden'}}>
+                      <div style={{height:'100%',width:pct+'%',background:'var(--green)'}}/>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <button className="btn btn-ghost" style={{width:'100%',marginTop:12}} onClick={()=>setModalValorArea(false)}>Fechar</button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Duplicados */}
+      {modalDup && (
+        <div className="overlay" onClick={()=>!busy && setModalDup(false)}>
+          <div className="modal" onClick={e=>e.stopPropagation()} style={{maxHeight:'85vh',overflowY:'auto'}}>
+            <div className="modal-title">🧹 Unificar duplicados</div>
+            {duplicados.total === 0 ? (
+              <div style={{color:'var(--text-muted)',padding:'12px 0'}}>✅ Nenhuma categoria ou item repetido encontrado.</div>
+            ) : <>
+              {duplicados.categorias.length > 0 && <>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:6}}>Categorias repetidas</div>
+                {duplicados.categorias.map(c => (
+                  <div key={c.destino} className="card-sm" style={{marginBottom:6,fontSize:12}}>
+                    {c.variantes.map(v => <div key={v.nome}>"{v.nome}" ({v.qtd} itens) → <b>"{c.destino}"</b></div>)}
+                  </div>
+                ))}
+              </>}
+              {duplicados.produtos.length > 0 && <>
+                <div style={{fontWeight:700,fontSize:13,margin:'10px 0 6px'}}>Itens repetidos</div>
+                {duplicados.produtos.map(g => (
+                  <div key={g.manter.id} className="card-sm" style={{marginBottom:6,fontSize:12}}>
+                    <div><b>{g.manter.produto}</b> — fica em "{g.manter.categoria}" ({g.manter.quantidade} {g.manter.unidade||'un'})</div>
+                    {g.remover.map(r => <div key={r.id} style={{color:'var(--text-muted)'}}>+ soma o de "{r.categoria}" ({r.quantidade} {r.unidade||'un'}) e apaga esse registro</div>)}
+                  </div>
+                ))}
+                <div style={{fontSize:11,color:'var(--text-dim)',marginTop:4}}>As quantidades são somadas e o histórico de movimentações e notas fiscais passa para o item que fica.</div>
+              </>}
+            </>}
+            <div style={{display:'flex',gap:8,marginTop:14}}>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModalDup(false)} disabled={busy}>Fechar</button>
+              {duplicados.total > 0 && <button className="btn btn-success" style={{flex:1}} onClick={unificarDuplicados} disabled={busy}>{busy?'Unificando...':'Unificar tudo'}</button>}
             </div>
           </div>
         </div>
