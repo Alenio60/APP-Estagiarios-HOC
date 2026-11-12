@@ -1508,6 +1508,21 @@ function EstoqueTab({user, sb}) {
     return { total, comPreco, semPreco, comReferencia };
   }, [itens, precos]);
 
+  // Valor exibido no card do topo: se uma categoria esta filtrada, mostra o total dela
+  const valorCard = useMemo(() => {
+    const lista = catFiltro ? itens.filter(i => i.categoria === catFiltro) : itens;
+    let total = 0, comPreco = 0, semPreco = 0, comReferencia = 0;
+    lista.forEach(i => {
+      const preco = precoDe(i);
+      if (preco != null) {
+        total += (i.quantidade||0) * preco;
+        comPreco++;
+        if (precos[i.id] == null) comReferencia++;
+      } else semPreco++;
+    });
+    return { total, comPreco, semPreco, comReferencia, qtdItens: lista.length };
+  }, [itens, precos, catFiltro]);
+
   const salvarNome = async (itemId) => {
     const novoNome = nomeEditValor.trim();
     if (!novoNome) return;
@@ -1589,15 +1604,18 @@ function EstoqueTab({user, sb}) {
         marginBottom:16, display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:10
       }}>
         <div>
-          <div style={{fontSize:12,color:'var(--text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:.5}}>💰 Valor total em estoque</div>
+          <div style={{fontSize:12,color:'var(--text-muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:.5}}>💰 {catFiltro ? 'Valor em estoque — '+catFiltro : 'Valor total em estoque'}</div>
           <div style={{fontSize:30,fontWeight:800,color:'var(--green)',marginTop:2}}>
-            R$ {valorEstoque.total.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}
+            R$ {valorCard.total.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}
           </div>
+          {catFiltro && <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>
+            Valor geral: R$ {valorEstoque.total.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} · <span onClick={()=>setCatFiltro('')} style={{cursor:'pointer',textDecoration:'underline'}}>ver geral</span>
+          </div>}
         </div>
         <div style={{fontSize:11,color:'var(--text-muted)',textAlign:'right'}}>
-          {valorEstoque.comPreco} de {itens.length} itens com valor conhecido
-          {valorEstoque.comReferencia > 0 && <div style={{marginTop:2}}>({valorEstoque.comReferencia} por valor de referência da planilha, {valorEstoque.comPreco-valorEstoque.comReferencia} por preço real de compra)</div>}
-          {valorEstoque.semPreco > 0 && <div style={{color:'var(--yellow)',marginTop:2}}>⚠️ {valorEstoque.semPreco} item(ns) sem nenhum valor não entram nessa soma</div>}
+          {valorCard.comPreco} de {valorCard.qtdItens} itens com valor conhecido
+          {valorCard.comReferencia > 0 && <div style={{marginTop:2}}>({valorCard.comReferencia} por valor de referência da planilha, {valorCard.comPreco-valorCard.comReferencia} por preço real de compra)</div>}
+          {valorCard.semPreco > 0 && <div style={{color:'var(--yellow)',marginTop:2}}>⚠️ {valorCard.semPreco} item(ns) sem nenhum valor não entram nessa soma</div>}
         </div>
       </div>
 
