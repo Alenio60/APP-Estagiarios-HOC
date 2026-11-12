@@ -2525,10 +2525,56 @@ function adivinharColunas(cabecalho) {
   };
   return {
     data: achar(['data','dia'], ['nasc']),
+    paciente: achar(['prontuario']),
     pacientes: achar(['pacientes','atendimentos','atendidos','quantidade','qtd','total']),
-    dentista: achar(['dentista','profissional','doutor','medico']),
-    especialidade: achar(['especialidade','area','setor']),
+    dentista: '',
+    especialidade: '',
     unidade: achar(['unidade','clinica','filial','local'])
+  };
+}
+
+function modoPadrao(g) {
+  if (g.paciente !== '') return 'distintos';
+  if (g.pacientes !== '') return 'coluna';
+  return 'contar';
+}
+
+// Agrega as linhas do relatorio em (dia, unidade, dentista, especialidade) -> pacientes
+function agregarPacientes(linhas, linhaCab, col, modo, unidadePadrao) {
+  if (!linhas.length || col.data === '') return null;
+  const dados = linhas.slice(linhaCab);
+  const agg = {};
+  let lidas = 0, ignoradas = 0;
+  dados.forEach(r => {
+    if (r.every(c => String(c).trim() === '')) return;
+    lidas++;
+    const d = parseDataFlex(r[+col.data]);
+    if (!d) { ignoradas++; return; }
+    let n = 1, id = null;
+    if (modo === 'coluna') {
+      if (col.pacientes === '') { ignoradas++; return; }
+      n = parseNumFlex(r[+col.pacientes]);
+      if (isNaN(n) || n < 0) { ignoradas++; return; }
+    } else if (modo === 'distintos') {
+      if (col.paciente === '') { ignoradas++; return; }
+      id = String(r[+col.paciente] == null ? '' : r[+col.paciente]).trim();
+      if (!id) { ignoradas++; return; }
+    }
+    const un = col.unidade !== '' ? (String(r[+col.unidade] || '').trim() || unidadePadrao) : unidadePadrao;
+    const dent = col.dentista !== '' ? String(r[+col.dentista] || '').trim() : '';
+    const esp = col.especialidade !== '' ? String(r[+col.especialidade] || '').trim() : '';
+    const k = [d, un, dent, esp].join('|');
+    if (!agg[k]) agg[k] = {data:d, unidade:un, dentista:dent, especialidade:esp, pacientes:0, ids:new Set()};
+    if (modo === 'distintos') agg[k].ids.add(id); else agg[k].pacientes += n;
+  });
+  const lista = Object.values(agg).map(x => ({data:x.data, unidade:x.unidade, dentista:x.dentista, especialidade:x.especialidade, pacientes: modo === 'distintos' ? x.ids.size : x.pacientes}))
+    .sort((a, b) => a.data.localeCompare(b.data));
+  return {
+    lista, lidas, ignoradas,
+    total: lista.reduce((s, x) => s + x.pacientes, 0),
+    dias: new Set(lista.map(x => x.data)).size,
+    inicio: lista.length ? lista[0].data : null,
+    fim: lista.length ? lista[lista.length - 1].data : null
   };
 }
 
@@ -2539,8 +2585,8 @@ function ImportarPacientesPanel({sb, user, periodo, onDone}) {
   const [abaPlan, setAbaPlan] = useState('');
   const [linhas, setLinhas] = useState([]);
   const [linhaCab, setLinhaCab] = useState(1);
-  const [col, setCol] = useState({data:'', pacientes:'', dentista:'', especialidade:'', unidade:''});
-  const [modo, setModo] = useState('contar'); // contar | coluna
+  const [col, setCol] = useState({data:'', paciente:'', pacientes:'', dentista:'', especialidade:'', unidade:''});
+  const [modo, setModo] = useState('distintos'); // distintos | coluna | contar
   const [unidadePadrao, setUnidadePadrao] = useState('HOC');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
@@ -2556,7 +2602,7 @@ function ImportarPacientesPanel({sb, user, periodo, onDone}) {
     setLinhaCab(idx + 1);
     const g = adivinharColunas(rows[idx] || []);
     setCol(g);
-    setModo(g.pacientes !== '' ? 'coluna' : 'contar');
+    setModo(modoPadrao(g));
   };
 
   const lerArquivo = (e) => {
@@ -2570,7 +2616,8 @@ function ImportarPacientesPanel({sb, user, periodo, onDone}) {
       try {
         const workbook = window.XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
         setWb(workbook);
-        aplicarAba(workbook, workbook.SheetNames[0]);
+        const preferida = workbook.SheetNames.find(n => normCab(n).includes('base')) || workbook.SheetNames[0];
+        aplicarAba(workbook, preferida);
       } catch (err) {
         setErro('Não consegui ler esse arquivo: ' + err.message);
       }
@@ -2584,43 +2631,12 @@ function ImportarPacientesPanel({sb, user, periodo, onDone}) {
     setLinhaCab(v);
     const g = adivinharColunas(linhas[v - 1] || []);
     setCol(g);
-    setModo(g.pacientes !== '' ? 'coluna' : 'contar');
+    setModo(modoPadrao(g));
   };
 
   const cabecalho = linhas[linhaCab - 1] || [];
 
-  const agregado = (() => {
-    if (!linhas.length || col.data === '') return null;
-    const dados = linhas.slice(linhaCab);
-    const agg = {};
-    let lidas = 0, ignoradas = 0;
-    dados.forEach(r => {
-      if (r.every(c => String(c).trim() === '')) return;
-      lidas++;
-      const d = parseDataFlex(r[+col.data]);
-      if (!d) { ignoradas++; return; }
-      let n = 1;
-      if (modo === 'coluna') {
-        if (col.pacientes === '') { ignoradas++; return; }
-        n = parseNumFlex(r[+col.pacientes]);
-        if (isNaN(n) || n < 0) { ignoradas++; return; }
-      }
-      const un = col.unidade !== '' ? (String(r[+col.unidade] || '').trim() || unidadePadrao) : unidadePadrao;
-      const dent = col.dentista !== '' ? String(r[+col.dentista] || '').trim() : '';
-      const esp = col.especialidade !== '' ? String(r[+col.especialidade] || '').trim() : '';
-      const k = [d, un, dent, esp].join('|');
-      if (!agg[k]) agg[k] = {data:d, unidade:un, dentista:dent, especialidade:esp, pacientes:0};
-      agg[k].pacientes += n;
-    });
-    const lista = Object.values(agg).sort((a, b) => a.data.localeCompare(b.data));
-    return {
-      lista, lidas, ignoradas,
-      total: lista.reduce((s, x) => s + x.pacientes, 0),
-      dias: new Set(lista.map(x => x.data)).size,
-      inicio: lista.length ? lista[0].data : null,
-      fim: lista.length ? lista[lista.length - 1].data : null
-    };
-  })();
+  const agregado = agregarPacientes(linhas, linhaCab, col, modo, unidadePadrao);
 
   const salvar = async () => {
     if (!agregado || !agregado.lista.length) return;
@@ -2695,18 +2711,24 @@ function ImportarPacientesPanel({sb, user, periodo, onDone}) {
           </div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
             {selCol('data', 'Coluna da data', true)}
-            {selCol('pacientes', 'Coluna de pacientes (quantidade)', false)}
-            {selCol('dentista', 'Coluna do dentista', false)}
-            {selCol('especialidade', 'Coluna da especialidade', false)}
+            {selCol('paciente', 'Coluna do prontuário (paciente)', false)}
+            {selCol('pacientes', 'Coluna de quantidade de pacientes', false)}
             {selCol('unidade', 'Coluna da unidade', false)}
+            {selCol('dentista', 'Coluna do dentista (opcional)', false)}
           </div>
           <div style={{display:'flex',gap:14,flexWrap:'wrap',fontSize:12,marginBottom:6}}>
+            <label style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}>
+              <input type="radio" checked={modo === 'distintos'} onChange={() => setModo('distintos')} /> Contar pacientes diferentes por dia (pelo prontuário) — recomendado
+            </label>
             <label style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}>
               <input type="radio" checked={modo === 'coluna'} onChange={() => setModo('coluna')} /> Somar a coluna de quantidade
             </label>
             <label style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}>
               <input type="radio" checked={modo === 'contar'} onChange={() => setModo('contar')} /> Cada linha = 1 atendimento (contar linhas)
             </label>
+          </div>
+          <div style={{fontSize:11,color:'var(--text-dim)'}}>
+            Um paciente com 3 procedimentos no mesmo dia conta como 1. Se escolher a coluna do dentista, um paciente atendido por 2 dentistas no mesmo dia conta nos dois e o total geral fica maior que o real — deixe em branco para o cálculo de consumo.
           </div>
         </div>
       )}
@@ -2719,7 +2741,7 @@ function ImportarPacientesPanel({sb, user, periodo, onDone}) {
           ) : (<>
             <div style={{fontSize:13,marginBottom:8}}>
               <b>{agregado.total}</b> paciente(s) em <b>{agregado.dias}</b> dia(s), de {fmtDataBR(agregado.inicio)} a {fmtDataBR(agregado.fim)}
-              <span style={{color:'var(--text-muted)',fontSize:11}}> · {agregado.lidas} linha(s) lidas{agregado.ignoradas > 0 ? `, ${agregado.ignoradas} ignorada(s) (sem data válida — ex.: totais)` : ''}</span>
+              <span style={{color:'var(--text-muted)',fontSize:11}}> · {agregado.lidas} linha(s)/procedimento(s) lidos{agregado.ignoradas > 0 ? `, ${agregado.ignoradas} ignorada(s) (sem data válida — ex.: totais)` : ''}</span>
             </div>
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
@@ -2828,10 +2850,11 @@ function PacientesTab({user, sb}) {
 
     const atendF = atend.filter(a => a.data >= de && a.data <= ate && (!unidadeF || a.unidade === unidadeF));
     const pacientes = atendF.reduce((s, a) => s + a.pacientes, 0);
+    const diasComPac = new Set(atendF.map(a => a.data));
     const saidas = movs
       .filter(m => m.tipo === 'saida' && !/^cancelamento nf/i.test(m.obs || ''))
       .map(m => ({...m, dia: dataLocal(m.created_at)}))
-      .filter(m => m.dia >= de && m.dia <= ate);
+      .filter(m => m.dia >= de && m.dia <= ate && (diasComPac.size === 0 || diasComPac.has(m.dia)));
 
     const porItem = {}, porCat = {}, mensal = {};
     const mes = k => { if (!mensal[k]) mensal[k] = {mes:k, pacientes:0, qtd:0, custo:0}; return mensal[k]; };
@@ -2933,7 +2956,7 @@ function PacientesTab({user, sb}) {
             ))}
           </div>
           <div style={{fontSize:11,color:'var(--text-dim)',marginBottom:16}}>
-            Consumo = saídas registradas no Estoque (cancelamentos de nota não contam), valorizadas pelo último preço pago.
+            Consumo = saídas registradas no Estoque (cancelamentos de nota não contam), valorizadas pelo último preço pago. Só entram os dias que têm pacientes importados, para o consumo e os pacientes cobrirem o mesmo período.
             {analise.semPrecoQtd > 0 && <span style={{color:'var(--yellow)'}}> {num(analise.semPrecoQtd)} un. de itens sem preço não entram no custo.</span>}
             {' '}Se algum material sai sem lançar a saída, o consumo por paciente fica menor que o real.
           </div>
