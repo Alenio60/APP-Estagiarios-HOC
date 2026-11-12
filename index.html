@@ -17,6 +17,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -2484,6 +2485,548 @@ function NotasFiscaisTab({user, sb}) {
   );
 }
 
+// ===== PACIENTES: importa relatorio do Controle Odonto e cruza com o consumo do estoque =====
+function parseDataFlex(v) {
+  if (v === '' || v == null) return null;
+  if (typeof v === 'number') {
+    if (v > 20000 && v < 80000) return new Date(Math.floor(v - 25569) * 86400000).toISOString().slice(0,10);
+    return null;
+  }
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+  if (m) {
+    let d = +m[1], mo = +m[2], y = m[3];
+    if (y.length === 2) y = '20' + y;
+    if (d < 1 || d > 31 || mo < 1 || mo > 12 || +y < 2000 || +y > 2100) return null;
+    return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
+  return null;
+}
+
+function parseNumFlex(v) {
+  if (typeof v === 'number') return Math.round(v);
+  const s = String(v == null ? '' : v).trim().replace(/\./g, '').replace(',', '.');
+  if (!s) return NaN;
+  const n = Number(s);
+  return isNaN(n) ? NaN : Math.round(n);
+}
+
+function normCab(s) {
+  return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+}
+
+function adivinharColunas(cabecalho) {
+  const hs = cabecalho.map(normCab);
+  const achar = (cands, excluir) => {
+    const i = hs.findIndex(h => h && cands.some(c => h.includes(c)) && !(excluir||[]).some(x => h.includes(x)));
+    return i >= 0 ? String(i) : '';
+  };
+  return {
+    data: achar(['data','dia'], ['nasc']),
+    pacientes: achar(['pacientes','atendimentos','atendidos','quantidade','qtd','total']),
+    dentista: achar(['dentista','profissional','doutor','medico']),
+    especialidade: achar(['especialidade','area','setor']),
+    unidade: achar(['unidade','clinica','filial','local'])
+  };
+}
+
+function ImportarPacientesPanel({sb, user, periodo, onDone}) {
+  const {useState} = React;
+  const [nomeArq, setNomeArq] = useState('');
+  const [wb, setWb] = useState(null);
+  const [abaPlan, setAbaPlan] = useState('');
+  const [linhas, setLinhas] = useState([]);
+  const [linhaCab, setLinhaCab] = useState(1);
+  const [col, setCol] = useState({data:'', pacientes:'', dentista:'', especialidade:'', unidade:''});
+  const [modo, setModo] = useState('contar'); // contar | coluna
+  const [unidadePadrao, setUnidadePadrao] = useState('HOC');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [erro, setErro] = useState('');
+
+  const aplicarAba = (workbook, nomeAba) => {
+    const ws = workbook.Sheets[nomeAba];
+    const rows = window.XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:''});
+    setAbaPlan(nomeAba);
+    setLinhas(rows);
+    let idx = rows.findIndex(r => r.filter(c => String(c).trim() !== '').length >= 2);
+    if (idx < 0) idx = 0;
+    setLinhaCab(idx + 1);
+    const g = adivinharColunas(rows[idx] || []);
+    setCol(g);
+    setModo(g.pacientes !== '' ? 'coluna' : 'contar');
+  };
+
+  const lerArquivo = (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    setErro(''); setMsg('');
+    if (!window.XLSX) { setErro('Leitor de Excel não carregou. Atualize a página (Ctrl+F5) e tente de novo.'); return; }
+    setNomeArq(f.name);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const workbook = window.XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
+        setWb(workbook);
+        aplicarAba(workbook, workbook.SheetNames[0]);
+      } catch (err) {
+        setErro('Não consegui ler esse arquivo: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(f);
+    e.target.value = '';
+  };
+
+  const mudarLinhaCab = (n) => {
+    const v = Math.max(1, +n || 1);
+    setLinhaCab(v);
+    const g = adivinharColunas(linhas[v - 1] || []);
+    setCol(g);
+    setModo(g.pacientes !== '' ? 'coluna' : 'contar');
+  };
+
+  const cabecalho = linhas[linhaCab - 1] || [];
+
+  const agregado = (() => {
+    if (!linhas.length || col.data === '') return null;
+    const dados = linhas.slice(linhaCab);
+    const agg = {};
+    let lidas = 0, ignoradas = 0;
+    dados.forEach(r => {
+      if (r.every(c => String(c).trim() === '')) return;
+      lidas++;
+      const d = parseDataFlex(r[+col.data]);
+      if (!d) { ignoradas++; return; }
+      let n = 1;
+      if (modo === 'coluna') {
+        if (col.pacientes === '') { ignoradas++; return; }
+        n = parseNumFlex(r[+col.pacientes]);
+        if (isNaN(n) || n < 0) { ignoradas++; return; }
+      }
+      const un = col.unidade !== '' ? (String(r[+col.unidade] || '').trim() || unidadePadrao) : unidadePadrao;
+      const dent = col.dentista !== '' ? String(r[+col.dentista] || '').trim() : '';
+      const esp = col.especialidade !== '' ? String(r[+col.especialidade] || '').trim() : '';
+      const k = [d, un, dent, esp].join('|');
+      if (!agg[k]) agg[k] = {data:d, unidade:un, dentista:dent, especialidade:esp, pacientes:0};
+      agg[k].pacientes += n;
+    });
+    const lista = Object.values(agg).sort((a, b) => a.data.localeCompare(b.data));
+    return {
+      lista, lidas, ignoradas,
+      total: lista.reduce((s, x) => s + x.pacientes, 0),
+      dias: new Set(lista.map(x => x.data)).size,
+      inicio: lista.length ? lista[0].data : null,
+      fim: lista.length ? lista[lista.length - 1].data : null
+    };
+  })();
+
+  const salvar = async () => {
+    if (!agregado || !agregado.lista.length) return;
+    setBusy(true); setErro(''); setMsg('');
+    try {
+      const linhasDb = agregado.lista.map(x => ({...x, importado_por: user.nome}));
+      for (let i = 0; i < linhasDb.length; i += 500) {
+        const {error} = await sb.from('atendimentos_pacientes').upsert(linhasDb.slice(i, i + 500), {onConflict:'data,unidade,dentista,especialidade'});
+        if (error) throw error;
+      }
+      setMsg(`✅ ${agregado.total} paciente(s) em ${agregado.dias} dia(s) importados (${fmtDataBR(agregado.inicio)} a ${fmtDataBR(agregado.fim)}).`);
+      setLinhas([]); setWb(null); setNomeArq('');
+      if (onDone) await onDone();
+    } catch (err) {
+      setErro('Erro ao salvar: ' + (err.message || JSON.stringify(err)));
+    }
+    setBusy(false);
+  };
+
+  const apagarPeriodo = async () => {
+    if (!window.confirm(`Apagar TODOS os dados de pacientes importados entre ${fmtDataBR(periodo.de)} e ${fmtDataBR(periodo.ate)}? Essa ação não pode ser desfeita.`)) return;
+    setBusy(true); setErro(''); setMsg('');
+    const {error} = await sb.from('atendimentos_pacientes').delete().gte('data', periodo.de).lte('data', periodo.ate);
+    if (error) setErro('Erro ao apagar: ' + error.message);
+    else { setMsg('Dados do período apagados.'); if (onDone) await onDone(); }
+    setBusy(false);
+  };
+
+  const selCol = (chave, rotulo, obrigatorio) => (
+    <div style={{flex:1,minWidth:150}}>
+      <label className="inp-label">{rotulo}{obrigatorio ? ' *' : ''}</label>
+      <select className="inp" value={col[chave]} onChange={e => setCol(prev => ({...prev, [chave]: e.target.value}))}>
+        <option value="">— não usar —</option>
+        {cabecalho.map((h, i) => <option key={i} value={String(i)}>{String(h).trim() || `(coluna ${i + 1})`}</option>)}
+      </select>
+    </div>
+  );
+
+  return (
+    <div>
+      <div className="card" style={{marginBottom:12}}>
+        <div style={{fontWeight:700,fontSize:14,marginBottom:6}}>📥 Importar relatório do Controle Odonto</div>
+        <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:10}}>
+          Envie o Excel (.xlsx, .xls) ou CSV. Só são guardados números por dia — nomes de pacientes não são salvos. Dias que já existem são substituídos, então pode reimportar períodos sem duplicar.
+        </div>
+        <input type="file" accept=".xlsx,.xls,.csv" onChange={lerArquivo} />
+        {nomeArq && <div style={{fontSize:12,color:'var(--text-muted)',marginTop:6}}>Arquivo: <b>{nomeArq}</b></div>}
+        {erro && <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#f87171',marginTop:10}}>{erro}</div>}
+        {msg && <div className="alert" style={{background:'#16a34a18',border:'1px solid #16a34a55',color:'var(--green)',marginTop:10}}>{msg}</div>}
+      </div>
+
+      {linhas.length > 0 && (
+        <div className="card" style={{marginBottom:12}}>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>Conferir colunas</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
+            {wb && wb.SheetNames.length > 1 && (
+              <div style={{flex:1,minWidth:150}}>
+                <label className="inp-label">Planilha</label>
+                <select className="inp" value={abaPlan} onChange={e => aplicarAba(wb, e.target.value)}>
+                  {wb.SheetNames.map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+            )}
+            <div style={{width:130}}>
+              <label className="inp-label">Linha do cabeçalho</label>
+              <input type="number" className="inp" min="1" value={linhaCab} onChange={e => mudarLinhaCab(e.target.value)} />
+            </div>
+            <div style={{flex:1,minWidth:150}}>
+              <label className="inp-label">Unidade (se o relatório não tiver)</label>
+              <input className="inp" value={unidadePadrao} onChange={e => setUnidadePadrao(e.target.value)} placeholder="HOC" />
+            </div>
+          </div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
+            {selCol('data', 'Coluna da data', true)}
+            {selCol('pacientes', 'Coluna de pacientes (quantidade)', false)}
+            {selCol('dentista', 'Coluna do dentista', false)}
+            {selCol('especialidade', 'Coluna da especialidade', false)}
+            {selCol('unidade', 'Coluna da unidade', false)}
+          </div>
+          <div style={{display:'flex',gap:14,flexWrap:'wrap',fontSize:12,marginBottom:6}}>
+            <label style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}>
+              <input type="radio" checked={modo === 'coluna'} onChange={() => setModo('coluna')} /> Somar a coluna de quantidade
+            </label>
+            <label style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}>
+              <input type="radio" checked={modo === 'contar'} onChange={() => setModo('contar')} /> Cada linha = 1 atendimento (contar linhas)
+            </label>
+          </div>
+        </div>
+      )}
+
+      {agregado && (
+        <div className="card" style={{marginBottom:12}}>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>Prévia do que será importado</div>
+          {agregado.lista.length === 0 ? (
+            <div style={{fontSize:12,color:'var(--yellow)'}}>⚠️ Nenhuma linha válida. Confira a linha do cabeçalho e a coluna da data.</div>
+          ) : (<>
+            <div style={{fontSize:13,marginBottom:8}}>
+              <b>{agregado.total}</b> paciente(s) em <b>{agregado.dias}</b> dia(s), de {fmtDataBR(agregado.inicio)} a {fmtDataBR(agregado.fim)}
+              <span style={{color:'var(--text-muted)',fontSize:11}}> · {agregado.lidas} linha(s) lidas{agregado.ignoradas > 0 ? `, ${agregado.ignoradas} ignorada(s) (sem data válida — ex.: totais)` : ''}</span>
+            </div>
+            <div style={{overflowX:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                <thead><tr>
+                  {['Data','Unidade','Dentista','Especialidade','Pacientes'].map(h => <th key={h} style={{textAlign:'left',padding:'4px 8px',fontSize:11,color:'var(--text-muted)',borderBottom:'1px solid var(--border)'}}>{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {agregado.lista.slice(0, 8).map((x, i) => (
+                    <tr key={i}>
+                      <td style={{padding:'4px 8px'}}>{fmtDataBR(x.data)}</td>
+                      <td style={{padding:'4px 8px'}}>{x.unidade}</td>
+                      <td style={{padding:'4px 8px'}}>{x.dentista || '—'}</td>
+                      <td style={{padding:'4px 8px'}}>{x.especialidade || '—'}</td>
+                      <td style={{padding:'4px 8px',fontWeight:700}}>{x.pacientes}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {agregado.lista.length > 8 && <div style={{fontSize:11,color:'var(--text-dim)',marginTop:4}}>… e mais {agregado.lista.length - 8} linha(s)</div>}
+            <button className="btn btn-success" style={{marginTop:12}} onClick={salvar} disabled={busy}>
+              {busy ? 'Importando...' : '✅ Confirmar importação'}
+            </button>
+          </>)}
+        </div>
+      )}
+
+      <div className="card">
+        <div style={{fontWeight:700,fontSize:13,marginBottom:6}}>🗑️ Corrigir uma importação errada</div>
+        <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:8}}>Apaga os dados de pacientes do período selecionado na aba Análise ({fmtDataBR(periodo.de)} a {fmtDataBR(periodo.ate)}). Depois é só importar de novo.</div>
+        <button className="btn btn-danger btn-sm" onClick={apagarPeriodo} disabled={busy}>Apagar dados deste período</button>
+      </div>
+    </div>
+  );
+}
+
+function fmtDataBR(iso) {
+  if (!iso) return '';
+  const [y, m, d] = String(iso).slice(0, 10).split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function PacientesTab({user, sb}) {
+  const {useState, useEffect, useMemo} = React;
+  const brl = n => 'R$ ' + (n || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const num = n => (n || 0).toLocaleString('pt-BR', {maximumFractionDigits:2});
+  const dataLocal = ts => new Date(ts).toLocaleDateString('en-CA', {timeZone:'America/Sao_Paulo'});
+  const hojeIso = dataLocal(new Date());
+  const addDias = (iso, d) => { const dt = new Date(iso + 'T12:00:00'); dt.setDate(dt.getDate() + d); return dt.toLocaleDateString('en-CA'); };
+
+  const [aba, setAba] = useState('analise'); // analise | importar
+  const [atend, setAtend] = useState([]);
+  const [movs, setMovs] = useState([]);
+  const [itens, setItens] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [erroCarga, setErroCarga] = useState('');
+  const [de, setDe] = useState(addDias(hojeIso, -89));
+  const [ate, setAte] = useState(hojeIso);
+  const [unidadeF, setUnidadeF] = useState('');
+  const [ordem, setOrdem] = useState('custo'); // custo | porPaciente
+  const [verTodos, setVerTodos] = useState(false);
+
+  const buscarTudo = async (montar) => {
+    let todos = [], from = 0;
+    while (true) {
+      const {data, error} = await montar().range(from, from + 999);
+      if (error) throw error;
+      todos = todos.concat(data || []);
+      if (!data || data.length < 1000) break;
+      from += 1000;
+    }
+    return todos;
+  };
+
+  const carregar = async () => {
+    if (!sb) return;
+    setCarregando(true); setErroCarga('');
+    try {
+      const [a, m, e] = await Promise.all([
+        buscarTudo(() => sb.from('atendimentos_pacientes').select('*').order('data').order('id')),
+        buscarTudo(() => sb.from('estoque_movimentacoes').select('id,produto_id,produto_nome,tipo,quantidade,valor_unitario,created_at,obs').order('id')),
+        buscarTudo(() => sb.from('estoque').select('id,produto,categoria,valor_unitario').order('id'))
+      ]);
+      setAtend(a); setMovs(m); setItens(e);
+    } catch (err) {
+      setErroCarga('Erro ao carregar: ' + (err.message || JSON.stringify(err)));
+    }
+    setCarregando(false);
+  };
+  useEffect(() => { carregar(); }, []);
+
+  const unidades = useMemo(() => [...new Set(atend.map(a => a.unidade))].sort(), [atend]);
+
+  const analise = useMemo(() => {
+    const precoUlt = {};
+    movs.filter(m => m.tipo === 'entrada' && m.valor_unitario != null)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .forEach(m => { if (precoUlt[m.produto_id] === undefined) precoUlt[m.produto_id] = +m.valor_unitario; });
+    const porId = {};
+    itens.forEach(i => { porId[i.id] = i; });
+    const preco = id => {
+      if (precoUlt[id] != null) return precoUlt[id];
+      const ref = porId[id] ? +porId[id].valor_unitario : 0;
+      return ref > 0 ? ref : null;
+    };
+
+    const atendF = atend.filter(a => a.data >= de && a.data <= ate && (!unidadeF || a.unidade === unidadeF));
+    const pacientes = atendF.reduce((s, a) => s + a.pacientes, 0);
+    const saidas = movs
+      .filter(m => m.tipo === 'saida' && !/^cancelamento nf/i.test(m.obs || ''))
+      .map(m => ({...m, dia: dataLocal(m.created_at)}))
+      .filter(m => m.dia >= de && m.dia <= ate);
+
+    const porItem = {}, porCat = {}, mensal = {};
+    const mes = k => { if (!mensal[k]) mensal[k] = {mes:k, pacientes:0, qtd:0, custo:0}; return mensal[k]; };
+    let qtdTotal = 0, custoTotal = 0, semPrecoQtd = 0;
+    saidas.forEach(m => {
+      const it = porId[m.produto_id];
+      const cat = it ? (it.categoria || 'Sem categoria') : 'Sem categoria';
+      const p = preco(m.produto_id);
+      const q = m.quantidade || 0;
+      const c = p != null ? q * p : 0;
+      if (p == null) semPrecoQtd += q;
+      if (!porItem[m.produto_id]) porItem[m.produto_id] = {produto: it ? it.produto : (m.produto_nome || '—'), categoria: cat, qtd:0, custo:0, semPreco: p == null};
+      porItem[m.produto_id].qtd += q; porItem[m.produto_id].custo += c;
+      if (!porCat[cat]) porCat[cat] = {categoria: cat, qtd:0, custo:0};
+      porCat[cat].qtd += q; porCat[cat].custo += c;
+      const mm = mes(m.dia.slice(0, 7)); mm.qtd += q; mm.custo += c;
+      qtdTotal += q; custoTotal += c;
+    });
+    atendF.forEach(a => { mes(a.data.slice(0, 7)).pacientes += a.pacientes; });
+
+    return {
+      pacientes, qtdTotal, custoTotal, semPrecoQtd,
+      diasComDados: new Set(atendF.map(a => a.data)).size,
+      cats: Object.values(porCat).sort((a, b) => b.custo - a.custo),
+      itens: Object.values(porItem),
+      meses: Object.values(mensal).sort((a, b) => a.mes.localeCompare(b.mes))
+    };
+  }, [atend, movs, itens, de, ate, unidadeF]);
+
+  const itensOrdenados = useMemo(() => {
+    const l = [...analise.itens];
+    if (ordem === 'porPaciente') l.sort((a, b) => b.qtd - a.qtd);
+    else l.sort((a, b) => b.custo - a.custo);
+    return verTodos ? l : l.slice(0, 40);
+  }, [analise, ordem, verTodos]);
+
+  const P = analise.pacientes;
+  const th = (txt, right) => <th style={{textAlign: right ? 'right' : 'left', padding:'6px 8px', fontSize:11, color:'var(--text-muted)', borderBottom:'1px solid var(--border)', whiteSpace:'nowrap'}}>{txt}</th>;
+  const td = (v, right, extra) => <td style={{padding:'6px 8px', textAlign: right ? 'right' : 'left', fontSize:12, borderBottom:'1px solid var(--border)', ...(extra || {})}}>{v}</td>;
+  const nomeMes = k => { const [y, m] = k.split('-'); return `${['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+m - 1]}/${y}`; };
+
+  const atalhos = [
+    ['Este mês', hojeIso.slice(0, 8) + '01', hojeIso],
+    ['Mês passado', (() => { const d = new Date(hojeIso + 'T12:00:00'); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.toLocaleDateString('en-CA'); })(), (() => { const d = new Date(hojeIso + 'T12:00:00'); d.setDate(0); return d.toLocaleDateString('en-CA'); })()],
+    ['90 dias', addDias(hojeIso, -89), hojeIso],
+    ['Este ano', hojeIso.slice(0, 4) + '-01-01', hojeIso]
+  ];
+
+  return (
+    <div>
+      <div className="tabs" style={{marginBottom:16}}>
+        {[['analise','📊 Consumo por paciente'],['importar','📥 Importar relatório']].map(([k, l]) => (
+          <button key={k} className={`tab ${aba === k ? 'active' : ''}`} onClick={() => setAba(k)}>{l}</button>
+        ))}
+      </div>
+
+      {erroCarga && <div className="alert" style={{background:'#ef444418',border:'1px solid #ef444440',color:'#f87171',marginBottom:12}}>{erroCarga}</div>}
+
+      {aba === 'importar' && <ImportarPacientesPanel sb={sb} user={user} periodo={{de, ate}} onDone={carregar} />}
+
+      {aba === 'analise' && <>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'flex-end',marginBottom:12}}>
+          <div><label className="inp-label">De</label><input type="date" className="inp" value={de} onChange={e => setDe(e.target.value)} /></div>
+          <div><label className="inp-label">Até</label><input type="date" className="inp" value={ate} onChange={e => setAte(e.target.value)} /></div>
+          {unidades.length > 1 && (
+            <div><label className="inp-label">Unidade</label>
+              <select className="inp" value={unidadeF} onChange={e => setUnidadeF(e.target.value)}>
+                <option value="">Todas</option>
+                {unidades.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+          )}
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            {atalhos.map(([l, d1, d2]) => (
+              <button key={l} className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={() => { setDe(d1); setAte(d2); }}>{l}</button>
+            ))}
+          </div>
+        </div>
+
+        {carregando ? <div style={{textAlign:'center',color:'var(--text-muted)',padding:40}}>Carregando...</div> : <>
+          {P === 0 && (
+            <div className="alert" style={{background:'#f59e0b18',border:'1px solid #f59e0b40',color:'#fbbf24',marginBottom:12}}>
+              ⚠️ Não há pacientes importados neste período, então não dá para calcular o consumo por paciente. Use a aba <b>Importar relatório</b>.
+            </div>
+          )}
+
+          <div className="stat-grid" style={{marginBottom:16}}>
+            {[
+              ['👥 Pacientes atendidos', num(P), 'var(--accent)'],
+              ['📦 Itens consumidos', num(analise.qtdTotal), 'var(--text)'],
+              ['💰 Custo de material', brl(analise.custoTotal), 'var(--green)'],
+              ['💰 Custo por paciente', P > 0 ? brl(analise.custoTotal / P) : '—', 'var(--green)'],
+              ['📦 Itens por paciente', P > 0 ? num(analise.qtdTotal / P) : '—', 'var(--text)']
+            ].map(([l, v, c]) => (
+              <div key={l} className="stat-box" style={{borderColor: c + '44'}}>
+                <div className="stat-num" style={{color: c, fontSize: 18}}>{v}</div>
+                <div className="stat-lbl">{l}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{fontSize:11,color:'var(--text-dim)',marginBottom:16}}>
+            Consumo = saídas registradas no Estoque (cancelamentos de nota não contam), valorizadas pelo último preço pago.
+            {analise.semPrecoQtd > 0 && <span style={{color:'var(--yellow)'}}> {num(analise.semPrecoQtd)} un. de itens sem preço não entram no custo.</span>}
+            {' '}Se algum material sai sem lançar a saída, o consumo por paciente fica menor que o real.
+          </div>
+
+          <div className="card" style={{marginBottom:16}}>
+            <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>📅 Mês a mês</div>
+            <div style={{overflowX:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse'}}>
+                <thead><tr>{th('Mês')}{th('Pacientes', true)}{th('Itens', true)}{th('Custo', true)}{th('Custo/paciente', true)}{th('Itens/paciente', true)}{th('Variação', true)}</tr></thead>
+                <tbody>
+                  {analise.meses.map((m, i) => {
+                    const cpp = m.pacientes > 0 ? m.custo / m.pacientes : null;
+                    const ant = analise.meses[i - 1];
+                    const cppAnt = ant && ant.pacientes > 0 ? ant.custo / ant.pacientes : null;
+                    const varp = cpp != null && cppAnt ? (cpp - cppAnt) / cppAnt * 100 : null;
+                    return (
+                      <tr key={m.mes}>
+                        {td(nomeMes(m.mes))}
+                        {td(num(m.pacientes), true)}
+                        {td(num(m.qtd), true)}
+                        {td(brl(m.custo), true)}
+                        {td(cpp != null ? brl(cpp) : '—', true, {fontWeight:700})}
+                        {td(m.pacientes > 0 ? num(m.qtd / m.pacientes) : '—', true)}
+                        {td(varp != null ? `${varp > 0 ? '▲' : '▼'} ${Math.abs(varp).toFixed(0)}%` : '—', true, {color: varp == null ? undefined : varp > 5 ? 'var(--red)' : varp < -5 ? 'var(--green)' : 'var(--text-muted)'})}
+                      </tr>
+                    );
+                  })}
+                  {analise.meses.length === 0 && <tr><td colSpan="7" style={{padding:20,textAlign:'center',color:'var(--text-muted)',fontSize:12}}>Sem dados no período</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="card" style={{marginBottom:16}}>
+            <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>🗂️ Por categoria</div>
+            <div style={{overflowX:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse'}}>
+                <thead><tr>{th('Categoria')}{th('Itens consumidos', true)}{th('Custo', true)}{th('Custo/paciente', true)}{th('Itens/paciente', true)}</tr></thead>
+                <tbody>
+                  {analise.cats.map(c => (
+                    <tr key={c.categoria}>
+                      {td(c.categoria)}
+                      {td(num(c.qtd), true)}
+                      {td(brl(c.custo), true)}
+                      {td(P > 0 ? brl(c.custo / P) : '—', true, {fontWeight:700})}
+                      {td(P > 0 ? num(c.qtd / P) : '—', true)}
+                    </tr>
+                  ))}
+                  {analise.cats.length === 0 && <tr><td colSpan="5" style={{padding:20,textAlign:'center',color:'var(--text-muted)',fontSize:12}}>Nenhuma saída registrada no período</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="card">
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,marginBottom:8}}>
+              <div style={{fontWeight:700,fontSize:14}}>🔎 Por item</div>
+              <div style={{display:'flex',gap:6}}>
+                {[['custo','Maior custo'],['porPaciente','Mais consumidos']].map(([k, l]) => (
+                  <button key={k} className="btn btn-sm" style={{background: ordem === k ? '#16a34a30' : 'var(--bg-card2)', border:'1px solid ' + (ordem === k ? 'var(--green)' : 'var(--border)'), color: ordem === k ? 'var(--green)' : 'var(--text-muted)'}} onClick={() => setOrdem(k)}>{l}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{overflowX:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse'}}>
+                <thead><tr>{th('Item')}{th('Categoria')}{th('Qtd', true)}{th('Qtd/paciente', true)}{th('Custo', true)}{th('Custo/paciente', true)}</tr></thead>
+                <tbody>
+                  {itensOrdenados.map((it, i) => (
+                    <tr key={i}>
+                      {td(it.produto)}
+                      {td(it.categoria, false, {color:'var(--text-muted)'})}
+                      {td(num(it.qtd), true)}
+                      {td(P > 0 ? num(it.qtd / P) : '—', true)}
+                      {td(it.semPreco ? 'sem preço' : brl(it.custo), true, it.semPreco ? {color:'var(--yellow)'} : {})}
+                      {td(P > 0 && !it.semPreco ? brl(it.custo / P) : '—', true, {fontWeight:700})}
+                    </tr>
+                  ))}
+                  {itensOrdenados.length === 0 && <tr><td colSpan="6" style={{padding:20,textAlign:'center',color:'var(--text-muted)',fontSize:12}}>Nenhuma saída registrada no período</td></tr>}
+                </tbody>
+              </table>
+            </div>
+            {analise.itens.length > 40 && (
+              <button className="btn btn-sm btn-ghost" style={{marginTop:8}} onClick={() => setVerTodos(v => !v)}>
+                {verTodos ? 'Mostrar só os 40 primeiros' : `Ver todos os ${analise.itens.length} itens`}
+              </button>
+            )}
+          </div>
+        </>}
+      </>}
+    </div>
+  );
+}
+
 function AnaliseTab({user, sb}) {
   const {useState, useEffect, useRef, useMemo} = React;
   const [movs, setMovs]   = useState([]);
@@ -4090,7 +4633,7 @@ function App() {
 
         <div className="content">
           <div className="tabs" style={{marginBottom:24}}>
-            {[['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais'],['analise','📊 Análise']].map(([k,l])=>(
+            {[['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais'],['analise','📊 Análise'],['pacientes','👥 Pacientes']].map(([k,l])=>(
               <button key={k} className={`tab ${abaFin===k?'active':''}`} onClick={()=>setAbaFin(k)}>{l}</button>
             ))}
           </div>
@@ -4099,6 +4642,7 @@ function App() {
           {abaFin==='listacompra' && <ListaCompraTab user={user} sb={sb}/>}
           {abaFin==='notasfiscais' && <NotasFiscaisTab user={user} sb={sb}/>}
           {abaFin==='analise' && <AnaliseTab user={user} sb={sb}/>}
+          {abaFin==='pacientes' && <PacientesTab user={user} sb={sb}/>}
         </div>
       </div>
     );
@@ -4185,7 +4729,7 @@ function App() {
           <div className="tabs" style={{marginBottom:24}}>
             {(isAvaliador
               ? [['usuarios','👥 Estagiários'],['aval','⭐ Avaliações']]
-              : [['usuarios','👥 Estagiários'],['dentistas','🦷 Dentistas'],['dash','📊 Dashboard'],['aval','⭐ Avaliações'],['hist','📋 Histórico'],['niveis','📚 Níveis'],['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais'],['analise','📊 Análise']]
+              : [['usuarios','👥 Estagiários'],['dentistas','🦷 Dentistas'],['dash','📊 Dashboard'],['aval','⭐ Avaliações'],['hist','📋 Histórico'],['niveis','📚 Níveis'],['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais'],['analise','📊 Análise'],['pacientes','👥 Pacientes']]
             ).map(([k,l])=>(
               <button key={k} className={`tab ${abaA===k?'active':''}`} onClick={()=>setAbaA(k)}>{l}</button>
             ))}
@@ -4443,6 +4987,7 @@ function App() {
           {abaA==='listacompra' && <ListaCompraTab user={user} sb={sb}/>}
           {abaA==='notasfiscais' && <NotasFiscaisTab user={user} sb={sb}/>}
           {abaA==='analise' && <AnaliseTab user={user} sb={sb}/>}
+          {abaA==='pacientes' && <PacientesTab user={user} sb={sb}/>}
 
         {modalAval && (
           <div className="overlay" onClick={()=>setModalAval(null)}>
