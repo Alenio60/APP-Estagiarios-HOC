@@ -1326,12 +1326,160 @@ const situacaoGarantia = (i) => {
 };
 const LABEL_TIPO_MANUT = {quebra:'💥 Quebrou', manutencao:'🛠️ Manutenção', revisao:'🔁 Revisão'};
 
+const BUCKET_EQUIP = 'equipamentos-docs';
+async function uploadDocEquip(sb, file, pasta) {
+  const ext = ((file.name || '').split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const path = `${pasta}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const {error} = await sb.storage.from(BUCKET_EQUIP).upload(path, file, {contentType: file.type || undefined});
+  if (error) throw error;
+  return {nome: file.name, path, tipo: file.type || '', em: new Date().toISOString()};
+}
+async function abrirDocEquip(sb, path) {
+  const {data, error} = await sb.storage.from(BUCKET_EQUIP).createSignedUrl(path, 600);
+  if (error) { alert('Não consegui abrir o arquivo: ' + error.message); return; }
+  window.open(data.signedUrl, '_blank');
+}
+function arquivoBase64(file) {
+  return new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result).split(',')[1]); r.onerror = reject; r.readAsDataURL(file); });
+}
+async function lerNotaFiscalIA(file) {
+  const tipos = ['application/pdf','image/png','image/jpeg','image/jpg','image/webp'];
+  if (!tipos.includes(file.type)) throw new Error('Para ler a nota, envie PDF ou foto (PNG/JPEG).');
+  if (file.size > 15 * 1024 * 1024) throw new Error('Arquivo muito grande (máximo 15MB).');
+  const resp = await fetch('/api/ler-nota-fiscal', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({fileBase64: await arquivoBase64(file), mimeType: file.type})});
+  const dados = await resp.json();
+  if (!resp.ok || dados.error) throw new Error(dados.error || 'Não foi possível ler a nota.');
+  const itens = Array.isArray(dados.itens) ? dados.itens : [];
+  const total = itens.reduce((s, i) => s + (+i.quantidade || 0) * (+i.valor_unitario || 0), 0);
+  return {numero: dados.numero || '', fornecedor: dados.fornecedor || '', data: dados.data || '', itens, total};
+}
+function ListaAnexos({sb, anexos, onRemover}) {
+  if (!anexos || !anexos.length) return null;
+  return (
+    <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:4}}>
+      {anexos.map((a, k) => (
+        <span key={a.path || k} style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:11,background:'var(--bg-card2)',border:'1px solid var(--border)',borderRadius:6,padding:'2px 8px'}}>
+          <span onClick={()=>abrirDocEquip(sb, a.path)} style={{cursor:'pointer',color:'var(--accent)',textDecoration:'underline'}}>📎 {String(a.nome || 'arquivo').slice(0, 40)}</span>
+          {onRemover && <span onClick={()=>onRemover(k)} style={{cursor:'pointer',color:'var(--red)'}} title="Remover">✕</span>}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// Cuidados periodicos de equipamentos (alertas para auxiliares)
+function CuidadosHoje({sb, user, modo}) {
+  const {useState, useEffect} = React;
+  const [cuidados, setCuidados] = useState([]);
+  const [ultimo, setUltimo] = useState({}); // cuidado_id -> {data, responsavel}
+  const [feitosHoje, setFeitosHoje] = useState({});
+  const [equips, setEquips] = useState({});
+  const [emManut, setEmManut] = useState({});
+  const [aberto, setAberto] = useState(null);
+  const [recolhido, setRecolhido] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const h = hojeISO();
+  const verTudo = modo === 'gestao' || user.tipo === 'admin' || user.nivel === 8;
+
+  const carregar = async () => {
+    if (!sb) return;
+    const [{data:c}, {data:x}, {data:e}, {data:m}] = await Promise.all([
+      sb.from('equipamentos_cuidados').select('*').eq('ativo', true).order('ordem'),
+      sb.from('equipamentos_cuidados_exec').select('cuidado_id,data,responsavel').gte('data', addMesesISO(h, -13)).order('data', {ascending:false}),
+      sb.from('estoque').select('id,produto').eq('permanente', true),
+      sb.from('equipamentos_manutencao').select('produto_id').is('data_retorno', null)
+    ]);
+    const ult = {}, hoje = {};
+    (x || []).forEach(r => { if (!ult[r.cuidado_id]) ult[r.cuidado_id] = r; if (r.data === h) hoje[r.cuidado_id] = r; });
+    const eq = {}; (e || []).forEach(i => { eq[i.id] = i.produto; });
+    const mm = {}; (m || []).forEach(r => { mm[r.produto_id] = true; });
+    setCuidados(c || []); setUltimo(ult); setFeitosHoje(hoje); setEquips(eq); setEmManut(mm);
+  };
+  useEffect(() => { carregar(); }, []);
+
+  const situacao = (c) => {
+    const u = ultimo[c.id];
+    if (!u) return {devido: true, atraso: null};
+    const d = diasEntre(u.data, h);
+    return {devido: d >= c.frequencia_dias, atraso: d - c.frequencia_dias, ultimaData: u.data, ultimaResp: u.responsavel};
+  };
+  const marcar = async (c) => {
+    setBusy(true);
+    const {error} = await sb.from('equipamentos_cuidados_exec').insert([{cuidado_id: c.id, produto_id: c.produto_id, responsavel: user.nome}]);
+    if (error) alert('Erro ao registrar: ' + error.message);
+    await carregar();
+    setBusy(false);
+  };
+
+  const visiveis = cuidados.filter(c => (verTudo || c.quem === 'auxiliar') && !emManut[c.produto_id]);
+  const pendentes = visiveis.filter(c => situacao(c).devido && !feitosHoje[c.id]);
+  const feitos = visiveis.filter(c => feitosHoje[c.id]);
+  if (!visiveis.length) return null;
+  if (modo !== 'gestao' && !pendentes.length && !feitos.length) return null;
+
+  const freqTxt = (c) => c.momento === 'cada_uso' ? 'após cada uso' : c.frequencia_dias === 1 ? 'diário' : c.frequencia_dias === 7 ? 'semanal' : c.frequencia_dias === 14 ? 'a cada 14 dias' : c.frequencia_dias === 30 ? 'mensal' : c.frequencia_dias === 90 ? 'trimestral' : c.frequencia_dias === 180 ? 'semestral' : `a cada ${c.frequencia_dias} dias`;
+  const lista = modo === 'gestao' ? visiveis : pendentes;
+  const porEquip = {};
+  lista.forEach(c => { (porEquip[c.produto_id] = porEquip[c.produto_id] || []).push(c); });
+
+  return (
+    <div style={{border:'2px solid var(--accent)',background:'var(--bg-card)',borderRadius:14,padding:'14px 16px',marginBottom:20}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap',cursor:'pointer'}} onClick={()=>setRecolhido(v=>!v)}>
+        <div style={{fontWeight:800,fontSize:15,color:'var(--accent)'}}>🧽 Cuidados com equipamentos {modo==='gestao' ? '' : 'de hoje'}</div>
+        <div style={{fontSize:12,color:'var(--text-muted)'}}>
+          {pendentes.length > 0 ? <b style={{color:'var(--yellow)'}}>{pendentes.length} pendente(s)</b> : <b style={{color:'var(--green)'}}>tudo em dia</b>}
+          {feitos.length > 0 && <> · {feitos.length} feito(s) hoje</>} {recolhido ? '▸' : '▾'}
+        </div>
+      </div>
+      {!recolhido && <>
+        {Object.entries(porEquip).map(([pid, cs]) => (
+          <div key={pid} style={{marginTop:10}}>
+            <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>{equips[pid] || 'Equipamento'}</div>
+            {cs.map(c => {
+              const st = situacao(c); const feito = feitosHoje[c.id];
+              return (
+                <div key={c.id} style={{background:'var(--bg-card2)',borderRadius:8,padding:'8px 10px',marginBottom:4,borderLeft:`4px solid ${feito?'var(--green)':st.devido?(st.atraso>2?'var(--red)':'var(--yellow)'):'var(--border)'}`}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                    <div style={{flex:1,minWidth:170,cursor:'pointer'}} onClick={()=>setAberto(aberto===c.id?null:c.id)}>
+                      <div style={{fontWeight:600,fontSize:13}}>{c.titulo} {c.quem==='assistencia' && <span style={{fontSize:10,color:'var(--purple)'}}>· assistência técnica</span>}</div>
+                      <div style={{fontSize:11,color:'var(--text-muted)'}}>
+                        {freqTxt(c)}
+                        {st.ultimaData ? ` · último: ${fmtDBR(st.ultimaData)}${st.ultimaResp?` (${String(st.ultimaResp).split(' ')[0]})`:''}` : ' · nunca registrado'}
+                        {st.devido && st.atraso > 0 && <b style={{color:'var(--red)'}}> · atrasado {st.atraso} dia(s)</b>}
+                        {' '}<span style={{color:'var(--accent)'}}>{aberto===c.id?'▴ fechar':'▾ como fazer'}</span>
+                      </div>
+                    </div>
+                    {feito ? <span style={{fontSize:11,fontWeight:700,color:'var(--green)'}}>✅ feito por {String(feito.responsavel||'').split(' ')[0]}</span>
+                      : <button className="btn btn-sm btn-success" disabled={busy} onClick={()=>marcar(c)}>✅ Feito</button>}
+                  </div>
+                  {aberto===c.id && <div style={{fontSize:12,marginTop:6,lineHeight:1.5,whiteSpace:'pre-wrap'}}>{c.instrucoes}<div style={{fontSize:10,color:'var(--text-dim)',marginTop:4}}>Fonte: {c.fonte || '—'}</div></div>}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+        {modo !== 'gestao' && !pendentes.length && <div style={{fontSize:12,color:'var(--green)',marginTop:8}}>Todos os cuidados de hoje foram feitos. 👏</div>}
+        <div style={{fontSize:10,color:'var(--text-dim)',marginTop:8}}>Toque no cuidado para ver o passo a passo do manual. "Após cada uso": confirme uma vez no fim do dia que foi feito em todos os atendimentos.</div>
+      </>}
+    </div>
+  );
+}
+
 function PainelManutencao({sb}) {
   const {useState, useEffect} = React;
   const [abertas, setAbertas] = useState([]);
   const [equips, setEquips] = useState([]);
+  const [atrasados, setAtrasados] = useState([]);
   useEffect(() => { (async () => {
     if (!sb) return;
+    const [{data:cs}, {data:ex}] = await Promise.all([
+      sb.from('equipamentos_cuidados').select('id,titulo,frequencia_dias,produto_id,estoque(produto)').eq('ativo', true),
+      sb.from('equipamentos_cuidados_exec').select('cuidado_id,data').gte('data', addMesesISO(hojeISO(), -13)).order('data', {ascending:false})
+    ]);
+    const ult = {}; (ex || []).forEach(r => { if (!ult[r.cuidado_id]) ult[r.cuidado_id] = r.data; });
+    const hh = hojeISO();
+    setAtrasados((cs || []).map(c => ({...c, atraso: ult[c.id] ? diasEntre(ult[c.id], hh) - c.frequencia_dias : null}))
+      .filter(c => c.atraso !== null ? c.atraso > 2 : false));
     const {data:a} = await sb.from('equipamentos_manutencao').select('*').is('data_retorno', null).order('data_saida');
     if (a) setAbertas(a);
     const {data:e} = await sb.from('estoque').select('id,produto,garantia_ate,revisao_meses,ultima_revisao,data_compra').eq('permanente', true);
@@ -1340,7 +1488,7 @@ function PainelManutencao({sb}) {
   const h = hojeISO();
   const revis = equips.map(e => ({...e, prox: proximaRevisao(e)})).filter(e => e.prox && diasEntre(h, e.prox) <= 30).sort((a, b) => a.prox.localeCompare(b.prox));
   const gar = equips.filter(e => e.garantia_ate && e.garantia_ate >= h && diasEntre(h, e.garantia_ate) <= 30);
-  if (!abertas.length && !revis.length && !gar.length) return null;
+  if (!abertas.length && !revis.length && !gar.length && !atrasados.length) return null;
   const linha = (key, cor, esq, dir) => (
     <div key={key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap',background:'var(--bg-card)',borderRadius:8,padding:'8px 10px',marginBottom:4,borderLeft:`4px solid ${cor}`}}>
       <div style={{flex:1,minWidth:180}}>{esq}</div>
@@ -1368,6 +1516,10 @@ function PainelManutencao({sb}) {
       {gar.length > 0 && <div style={{marginBottom:10}}>
         <div style={{fontWeight:700,fontSize:13,marginBottom:6}}>🛡️ Garantia acabando nos próximos 30 dias</div>
         {gar.map(e => linha(e.id, 'var(--yellow)', <b style={{fontSize:13}}>{e.produto}</b>, `até ${fmtDBR(e.garantia_ate)}`))}
+      </div>}
+      {atrasados.length > 0 && <div style={{marginBottom:10}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:6}}>🧽 Cuidados atrasados</div>
+        {atrasados.map(c => linha(c.id, 'var(--red)', <><b style={{fontSize:13}}>{c.titulo}</b><div style={{fontSize:11,color:'var(--text-muted)'}}>{c.estoque ? c.estoque.produto : ''}</div></>, `atrasado ${c.atraso} dia(s)`))}
       </div>}
       <div style={{fontSize:11,color:'var(--text-dim)'}}>Detalhes e relatório: aba 📦 Estoque → 🛠️ Equipamentos.</div>
     </div>
@@ -1435,6 +1587,14 @@ function EstoqueTab({user, sb}) {
   const [relDe, setRelDe]                 = useState(() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d.toLocaleDateString('en-CA'); });
   const [relAte, setRelAte]               = useState(() => new Date().toLocaleDateString('en-CA'));
   const [relGrupo, setRelGrupo]           = useState('equip'); // equip | todos
+  const [mAnexos, setMAnexos]             = useState([]);
+  const [mNfNum, setMNfNum]               = useState('');
+  const [rAnexos, setRAnexos]             = useState([]);
+  const [rNfNum, setRNfNum]               = useState('');
+  const [lendoNF, setLendoNF]             = useState(false);
+  const [msgNF, setMsgNF]                 = useState('');
+  const [nfsDoItem, setNfsDoItem]         = useState([]);
+  const [garMeses, setGarMeses]           = useState('');
 
   const isSup = user.nivel === 8 || user.tipo === 'admin' || user.tipo === 'financeiro' || user.tipo === 'genesis';
 
@@ -1474,6 +1634,7 @@ function EstoqueTab({user, sb}) {
   const abrirManut = (item) => {
     setModalManut(item); setMQtd(1); setMTipo('quebra'); setMMotivo(''); setMLocal(''); setMPrev(''); setMCusto('');
     setMGarantia(['ok','vencendo'].includes(situacaoGarantia(item)));
+    setMAnexos([]); setMNfNum(''); setMsgNF('');
   };
 
   const registrarManut = async () => {
@@ -1485,7 +1646,8 @@ function EstoqueTab({user, sb}) {
     const {error} = await sb.from('equipamentos_manutencao').insert([{
       produto_id: item.id, produto_nome: item.produto, quantidade: mQtd, tipo: mTipo,
       motivo: mMotivo.trim(), local: mLocal.trim() || null, previsao_retorno: mPrev || null,
-      custo: mCusto ? +mCusto : null, responsavel: user.nome, em_garantia: mGarantia
+      custo: mCusto ? +mCusto : null, responsavel: user.nome, em_garantia: mGarantia,
+      anexos: mAnexos, nf_numero: mNfNum || null
     }]);
     if (error) alert('Erro ao registrar: ' + error.message);
     else setModalManut(null);
@@ -1493,7 +1655,36 @@ function EstoqueTab({user, sb}) {
     setBusy(false);
   };
 
-  const abrirRetorno = (reg) => { setModalRetorno(reg); setRResultado('consertado'); setRCusto(reg.custo != null ? String(reg.custo) : (reg.em_garantia ? '0' : '')); setRObs(''); setRServico(''); };
+  const abrirRetorno = (reg) => { setModalRetorno(reg); setRResultado('consertado'); setRCusto(reg.custo != null ? String(reg.custo) : (reg.em_garantia ? '0' : '')); setRObs(''); setRServico(''); setRAnexos(reg.anexos || []); setRNfNum(reg.nf_numero || ''); setMsgNF(''); };
+
+  // Anexa arquivo; se for nota fiscal, le com IA e preenche os campos
+  const anexarDocManut = async (e, etapa, lerNF) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    setLendoNF(true); setMsgNF('');
+    try {
+      const anexo = await uploadDocEquip(sb, file, 'manutencoes');
+      if (etapa === 'saida') setMAnexos(a => [...a, anexo]); else setRAnexos(a => [...a, anexo]);
+      if (lerNF) {
+        const nf = await lerNotaFiscalIA(file);
+        const desc = nf.itens.map(i => String(i.produto || '').trim()).filter(Boolean).join('; ');
+        if (etapa === 'saida') {
+          if (nf.numero) setMNfNum(String(nf.numero));
+          if (nf.total > 0) setMCusto(nf.total.toFixed(2));
+          if (nf.fornecedor && !mLocal.trim()) setMLocal(nf.fornecedor);
+        } else {
+          if (nf.numero) setRNfNum(String(nf.numero));
+          if (nf.total > 0) setRCusto(nf.total.toFixed(2));
+          if (desc && !rServico.trim()) setRServico(desc);
+        }
+        setMsgNF(`✅ Nota lida: ${nf.fornecedor || 'fornecedor não identificado'}${nf.numero ? ' · NF ' + nf.numero : ''}${nf.total > 0 ? ' · ' + brl2(nf.total) : ''}. Confira os campos.`);
+      } else setMsgNF('✅ Arquivo anexado.');
+    } catch (err) {
+      setMsgNF('❌ ' + (err.message || err));
+    }
+    setLendoNF(false);
+  };
 
   const registrarRetorno = async () => {
     const reg = modalRetorno;
@@ -1503,7 +1694,8 @@ function EstoqueTab({user, sb}) {
       const hoje = new Date().toLocaleDateString('en-CA', {timeZone:'America/Sao_Paulo'});
       let r = await sb.from('equipamentos_manutencao').update({
         data_retorno: hoje, resultado: rResultado, custo: rCusto ? +rCusto : null,
-        responsavel_retorno: user.nome, obs: rObs.trim() || null, servico_realizado: rServico.trim() || null
+        responsavel_retorno: user.nome, obs: rObs.trim() || null, servico_realizado: rServico.trim() || null,
+        anexos: rAnexos, nf_numero: rNfNum || null
       }).eq('id', reg.id);
       if (r.error) throw r.error;
       if (reg.tipo === 'revisao' && rResultado === 'consertado') {
@@ -1528,7 +1720,30 @@ function EstoqueTab({user, sb}) {
   const abrirFicha = (item) => {
     setModalFicha(item);
     setFicha({data_compra: item.data_compra || '', garantia_ate: item.garantia_ate || '', fornecedor_equip: item.fornecedor_equip || '',
-      numero_serie: item.numero_serie || '', revisao_meses: item.revisao_meses || '', ultima_revisao: item.ultima_revisao || ''});
+      numero_serie: item.numero_serie || '', revisao_meses: item.revisao_meses || '', ultima_revisao: item.ultima_revisao || '',
+      manual_url: item.manual_url || '', obs_equip: item.obs_equip || '', nf_compra_id: item.nf_compra_id || null, anexos: item.anexos || []});
+    setGarMeses(''); setMsgNF(''); setNfsDoItem([]);
+    (async () => {
+      const {data} = await sb.from('notas_fiscais_itens').select('quantidade,valor_unitario,produto_nome,notas_fiscais(id,numero,fornecedor,data_emissao,valor_total)').eq('produto_id', item.id);
+      setNfsDoItem((data || []).filter(r => r.notas_fiscais).sort((a, b) => String(b.notas_fiscais.data_emissao).localeCompare(String(a.notas_fiscais.data_emissao))));
+    })();
+  };
+  const usarNF = (r) => {
+    const n = r.notas_fiscais;
+    setFicha(f => ({...f, nf_compra_id: n.id, data_compra: n.data_emissao || f.data_compra, fornecedor_equip: n.fornecedor || f.fornecedor_equip,
+      garantia_ate: garMeses && n.data_emissao ? addMesesISO(n.data_emissao, +garMeses) : f.garantia_ate}));
+  };
+  const anexarDocFicha = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file || !modalFicha) return;
+    setLendoNF(true); setMsgNF('');
+    try {
+      const anexo = await uploadDocEquip(sb, file, 'equipamentos/' + modalFicha.id);
+      setFicha(f => ({...f, anexos: [...(f.anexos || []), anexo]}));
+      setMsgNF('✅ Arquivo anexado. Clique em Salvar.');
+    } catch (err) { setMsgNF('❌ ' + (err.message || err)); }
+    setLendoNF(false);
   };
   const salvarFicha = async () => {
     const item = modalFicha; if (!item) return;
@@ -1537,6 +1752,8 @@ function EstoqueTab({user, sb}) {
       data_compra: ficha.data_compra || null, garantia_ate: ficha.garantia_ate || null,
       fornecedor_equip: (ficha.fornecedor_equip || '').trim() || null, numero_serie: (ficha.numero_serie || '').trim() || null,
       revisao_meses: ficha.revisao_meses ? +ficha.revisao_meses : null, ultima_revisao: ficha.ultima_revisao || null,
+      manual_url: (ficha.manual_url || '').trim() || null, obs_equip: (ficha.obs_equip || '').trim() || null,
+      nf_compra_id: ficha.nf_compra_id || null, anexos: ficha.anexos || [],
       updated_at: new Date().toISOString()
     }).eq('id', item.id);
     if (error) alert('Erro ao salvar ficha: ' + error.message); else setModalFicha(null);
@@ -1581,7 +1798,7 @@ function EstoqueTab({user, sb}) {
     const wb = window.XLSX.utils.book_new();
     const eq = relatorio.linhas.map(l => ({
       'Equipamento': l.item.produto, 'Categoria': l.item.categoria, 'Qtd': l.item.quantidade, 'Em manutenção': l.emManut,
-      'Nº de série': l.item.numero_serie || '', 'Fornecedor': l.item.fornecedor_equip || '', 'Compra': fmtDBR(l.item.data_compra),
+      'Nº de série': l.item.numero_serie || '', 'Fornecedor': l.item.fornecedor_equip || '', 'Compra': fmtDBR(l.item.data_compra), 'Manual': l.item.manual_url || '',
       'Garantia': txtGarantia(l.item), 'Revisão a cada (meses)': l.item.revisao_meses || '', 'Última revisão': fmtDBR(l.item.ultima_revisao),
       'Próxima revisão': fmtDBR(l.prox), 'Ocorrências': l.n, 'Quebras': l.quebras, 'Manutenções': l.manut, 'Revisões': l.revisoes,
       'Dias parado': l.dias, 'Custo (R$)': +l.custo.toFixed(2), 'Na garantia (ocorrências)': l.garantia
@@ -1591,7 +1808,7 @@ function EstoqueTab({user, sb}) {
       'Na garantia': r.em_garantia ? 'Sim' : 'Não', 'Onde está / técnico': r.local || '', 'Saída': fmtDBR(r.data_saida),
       'Previsão': fmtDBR(r.previsao_retorno), 'Retorno': fmtDBR(r.data_retorno),
       'Resultado': !r.data_retorno ? 'Em manutenção' : r.resultado === 'sem_conserto' ? 'Sem conserto (baixa)' : 'Voltou funcionando',
-      'O que foi feito': r.servico_realizado || '', 'Custo (R$)': r.custo != null ? +r.custo : '', 'Registrado por': r.responsavel || '', 'Obs': r.obs || ''
+      'O que foi feito': r.servico_realizado || '', 'NF': r.nf_numero || '', 'Custo (R$)': r.custo != null ? +r.custo : '', 'Registrado por': r.responsavel || '', 'Obs': r.obs || ''
     }));
     window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(eq.length ? eq : [{'Equipamento':'(nenhum)'}]), 'Equipamentos');
     window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(oc.length ? oc : [{'Equipamento':'(nenhuma ocorrência)'}]), 'Ocorrências');
@@ -2007,6 +2224,7 @@ function EstoqueTab({user, sb}) {
                         {pr && <span style={{fontWeight:700,color: pr<h?'var(--red)':diasEntre(h,pr)<=30?'var(--yellow)':'var(--text-muted)'}}>🔁 {pr<h?'Revisão vencida em ':'Próxima revisão: '}{fmtDBR(pr)}</span>}
                         {item.revisao_meses && !pr && <span style={{color:'var(--yellow)'}}>🔁 Revisão a cada {item.revisao_meses} meses — informe a última na ficha</span>}
                         {item.numero_serie && <span style={{color:'var(--text-dim)'}}>Nº série {item.numero_serie}</span>}
+                        {item.manual_url && <a href={item.manual_url} target="_blank" rel="noopener noreferrer" style={{color:'var(--accent)'}}>📖 Manual</a>}
                         {isSup && <span onClick={()=>abrirFicha(item)} style={{cursor:'pointer',color:'var(--accent)',textDecoration:'underline'}}>📋 {temFicha?'Ficha':'Preencher ficha (garantia, revisão)'}</span>}
                       </div>
                     );
@@ -2097,6 +2315,8 @@ function EstoqueTab({user, sb}) {
             <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={exportarRelExcel}>📊 Excel</button>
           </div>
 
+          <CuidadosHoje sb={sb} user={user} modo="gestao"/>
+
           <div className="stat-grid" style={{marginBottom:16}}>
             {[['Equipamentos',t.equip,'var(--accent)'],['🔧 Em manutenção',t.emManut,'var(--yellow)'],['Ocorrências',t.ocorr,'var(--text)'],['💥 Quebras',t.quebras,'var(--red)'],
               ['Dias parado',t.dias,'var(--yellow)'],['Custo',brl2(t.custo),'var(--red)'],['🛡️ Na garantia',t.naGarantia,'var(--green)'],['🔁 Revisões vencidas',t.revVencidas,'var(--red)']
@@ -2143,6 +2363,8 @@ function EstoqueTab({user, sb}) {
                     <div style={{fontWeight:600,fontSize:13}}>{r.produto_nome}{r.quantidade>1?` (${r.quantidade} un.)`:''}{r.em_garantia && <span style={{marginLeft:6,fontSize:11,color:'var(--green)'}}>🛡️ na garantia</span>}</div>
                     <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>{LABEL_TIPO_MANUT[r.tipo]}: {r.motivo}{r.local?` · Onde: ${r.local}`:''}</div>
                     {r.servico_realizado && <div style={{fontSize:11,color:'var(--text)',marginTop:2}}>🔩 Feito: {r.servico_realizado}</div>}
+                    {r.nf_numero && <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>🧾 NF {r.nf_numero}</div>}
+                    <ListaAnexos sb={sb} anexos={r.anexos}/>
                     <div style={{fontSize:11,color:'var(--text-dim)',marginTop:2}}>
                       Saiu {fmtD(r.data_saida)} por {r.responsavel}
                       {r.data_retorno ? <> · {r.resultado==='sem_conserto'?'❌ Sem conserto (baixa)':'✅ Voltou'} {fmtD(r.data_retorno)}{r.responsavel_retorno?` por ${r.responsavel_retorno}`:''} · {diasEntre(r.data_saida,r.data_retorno)} dia(s) parado</> : <b style={{color:'var(--yellow)'}}> · ainda em manutenção ({diasDesde(r.data_saida)} dia(s)){r.previsao_retorno?` · previsão ${fmtD(r.previsao_retorno)}`:''}</b>}
@@ -2164,6 +2386,20 @@ function EstoqueTab({user, sb}) {
         <div className="overlay" onClick={()=>setModalFicha(null)}>
           <div className="modal" onClick={e=>e.stopPropagation()}>
             <div className="modal-title">📋 Ficha — {modalFicha.produto}</div>
+            <div style={{background:'var(--bg-card2)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 12px',marginBottom:12}}>
+              <div style={{fontWeight:700,fontSize:12,marginBottom:6}}>🧾 Puxar dados da nota fiscal de compra</div>
+              {nfsDoItem.length === 0 ? <div style={{fontSize:11,color:'var(--text-muted)'}}>Nenhuma NF lançada no app com este item. Lance a nota na aba 🧾 Notas Fiscais ligando o produto a este item, ou preencha abaixo.</div> : <>
+                <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6,fontSize:11}}>
+                  Garantia de <input type="number" min="1" className="inp" value={garMeses} onChange={e=>setGarMeses(e.target.value)} style={{width:60,padding:'2px 6px'}} placeholder="12"/> meses (opcional, calcula a data)
+                </div>
+                {nfsDoItem.map((r, k) => (
+                  <div key={k} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:6,fontSize:12,padding:'4px 0',borderTop:k?'1px solid var(--border)':'none'}}>
+                    <span>NF {r.notas_fiscais.numero} · {r.notas_fiscais.fornecedor} · {fmtDBR(r.notas_fiscais.data_emissao)} · {r.quantidade} un × {brl2(r.valor_unitario)}{ficha.nf_compra_id===r.notas_fiscais.id && <b style={{color:'var(--green)'}}> ✓ ligada</b>}</span>
+                    <button className="btn btn-sm btn-success" style={{padding:'2px 8px'}} onClick={()=>usarNF(r)}>Usar</button>
+                  </div>
+                ))}
+              </>}
+            </div>
             <div style={{display:'flex',gap:8,marginBottom:12}}>
               <div style={{flex:1}}><label className="inp-label">Data da compra</label><input type="date" className="inp" value={ficha.data_compra} onChange={e=>setFicha(f=>({...f,data_compra:e.target.value}))}/></div>
               <div style={{flex:1}}><label className="inp-label">Garantia até</label><input type="date" className="inp" value={ficha.garantia_ate} onChange={e=>setFicha(f=>({...f,garantia_ate:e.target.value}))}/></div>
@@ -2177,6 +2413,24 @@ function EstoqueTab({user, sb}) {
               <div style={{flex:1}}><label className="inp-label">Última revisão</label><input type="date" className="inp" value={ficha.ultima_revisao} onChange={e=>setFicha(f=>({...f,ultima_revisao:e.target.value}))}/></div>
             </div>
             {ficha.revisao_meses && (ficha.ultima_revisao || ficha.data_compra) && <div style={{fontSize:12,color:'var(--accent)',marginBottom:12}}>🔁 Próxima revisão: {fmtDBR(addMesesISO(ficha.ultima_revisao || ficha.data_compra, +ficha.revisao_meses))}</div>}
+            <div style={{marginBottom:12}}>
+              <label className="inp-label">Link do manual</label>
+              <div style={{display:'flex',gap:6}}>
+                <input className="inp" value={ficha.manual_url} onChange={e=>setFicha(f=>({...f,manual_url:e.target.value}))} placeholder="https://..." style={{flex:1}}/>
+                {ficha.manual_url && <a className="btn btn-sm btn-ghost" href={ficha.manual_url} target="_blank" rel="noopener noreferrer">Abrir</a>}
+              </div>
+            </div>
+            <div style={{marginBottom:12}}>
+              <label className="inp-label">Observações (garantia de partes, contato da assistência...)</label>
+              <textarea className="inp" value={ficha.obs_equip} onChange={e=>setFicha(f=>({...f,obs_equip:e.target.value}))} style={{width:'100%',minHeight:70,resize:'vertical'}}/>
+            </div>
+            <div style={{marginBottom:12}}>
+              <label className="inp-label">Documentos (NF, certificado de garantia, manual em PDF)</label>
+              <input type="file" accept=".pdf,image/*" onChange={anexarDocFicha} disabled={lendoNF}/>
+              <ListaAnexos sb={sb} anexos={ficha.anexos} onRemover={(k)=>setFicha(f=>({...f,anexos:f.anexos.filter((_,i)=>i!==k)}))}/>
+              {lendoNF && <div style={{fontSize:11,color:'var(--text-muted)',marginTop:4}}>Enviando...</div>}
+              {msgNF && <div style={{fontSize:11,marginTop:4}}>{msgNF}</div>}
+            </div>
             <div style={{fontSize:11,color:'var(--text-dim)',marginBottom:12}}>Ao fechar uma ocorrência do tipo "Revisão", a data da última revisão é atualizada sozinha.</div>
             <div style={{display:'flex',gap:8}}>
               <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModalFicha(null)}>Cancelar</button>
@@ -2221,6 +2475,17 @@ function EstoqueTab({user, sb}) {
               <div style={{flex:1}}><label className="inp-label">Previsão de retorno</label><input type="date" className="inp" value={mPrev} onChange={e=>setMPrev(e.target.value)}/></div>
               <div style={{flex:1}}><label className="inp-label">Orçamento (R$)</label><input type="number" className="inp" value={mCusto} onChange={e=>setMCusto(e.target.value)} min="0" step="0.01"/></div>
             </div>
+            <div style={{marginBottom:12}}>
+              <label className="inp-label">Orçamento ou NF do conserto (opcional)</label>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                <label className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)',cursor:'pointer'}}>🤖 Anexar e ler a nota<input type="file" accept=".pdf,image/*" style={{display:'none'}} onChange={e=>anexarDocManut(e,'saida',true)} disabled={lendoNF}/></label>
+                <label className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)',cursor:'pointer'}}>📎 Só anexar<input type="file" accept=".pdf,image/*" style={{display:'none'}} onChange={e=>anexarDocManut(e,'saida',false)} disabled={lendoNF}/></label>
+              </div>
+              {lendoNF && <div style={{fontSize:11,color:'var(--text-muted)',marginTop:4}}>Lendo o arquivo...</div>}
+              {msgNF && <div style={{fontSize:11,marginTop:4}}>{msgNF}</div>}
+              {mNfNum && <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>NF {mNfNum}</div>}
+              <ListaAnexos sb={sb} anexos={mAnexos} onRemover={(k)=>setMAnexos(a=>a.filter((_,i)=>i!==k))}/>
+            </div>
             <div style={{fontSize:11,color:'var(--text-dim)',marginBottom:12}}>O equipamento continua no estoque, marcado como "em manutenção", até voltar.</div>
             <div style={{display:'flex',gap:8}}>
               <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModalManut(null)}>Cancelar</button>
@@ -2252,6 +2517,17 @@ function EstoqueTab({user, sb}) {
             <div style={{marginBottom:12}}>
               <label className="inp-label">Observação (opcional)</label>
               <input className="inp" value={rObs} onChange={e=>setRObs(e.target.value)} placeholder="Ex: técnico recomendou trocar em 1 ano"/>
+            </div>
+            <div style={{marginBottom:12}}>
+              <label className="inp-label">NF do conserto</label>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                <label className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)',cursor:'pointer'}}>🤖 Anexar e ler a NF<input type="file" accept=".pdf,image/*" style={{display:'none'}} onChange={e=>anexarDocManut(e,'retorno',true)} disabled={lendoNF}/></label>
+                <label className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)',cursor:'pointer'}}>📎 Só anexar<input type="file" accept=".pdf,image/*" style={{display:'none'}} onChange={e=>anexarDocManut(e,'retorno',false)} disabled={lendoNF}/></label>
+                <input className="inp" value={rNfNum} onChange={e=>setRNfNum(e.target.value)} placeholder="Nº da NF" style={{width:120,padding:'4px 8px'}}/>
+              </div>
+              {lendoNF && <div style={{fontSize:11,color:'var(--text-muted)',marginTop:4}}>Lendo o arquivo...</div>}
+              {msgNF && <div style={{fontSize:11,marginTop:4}}>{msgNF}</div>}
+              <ListaAnexos sb={sb} anexos={rAnexos} onRemover={(k)=>setRAnexos(a=>a.filter((_,i)=>i!==k))}/>
             </div>
             {modalRetorno.tipo==='revisao' && rResultado==='consertado' && <div style={{fontSize:11,color:'var(--accent)',marginBottom:12}}>🔁 A última revisão do equipamento passa a ser hoje.</div>}
             {rResultado==='sem_conserto' && <div style={{fontSize:11,color:'var(--red)',marginBottom:12}}>{modalRetorno.quantidade} unidade(s) sairão do estoque como baixa de equipamento.</div>}
@@ -4875,7 +5151,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.18 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.19 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -4971,6 +5247,8 @@ function App() {
               })}
             </div>
           </div>
+
+          {(user.area==='clinico'||!user.area) && <CuidadosHoje sb={sb} user={user}/>}
 
           <div className="tabs" style={{marginBottom:20}}>
             {(user.nivel===8 && (user.area==='clinico'||!user.area)
