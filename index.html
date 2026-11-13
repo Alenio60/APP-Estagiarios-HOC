@@ -165,6 +165,23 @@ input,select,textarea,button{font-family:inherit;outline:none}
 .timeline-date::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent)}
 .ativs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px}
 .ativ-chip{background:var(--bg-card2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:12px}
+.modnav{margin-bottom:20px}
+.modnav-mods{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.modnav-mod{display:flex;align-items:center;gap:7px;padding:10px 16px;border-radius:10px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);font-weight:700;font-size:14px;cursor:pointer;transition:all .2s;position:relative}
+.modnav-mod:hover{border-color:var(--accent);color:var(--text)}
+.modnav-mod.active{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 2px 8px var(--accent-glow)}
+.modnav-mod .ico{font-size:17px;line-height:1}
+.modnav-mod .badge{position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;font-size:10px;font-weight:800;border-radius:9px;padding:1px 6px}
+@media(max-width:700px){
+  .modnav-mods{position:fixed;left:0;right:0;bottom:0;z-index:150;margin:0;gap:0;flex-wrap:nowrap;background:var(--bg-card);border-top:1px solid var(--border);padding:6px 4px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -4px 16px rgba(0,0,0,.12)}
+  .modnav-mod{flex:1;flex-direction:column;gap:3px;padding:6px 2px;border:none;background:transparent;font-size:10px;border-radius:8px;min-width:0}
+  .modnav-mod.active{background:transparent;color:var(--accent);box-shadow:none}
+  .modnav-mod .ico{font-size:21px}
+  .modnav-mod .lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .modnav-mod .badge{top:0;right:18%}
+  body.tem-bottomnav .content{padding-bottom:96px}
+  .modnav-sub{position:sticky;top:64px;z-index:90}
+}
 @media(max-width:600px){
   .header{padding:0 16px}
   .content{padding:16px 12px}
@@ -1312,6 +1329,80 @@ function ImportarEstoqueModal({itensAtuais, sb, onClose, onImported}) {
   );
 }
 
+// ===== NAVEGACAO POR MODULOS (desktop: modulos no alto; celular: barra fixa embaixo) =====
+function NavModulos({modulos, aba, setAba, badges}) {
+  const {useEffect, useRef} = React;
+  const ultimaPorModulo = useRef({});
+  const mods = modulos.filter(m => m.itens && m.itens.length);
+  const atual = mods.find(m => m.itens.some(([k]) => k === aba)) || mods[0];
+  if (atual) ultimaPorModulo.current[atual.id] = aba;
+  const temBarra = mods.length > 1;
+  useEffect(() => {
+    if (temBarra) document.body.classList.add('tem-bottomnav'); else document.body.classList.remove('tem-bottomnav');
+    return () => document.body.classList.remove('tem-bottomnav');
+  }, [temBarra]);
+  if (!atual) return null;
+  const irPara = (m) => {
+    const lembrada = ultimaPorModulo.current[m.id];
+    setAba(lembrada && m.itens.some(([k]) => k === lembrada) ? lembrada : m.itens[0][0]);
+    try { window.scrollTo({top:0, behavior:'smooth'}); } catch(e) {}
+  };
+  return (
+    <div className="modnav">
+      {temBarra && (
+        <div className="modnav-mods">
+          {mods.map(m => (
+            <button key={m.id} className={`modnav-mod ${m.id===atual.id?'active':''}`} onClick={()=>irPara(m)} title={m.label}>
+              <span className="ico">{m.emoji}</span><span className="lbl">{m.label}</span>
+              {badges && badges[m.id] > 0 && <span className="badge">{badges[m.id]}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+      {atual.itens.length > 1 && (
+        <div className="tabs modnav-sub">
+          {atual.itens.map(([k, l]) => (
+            <button key={k} className={`tab ${aba===k?'active':''}`} onClick={()=>setAba(k)}>{l}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Equipamentos para as auxiliares: cuidados do dia, aviso de quebra, o que esta em manutencao e manuais
+function EquipamentosAuxTab({sb, user}) {
+  const {useState, useEffect} = React;
+  const [manuais, setManuais] = useState([]);
+  useEffect(() => { (async () => {
+    if (!sb) return;
+    const {data} = await sb.from('estoque').select('id,produto,marca,modelo,manual_url,local_equip').eq('permanente', true).not('manual_url', 'is', null).order('produto');
+    setManuais(data || []);
+  })(); }, []);
+  return (
+    <div>
+      <CuidadosHoje sb={sb} user={user}/>
+      <PainelManutencao sb={sb}/>
+      {manuais.length > 0 && (
+        <div className="card" style={{marginTop:20}}>
+          <div style={{fontWeight:800,fontSize:14,marginBottom:8}}>📖 Manuais dos equipamentos</div>
+          {manuais.map(m => (
+            <div key={m.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,padding:'8px 0',borderTop:'1px solid var(--border)'}}>
+              <div><div style={{fontWeight:600,fontSize:13}}>{m.produto}</div><div style={{fontSize:11,color:'var(--text-muted)'}}>{[m.marca, m.modelo].filter(Boolean).join(' ')}{m.local_equip ? ` · 📍 ${m.local_equip}` : ''}</div></div>
+              <a className="btn btn-sm btn-ghost" href={m.manual_url} target="_blank" rel="noopener noreferrer">Abrir</a>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Modulos de cada perfil
+const MOD_MATERIAIS = {id:'materiais', emoji:'📦', label:'Materiais', itens:[['estoque','Estoque'],['listacompra','Lista de Compra'],['notasfiscais','Notas Fiscais'],['analise','Análise']]};
+const MOD_EQUIP = {id:'equip', emoji:'🛠️', label:'Equipamentos', itens:[['equipamentos','Equipamentos e manutenção']]};
+const MOD_ATEND = {id:'atend', emoji:'🦷', label:'Atendimentos', itens:[['pacientes','Pacientes e consumo']]};
+
 // ===== EQUIPAMENTOS: garantia, revisao e painel de manutencao =====
 const hojeISO = () => new Date().toLocaleDateString('en-CA', {timeZone:'America/Sao_Paulo'});
 const fmtDBR = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '';
@@ -1368,7 +1459,7 @@ function ListaAnexos({sb, anexos, onRemover}) {
 }
 
 // Cuidados periodicos de equipamentos (alertas para auxiliares)
-function CuidadosHoje({sb, user, modo}) {
+function CuidadosHoje({sb, user, modo, soPendentes}) {
   const {useState, useEffect} = React;
   const [cuidados, setCuidados] = useState([]);
   const [ultimo, setUltimo] = useState({}); // cuidado_id -> {data, responsavel}
@@ -1436,6 +1527,7 @@ function CuidadosHoje({sb, user, modo}) {
   const pendentes = visiveis.filter(c => situacao(c).devido && !feitosHoje[c.id]);
   const feitos = visiveis.filter(c => feitosHoje[c.id]);
   if (!visiveis.length && modo === 'gestao') return null;
+  if (soPendentes && !pendentes.length) return null;
 
   const freqTxt = (c) => c.momento === 'cada_uso' ? 'após cada uso' : c.frequencia_dias === 1 ? 'diário' : c.frequencia_dias === 7 ? 'semanal' : c.frequencia_dias === 14 ? 'a cada 14 dias' : c.frequencia_dias === 30 ? 'mensal' : c.frequencia_dias === 90 ? 'trimestral' : c.frequencia_dias === 180 ? 'semestral' : `a cada ${c.frequencia_dias} dias`;
   const lista = modo === 'gestao' ? visiveis : pendentes;
@@ -1564,12 +1656,12 @@ function PainelManutencao({sb}) {
         <div style={{fontWeight:700,fontSize:13,marginBottom:6}}>🧽 Cuidados atrasados</div>
         {atrasados.map(c => linha(c.id, 'var(--red)', <><b style={{fontSize:13}}>{c.titulo}</b><div style={{fontSize:11,color:'var(--text-muted)'}}>{c.estoque ? c.estoque.produto : ''}</div></>, `atrasado ${c.atraso} dia(s)`))}
       </div>}
-      <div style={{fontSize:11,color:'var(--text-dim)'}}>Detalhes e relatório: aba 📦 Estoque → 🛠️ Equipamentos.</div>
+      <div style={{fontSize:11,color:'var(--text-dim)'}}>Detalhes, cuidados e relatório: módulo 🛠️ Equipamentos.</div>
     </div>
   );
 }
 
-function EstoqueTab({user, sb}) {
+function EstoqueTab({user, sb, modo}) {
   const {useState, useEffect, useMemo} = React;
   const [itens, setItens]       = useState([]);
   const [movs, setMovs]         = useState([]);
@@ -1588,7 +1680,7 @@ function EstoqueTab({user, sb}) {
   const [loteMov, setLoteMov]   = useState('');
   const [vencMov, setVencMov]   = useState('');
   const [busy, setBusy]         = useState(false);
-  const [aba, setAba]           = useState('estoque'); // estoque | historico
+  const [aba, setAba]           = useState(modo === 'equipamentos' ? 'manut' : 'estoque'); // estoque | historico | manut
   // Cadastro novo item
   const [nProd, setNProd]       = useState('');
   const [nCat, setNCat]         = useState('');
@@ -2165,6 +2257,8 @@ function EstoqueTab({user, sb}) {
 
   return (
     <div>
+      {modo === 'equipamentos' && <div style={{fontWeight:800,fontSize:18,marginBottom:12}}>🛠️ Equipamentos e manutenção</div>}
+      {modo !== 'equipamentos' && <>
       {/* Valor total em estoque */}
       <div style={{
         background:'linear-gradient(135deg, #16a34a22, #16a34a08)',
@@ -2186,6 +2280,8 @@ function EstoqueTab({user, sb}) {
           {valorCard.semPreco > 0 && <div style={{color:'var(--yellow)',marginTop:2}}>⚠️ {valorCard.semPreco} item(ns) sem nenhum valor não entram nessa soma</div>}
         </div>
       </div>
+
+      </>}
 
       {/* Equipamentos em manutencao */}
       {listaAbertas.length > 0 && (
@@ -2211,6 +2307,7 @@ function EstoqueTab({user, sb}) {
         </div>
       )}
 
+      {modo !== 'equipamentos' && <>
       {/* KPIs */}
       <div className="stat-grid" style={{marginBottom:16}}>
         {[['Total',stats.total,'var(--accent)'],['✅ OK',stats.ok,'var(--green)'],
@@ -2230,10 +2327,12 @@ function EstoqueTab({user, sb}) {
 
       {/* Abas */}
       <div className="tabs" style={{marginBottom:16}}>
-        {[['estoque','📦 Estoque'],['historico','📋 Histórico'],['manut','🛠️ Equipamentos']].map(([k,l])=>(
+        {[['estoque','📦 Estoque'],['historico','📋 Histórico']].map(([k,l])=>(
           <button key={k} className={`tab ${aba===k?'active':''}`} onClick={()=>setAba(k)}>{l}</button>
         ))}
       </div>
+
+      </>}
 
       {aba==='estoque' && <>
         {/* Filtros */}
@@ -2250,7 +2349,7 @@ function EstoqueTab({user, sb}) {
           <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={()=>setModalValorArea(true)}>📊 Valor por área</button>
           {isSup && <button className="btn btn-sm" style={{background: duplicados.total?'#f59e0b20':'var(--bg-card2)',border:'1px solid '+(duplicados.total?'var(--yellow)':'var(--border)'),color: duplicados.total?'var(--yellow)':'var(--text-muted)'}} onClick={()=>setModalDup(true)}>🧹 Duplicados ({duplicados.total})</button>}
           <button className="btn btn-sm" style={{background: semPrecoFiltro?'#f59e0b30':'var(--bg-card2)',border:'1px solid '+(semPrecoFiltro?'var(--yellow)':'var(--border)'),color: semPrecoFiltro?'var(--yellow)':'var(--text-muted)'}} onClick={()=>setSemPrecoFiltro(v=>!v)}>💲 Sem preço ({valorEstoque.semPreco})</button>
-          <button className="btn btn-sm" style={{background: equipFiltro?'#8b5cf630':'var(--bg-card2)',border:'1px solid '+(equipFiltro?'var(--purple)':'var(--border)'),color: equipFiltro?'var(--purple)':'var(--text-muted)'}} onClick={()=>setEquipFiltro(v=>!v)}>🛠️ Equipamentos ({itens.filter(i=>i.permanente).length})</button>
+          <button className="btn btn-sm" title="Mostra só equipamentos e instrumentais. Manutenção, cuidados e relatório ficam no módulo 🛠️ Equipamentos." style={{background: equipFiltro?'#8b5cf630':'var(--bg-card2)',border:'1px solid '+(equipFiltro?'var(--purple)':'var(--border)'),color: equipFiltro?'var(--purple)':'var(--text-muted)'}} onClick={()=>setEquipFiltro(v=>!v)}>🛠️ Equipamentos ({itens.filter(i=>i.permanente).length})</button>
           <button className="btn btn-sm" style={{background: manutFiltro?'#f59e0b30':'var(--bg-card2)',border:'1px solid '+(manutFiltro?'var(--yellow)':'var(--border)'),color: manutFiltro?'var(--yellow)':'var(--text-muted)'}} onClick={()=>setManutFiltro(v=>!v)}>🔧 Em manutenção ({Object.keys(manutAbertas).length})</button>
         </div>
 
@@ -5273,7 +5372,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.21 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.22 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -5370,20 +5469,18 @@ function App() {
             </div>
           </div>
 
-          {(user.area==='clinico'||!user.area) && <CuidadosHoje sb={sb} user={user}/>}
+          {(user.area==='clinico'||!user.area) && aba!=='equipamentos' && <CuidadosHoje sb={sb} user={user} soPendentes/>}
 
-          <div className="tabs" style={{marginBottom:20}}>
-            {(user.nivel===8 && (user.area==='clinico'||!user.area)
-              ? [['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas'],['guia','📚 Guia'],['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais'],['analise','📊 Análise'],['pacientes','👥 Pacientes']]
-              : user.area==='clinico'||!user.area
-              ? [['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas'],['guia','📚 Guia']]
-              : user.area==='comercial'
-              ? [['dash','📊 Dashboard'],['reg','📝 Registrar'],['hist','📋 Histórico']]
-              : [['reg','📝 Registrar'],['hist','📊 Histórico']]
-            ).map(([k,l]) => (
-              <button key={k} className={`tab ${aba===k?'active':''}`} onClick={()=>setAba(k)}>{l}</button>
-            ))}
-          </div>
+          {(() => {
+            const clinica = user.area==='clinico' || !user.area;
+            const ativ = {id:'ativ', emoji:'📝', label:'Atividades', itens:[['reg','Registrar'],['hist','Histórico'],['metas','Metas'],['guia','Guia']]};
+            const mods = (user.nivel===8 && clinica) ? [ativ, MOD_MATERIAIS, MOD_EQUIP, MOD_ATEND]
+              : clinica ? [ativ, {id:'equip', emoji:'🛠️', label:'Equipamentos', itens:[['equipamentos','Cuidados e manuais']]}]
+              : user.area==='comercial' ? [{...ativ, itens:[['dash','Dashboard'],['reg','Registrar'],['hist','Histórico']]}]
+              : [{...ativ, itens:[['reg','Registrar'],['hist','Histórico']]}];
+            return <NavModulos modulos={mods} aba={aba} setAba={setAba}/>;
+          })()}
+          {aba==='equipamentos' && (user.nivel===8 && (user.area==='clinico'||!user.area) ? <EstoqueTab user={user} sb={sb} modo="equipamentos"/> : <EquipamentosAuxTab sb={sb} user={user}/>)}
 
           {aba==='dash' && user.area==='comercial' && <ComercialDash regs={regs} user={user}/>}
           {aba==='estoque' && <EstoqueTab user={user} sb={sb}/>}
@@ -5533,7 +5630,7 @@ function App() {
           })()}
 
           {aba==='guia' && <GuiaTab user={user}/>}
-          {(user.area==='clinico'||!user.area) && <PainelManutencao key={'pm-s-'+aba} sb={sb}/>}
+          {(user.area==='clinico'||!user.area) && aba!=='equipamentos' && <PainelManutencao key={'pm-s-'+aba} sb={sb}/>}
         </div>
       </div>
     );
@@ -5556,18 +5653,15 @@ function App() {
         </div>
 
         <div className="content">
-          <div className="tabs" style={{marginBottom:24}}>
-            {[['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais'],['analise','📊 Análise'],['pacientes','👥 Pacientes']].map(([k,l])=>(
-              <button key={k} className={`tab ${abaFin===k?'active':''}`} onClick={()=>setAbaFin(k)}>{l}</button>
-            ))}
-          </div>
+          <NavModulos modulos={[MOD_MATERIAIS, MOD_EQUIP, MOD_ATEND]} aba={abaFin} setAba={setAbaFin}/>
+          {abaFin==='equipamentos' && <EstoqueTab user={user} sb={sb} modo="equipamentos"/>}
 
           {abaFin==='estoque' && <EstoqueTab user={user} sb={sb}/>}
           {abaFin==='listacompra' && <ListaCompraTab user={user} sb={sb}/>}
           {abaFin==='notasfiscais' && <NotasFiscaisTab user={user} sb={sb}/>}
           {abaFin==='analise' && <AnaliseTab user={user} sb={sb}/>}
           {abaFin==='pacientes' && <PacientesTab user={user} sb={sb}/>}
-          <PainelManutencao key={'pm-f-'+abaFin} sb={sb}/>
+          {abaFin!=='equipamentos' && <PainelManutencao key={'pm-f-'+abaFin} sb={sb}/>}
         </div>
       </div>
     );
@@ -5651,14 +5745,12 @@ function App() {
               </div>
             );
           })()}
-          <div className="tabs" style={{marginBottom:24}}>
-            {(isAvaliador
-              ? [['usuarios','👥 Estagiários'],['aval','⭐ Avaliações']]
-              : [['usuarios','👥 Estagiários'],['dentistas','🦷 Dentistas'],['dash','📊 Dashboard'],['aval','⭐ Avaliações'],['hist','📋 Histórico'],['niveis','📚 Níveis'],['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais'],['analise','📊 Análise'],['pacientes','👥 Pacientes']]
-            ).map(([k,l])=>(
-              <button key={k} className={`tab ${abaA===k?'active':''}`} onClick={()=>setAbaA(k)}>{l}</button>
-            ))}
-          </div>
+          <NavModulos aba={abaA} setAba={setAbaA} modulos={isAvaliador
+            ? [{id:'equipe', emoji:'👥', label:'Equipe', itens:[['usuarios','Estagiários'],['aval','Avaliações']]}]
+            : [{id:'painel', emoji:'📊', label:'Painel', itens:[['dash','Dashboard'],['hist','Histórico']]},
+               {id:'equipe', emoji:'👥', label:'Equipe', itens:[['usuarios','Estagiários'],['aval','Avaliações'],['niveis','Níveis'],['dentistas','Dentistas']]},
+               MOD_MATERIAIS, MOD_EQUIP, MOD_ATEND]}/>
+          {abaA==='equipamentos' && <EstoqueTab user={user} sb={sb} modo="equipamentos"/>}
 
           {abaA==='usuarios' && <>
             <div style={{display:'flex',gap:12,marginBottom:20,alignItems:'flex-end',flexWrap:'wrap'}}>
@@ -5913,7 +6005,7 @@ function App() {
           {abaA==='notasfiscais' && <NotasFiscaisTab user={user} sb={sb}/>}
           {abaA==='analise' && <AnaliseTab user={user} sb={sb}/>}
           {abaA==='pacientes' && <PacientesTab user={user} sb={sb}/>}
-          {!isAvaliador && <PainelManutencao key={'pm-a-'+abaA} sb={sb}/>}
+          {!isAvaliador && abaA!=='equipamentos' && <PainelManutencao key={'pm-a-'+abaA} sb={sb}/>}
 
         {modalAval && (
           <div className="overlay" onClick={()=>setModalAval(null)}>
