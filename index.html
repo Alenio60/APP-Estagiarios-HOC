@@ -1312,6 +1312,68 @@ function ImportarEstoqueModal({itensAtuais, sb, onClose, onImported}) {
   );
 }
 
+// ===== EQUIPAMENTOS: garantia, revisao e painel de manutencao =====
+const hojeISO = () => new Date().toLocaleDateString('en-CA', {timeZone:'America/Sao_Paulo'});
+const fmtDBR = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '';
+const diasEntre = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 86400000);
+const addMesesISO = (iso, meses) => { const d = new Date(iso + 'T12:00:00'); d.setMonth(d.getMonth() + meses); return d.toLocaleDateString('en-CA'); };
+const proximaRevisao = (i) => { if (!i.revisao_meses) return null; const base = i.ultima_revisao || i.data_compra; return base ? addMesesISO(base, i.revisao_meses) : null; };
+const situacaoGarantia = (i) => {
+  if (!i.garantia_ate) return null;
+  const h = hojeISO();
+  if (i.garantia_ate < h) return 'vencida';
+  return diasEntre(h, i.garantia_ate) <= 60 ? 'vencendo' : 'ok';
+};
+const LABEL_TIPO_MANUT = {quebra:'💥 Quebrou', manutencao:'🛠️ Manutenção', revisao:'🔁 Revisão'};
+
+function PainelManutencao({sb}) {
+  const {useState, useEffect} = React;
+  const [abertas, setAbertas] = useState([]);
+  const [equips, setEquips] = useState([]);
+  useEffect(() => { (async () => {
+    if (!sb) return;
+    const {data:a} = await sb.from('equipamentos_manutencao').select('*').is('data_retorno', null).order('data_saida');
+    if (a) setAbertas(a);
+    const {data:e} = await sb.from('estoque').select('id,produto,garantia_ate,revisao_meses,ultima_revisao,data_compra').eq('permanente', true);
+    if (e) setEquips(e);
+  })(); }, []);
+  const h = hojeISO();
+  const revis = equips.map(e => ({...e, prox: proximaRevisao(e)})).filter(e => e.prox && diasEntre(h, e.prox) <= 30).sort((a, b) => a.prox.localeCompare(b.prox));
+  const gar = equips.filter(e => e.garantia_ate && e.garantia_ate >= h && diasEntre(h, e.garantia_ate) <= 30);
+  if (!abertas.length && !revis.length && !gar.length) return null;
+  const linha = (key, cor, esq, dir) => (
+    <div key={key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap',background:'var(--bg-card)',borderRadius:8,padding:'8px 10px',marginBottom:4,borderLeft:`4px solid ${cor}`}}>
+      <div style={{flex:1,minWidth:180}}>{esq}</div>
+      <div style={{fontSize:11,fontWeight:800,color:cor}}>{dir}</div>
+    </div>
+  );
+  return (
+    <div style={{marginTop:28,border:'2px solid var(--yellow)',background:'#f59e0b14',borderRadius:14,padding:'16px 18px'}}>
+      <div style={{fontWeight:800,fontSize:16,color:'var(--yellow)',marginBottom:10}}>🔧 Equipamentos — atenção</div>
+      {abertas.length > 0 && <div style={{marginBottom:10}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:6}}>Em manutenção ({abertas.reduce((s, r) => s + r.quantidade, 0)})</div>
+        {abertas.map(r => {
+          const d = diasEntre(r.data_saida, h);
+          const atras = r.previsao_retorno && r.previsao_retorno < h;
+          return linha(r.id, atras ? 'var(--red)' : 'var(--yellow)',
+            <><b style={{fontSize:13}}>{r.produto_nome}{r.quantidade > 1 ? ` (${r.quantidade})` : ''}</b>
+              <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>{LABEL_TIPO_MANUT[r.tipo]}: {r.motivo}{r.local ? ` · ${r.local}` : ''}{r.em_garantia ? ' · 🛡️ na garantia' : ''}</div></>,
+            `${d} dia${d === 1 ? '' : 's'} parado${atras ? ' · ATRASADO' : ''}`);
+        })}
+      </div>}
+      {revis.length > 0 && <div style={{marginBottom:10}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:6}}>🔁 Revisões vencidas ou nos próximos 30 dias</div>
+        {revis.map(e => { const d = diasEntre(h, e.prox); return linha(e.id, d < 0 ? 'var(--red)' : 'var(--yellow)', <b style={{fontSize:13}}>{e.produto}</b>, d < 0 ? `vencida há ${-d} dia(s)` : `em ${fmtDBR(e.prox)}`); })}
+      </div>}
+      {gar.length > 0 && <div style={{marginBottom:10}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:6}}>🛡️ Garantia acabando nos próximos 30 dias</div>
+        {gar.map(e => linha(e.id, 'var(--yellow)', <b style={{fontSize:13}}>{e.produto}</b>, `até ${fmtDBR(e.garantia_ate)}`))}
+      </div>}
+      <div style={{fontSize:11,color:'var(--text-dim)'}}>Detalhes e relatório: aba 📦 Estoque → 🛠️ Equipamentos.</div>
+    </div>
+  );
+}
+
 function EstoqueTab({user, sb}) {
   const {useState, useEffect, useMemo} = React;
   const [itens, setItens]       = useState([]);
@@ -1366,6 +1428,13 @@ function EstoqueTab({user, sb}) {
   const [rResultado, setRResultado]       = useState('consertado');
   const [rCusto, setRCusto]               = useState('');
   const [rObs, setRObs]                   = useState('');
+  const [rServico, setRServico]           = useState('');
+  const [mGarantia, setMGarantia]         = useState(false);
+  const [modalFicha, setModalFicha]       = useState(null); // item
+  const [ficha, setFicha]                 = useState({});
+  const [relDe, setRelDe]                 = useState(() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d.toLocaleDateString('en-CA'); });
+  const [relAte, setRelAte]               = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [relGrupo, setRelGrupo]           = useState('equip'); // equip | todos
 
   const isSup = user.nivel === 8 || user.tipo === 'admin' || user.tipo === 'financeiro' || user.tipo === 'genesis';
 
@@ -1404,6 +1473,7 @@ function EstoqueTab({user, sb}) {
 
   const abrirManut = (item) => {
     setModalManut(item); setMQtd(1); setMTipo('quebra'); setMMotivo(''); setMLocal(''); setMPrev(''); setMCusto('');
+    setMGarantia(['ok','vencendo'].includes(situacaoGarantia(item)));
   };
 
   const registrarManut = async () => {
@@ -1415,7 +1485,7 @@ function EstoqueTab({user, sb}) {
     const {error} = await sb.from('equipamentos_manutencao').insert([{
       produto_id: item.id, produto_nome: item.produto, quantidade: mQtd, tipo: mTipo,
       motivo: mMotivo.trim(), local: mLocal.trim() || null, previsao_retorno: mPrev || null,
-      custo: mCusto ? +mCusto : null, responsavel: user.nome
+      custo: mCusto ? +mCusto : null, responsavel: user.nome, em_garantia: mGarantia
     }]);
     if (error) alert('Erro ao registrar: ' + error.message);
     else setModalManut(null);
@@ -1423,7 +1493,7 @@ function EstoqueTab({user, sb}) {
     setBusy(false);
   };
 
-  const abrirRetorno = (reg) => { setModalRetorno(reg); setRResultado('consertado'); setRCusto(reg.custo != null ? String(reg.custo) : ''); setRObs(''); };
+  const abrirRetorno = (reg) => { setModalRetorno(reg); setRResultado('consertado'); setRCusto(reg.custo != null ? String(reg.custo) : (reg.em_garantia ? '0' : '')); setRObs(''); setRServico(''); };
 
   const registrarRetorno = async () => {
     const reg = modalRetorno;
@@ -1433,9 +1503,13 @@ function EstoqueTab({user, sb}) {
       const hoje = new Date().toLocaleDateString('en-CA', {timeZone:'America/Sao_Paulo'});
       let r = await sb.from('equipamentos_manutencao').update({
         data_retorno: hoje, resultado: rResultado, custo: rCusto ? +rCusto : null,
-        responsavel_retorno: user.nome, obs: rObs.trim() || null
+        responsavel_retorno: user.nome, obs: rObs.trim() || null, servico_realizado: rServico.trim() || null
       }).eq('id', reg.id);
       if (r.error) throw r.error;
+      if (reg.tipo === 'revisao' && rResultado === 'consertado') {
+        r = await sb.from('estoque').update({ultima_revisao: hoje, updated_at: new Date().toISOString()}).eq('id', reg.produto_id);
+        if (r.error) throw r.error;
+      }
       if (rResultado === 'sem_conserto') {
         const item = itens.find(i => i.id === reg.produto_id);
         if (item) {
@@ -1449,6 +1523,111 @@ function EstoqueTab({user, sb}) {
     } catch (e) { alert('Erro ao registrar retorno: ' + (e.message || e)); }
     await carregar();
     setBusy(false);
+  };
+
+  const abrirFicha = (item) => {
+    setModalFicha(item);
+    setFicha({data_compra: item.data_compra || '', garantia_ate: item.garantia_ate || '', fornecedor_equip: item.fornecedor_equip || '',
+      numero_serie: item.numero_serie || '', revisao_meses: item.revisao_meses || '', ultima_revisao: item.ultima_revisao || ''});
+  };
+  const salvarFicha = async () => {
+    const item = modalFicha; if (!item) return;
+    setBusy(true);
+    const {error} = await sb.from('estoque').update({
+      data_compra: ficha.data_compra || null, garantia_ate: ficha.garantia_ate || null,
+      fornecedor_equip: (ficha.fornecedor_equip || '').trim() || null, numero_serie: (ficha.numero_serie || '').trim() || null,
+      revisao_meses: ficha.revisao_meses ? +ficha.revisao_meses : null, ultima_revisao: ficha.ultima_revisao || null,
+      updated_at: new Date().toISOString()
+    }).eq('id', item.id);
+    if (error) alert('Erro ao salvar ficha: ' + error.message); else setModalFicha(null);
+    await carregar();
+    setBusy(false);
+  };
+
+  const relatorio = useMemo(() => {
+    const h = hojeISO(), de = relDe, ate = relAte;
+    const ocorr = manuts.filter(r => r.data_saida <= ate && (r.data_retorno || h) >= de);
+    const vazio = () => ({n:0, quebras:0, manut:0, revisoes:0, dias:0, custo:0, garantia:0});
+    const porItem = {};
+    ocorr.forEach(r => {
+      const p = porItem[r.produto_id] = porItem[r.produto_id] || vazio();
+      p.n++;
+      if (r.tipo === 'quebra') p.quebras++; else if (r.tipo === 'revisao') p.revisoes++; else p.manut++;
+      const ini = r.data_saida < de ? de : r.data_saida;
+      const fimR = r.data_retorno || h; const fim = fimR > ate ? ate : fimR;
+      p.dias += Math.max(0, diasEntre(ini, fim)) * (r.quantidade || 1);
+      if (r.custo != null) p.custo += +r.custo;
+      if (r.em_garantia) p.garantia++;
+    });
+    const base = itens.filter(i => i.permanente && (relGrupo === 'todos' || i.categoria !== 'Instrumentais' || porItem[i.id] || i.garantia_ate || i.revisao_meses));
+    const linhas = base.map(i => ({item:i, ...(porItem[i.id] || vazio()), emManut: qtdEmManut(i.id), gar: situacaoGarantia(i), prox: proximaRevisao(i)}))
+      .sort((a, b) => b.n - a.n || b.custo - a.custo || a.item.produto.localeCompare(b.item.produto));
+    const tot = {
+      equip: base.length, ocorr: ocorr.length,
+      quebras: ocorr.filter(r => r.tipo === 'quebra').length,
+      custo: linhas.reduce((s, l) => s + l.custo, 0), dias: linhas.reduce((s, l) => s + l.dias, 0),
+      emManut: listaAbertas.reduce((s, r) => s + r.quantidade, 0),
+      naGarantia: base.filter(i => ['ok','vencendo'].includes(situacaoGarantia(i))).length,
+      revVencidas: base.filter(i => { const pr = proximaRevisao(i); return pr && pr < h; }).length
+    };
+    return {ocorr, linhas, tot};
+  }, [manuts, itens, relDe, relAte, relGrupo, listaAbertas, manutAbertas]);
+
+  const txtGarantia = (i) => { const g = situacaoGarantia(i); return !g ? '—' : g === 'vencida' ? `Vencida (${fmtDBR(i.garantia_ate)})` : `Até ${fmtDBR(i.garantia_ate)}`; };
+  const brl2 = (n) => 'R$ ' + (+n || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  const exportarRelExcel = () => {
+    if (!window.XLSX) { alert('Leitor de Excel não carregou. Atualize a página.'); return; }
+    const wb = window.XLSX.utils.book_new();
+    const eq = relatorio.linhas.map(l => ({
+      'Equipamento': l.item.produto, 'Categoria': l.item.categoria, 'Qtd': l.item.quantidade, 'Em manutenção': l.emManut,
+      'Nº de série': l.item.numero_serie || '', 'Fornecedor': l.item.fornecedor_equip || '', 'Compra': fmtDBR(l.item.data_compra),
+      'Garantia': txtGarantia(l.item), 'Revisão a cada (meses)': l.item.revisao_meses || '', 'Última revisão': fmtDBR(l.item.ultima_revisao),
+      'Próxima revisão': fmtDBR(l.prox), 'Ocorrências': l.n, 'Quebras': l.quebras, 'Manutenções': l.manut, 'Revisões': l.revisoes,
+      'Dias parado': l.dias, 'Custo (R$)': +l.custo.toFixed(2), 'Na garantia (ocorrências)': l.garantia
+    }));
+    const oc = relatorio.ocorr.map(r => ({
+      'Equipamento': r.produto_nome, 'Qtd': r.quantidade, 'Tipo': (LABEL_TIPO_MANUT[r.tipo] || r.tipo).replace(/^\S+ /, ''), 'O que aconteceu': r.motivo,
+      'Na garantia': r.em_garantia ? 'Sim' : 'Não', 'Onde está / técnico': r.local || '', 'Saída': fmtDBR(r.data_saida),
+      'Previsão': fmtDBR(r.previsao_retorno), 'Retorno': fmtDBR(r.data_retorno),
+      'Resultado': !r.data_retorno ? 'Em manutenção' : r.resultado === 'sem_conserto' ? 'Sem conserto (baixa)' : 'Voltou funcionando',
+      'O que foi feito': r.servico_realizado || '', 'Custo (R$)': r.custo != null ? +r.custo : '', 'Registrado por': r.responsavel || '', 'Obs': r.obs || ''
+    }));
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(eq.length ? eq : [{'Equipamento':'(nenhum)'}]), 'Equipamentos');
+    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(oc.length ? oc : [{'Equipamento':'(nenhuma ocorrência)'}]), 'Ocorrências');
+    window.XLSX.writeFile(wb, `relatorio-equipamentos-${relDe}-a-${relAte}.xlsx`);
+  };
+
+  const exportarRelPDF = () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({orientation:'landscape', unit:'mm', format:'a4'});
+    const t = relatorio.tot;
+    doc.setFontSize(15); doc.text('Relatório de Equipamentos — HOC Hospital Odontológico', 14, 15);
+    doc.setFontSize(9); doc.text(`Período: ${fmtDBR(relDe)} a ${fmtDBR(relAte)} · Gerado em ${new Date().toLocaleDateString('pt-BR')}`, 14, 21);
+    doc.text(`${t.equip} equipamento(s) · ${t.emManut} em manutenção agora · ${t.ocorr} ocorrência(s) (${t.quebras} quebra(s)) · ${t.dias} dia(s) parado · custo ${brl2(t.custo)} · ${t.naGarantia} na garantia · ${t.revVencidas} revisão(ões) vencida(s)`, 14, 26);
+    let y = 35;
+    const cab = (cols) => { doc.setFont(undefined,'bold'); cols.forEach(([txt,x]) => doc.text(txt, x, y)); doc.setFont(undefined,'normal'); y += 2; doc.line(14, y, 283, y); y += 4; };
+    const colsEq = [['Equipamento',14],['Qtd',92],['Manut.',102],['Garantia',116],['Próx. revisão',150],['Ocorr.',176],['Quebras',190],['Dias parado',206],['Custo',228],['Nº série',252]];
+    cab(colsEq);
+    relatorio.linhas.forEach(l => {
+      if (y > 195) { doc.addPage(); y = 15; cab(colsEq); }
+      const vals = [String(l.item.produto).slice(0,42), String(l.item.quantidade), String(l.emManut||''), txtGarantia(l.item), l.prox ? fmtDBR(l.prox) : '—', String(l.n), String(l.quebras), String(l.dias), brl2(l.custo), String(l.item.numero_serie||'').slice(0,16)];
+      vals.forEach((v, k) => doc.text(v, colsEq[k][1], y));
+      y += 5;
+    });
+    if (relatorio.ocorr.length) {
+      y += 6; if (y > 185) { doc.addPage(); y = 15; }
+      doc.setFontSize(11); doc.text('Ocorrências no período', 14, y); y += 6; doc.setFontSize(9);
+      const colsOc = [['Equipamento',14],['Tipo',80],['O que aconteceu',104],['Garantia',160],['Saída',176],['Retorno',196],['O que foi feito',216],['Custo',266]];
+      cab(colsOc);
+      relatorio.ocorr.forEach(r => {
+        if (y > 195) { doc.addPage(); y = 15; cab(colsOc); }
+        const vals = [String(r.produto_nome).slice(0,36), (LABEL_TIPO_MANUT[r.tipo]||r.tipo).replace(/^\S+ /,''), String(r.motivo||'').slice(0,32), r.em_garantia?'Sim':'Não', fmtDBR(r.data_saida), r.data_retorno ? fmtDBR(r.data_retorno) : 'em aberto', String(r.servico_realizado||'').slice(0,28), r.custo!=null ? brl2(r.custo) : '—'];
+        vals.forEach((v, k) => doc.text(v, colsOc[k][1], y));
+        y += 5;
+      });
+    }
+    doc.save(`relatorio-equipamentos-${relDe}-a-${relAte}.pdf`);
   };
 
   const alternarPermanente = async (item) => {
@@ -1719,7 +1898,7 @@ function EstoqueTab({user, sb}) {
                 <div style={{flex:1,minWidth:180}}>
                   <div style={{fontWeight:700,fontSize:13}}>{r.produto_nome}{r.quantidade > 1 ? ` (${r.quantidade} un.)` : ''}</div>
                   <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>
-                    {r.tipo === 'quebra' ? '💥 Quebrou' : '🛠️ Manutenção/revisão'}: {r.motivo}
+                    {LABEL_TIPO_MANUT[r.tipo]}: {r.motivo}{r.em_garantia ? ' · 🛡️ na garantia' : ''}
                   </div>
                   <div style={{fontSize:11,color:'var(--text-dim)',marginTop:2}}>
                     Desde {fmtD(r.data_saida)} ({diasDesde(r.data_saida)} dia{diasDesde(r.data_saida)===1?'':'s'}){r.local ? ` · ${r.local}` : ''}{r.previsao_retorno ? ` · Previsão: ${fmtD(r.previsao_retorno)}` : ''} · por {r.responsavel}
@@ -1752,7 +1931,7 @@ function EstoqueTab({user, sb}) {
 
       {/* Abas */}
       <div className="tabs" style={{marginBottom:16}}>
-        {[['estoque','📦 Estoque'],['historico','📋 Histórico'],['manut','🔧 Manutenções']].map(([k,l])=>(
+        {[['estoque','📦 Estoque'],['historico','📋 Histórico'],['manut','🛠️ Equipamentos']].map(([k,l])=>(
           <button key={k} className={`tab ${aba===k?'active':''}`} onClick={()=>setAba(k)}>{l}</button>
         ))}
       </div>
@@ -1819,6 +1998,19 @@ function EstoqueTab({user, sb}) {
                     {!isSup && item.permanente && <span style={{marginLeft:6,fontSize:11,color:'var(--purple)'}}>🛠️ Equipamento</span>}
                   </div>
                   )}
+                  {item.permanente && (() => {
+                    const g = situacaoGarantia(item); const pr = proximaRevisao(item); const h = hojeISO();
+                    const temFicha = item.garantia_ate || item.revisao_meses || item.numero_serie || item.fornecedor_equip;
+                    return (
+                      <div style={{fontSize:11,marginTop:3,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+                        {g && <span style={{fontWeight:700,color: g==='vencida'?'var(--text-dim)':g==='vencendo'?'var(--yellow)':'var(--green)'}}>🛡️ {g==='vencida'?'Fora da garantia':`Garantia até ${fmtDBR(item.garantia_ate)}`}</span>}
+                        {pr && <span style={{fontWeight:700,color: pr<h?'var(--red)':diasEntre(h,pr)<=30?'var(--yellow)':'var(--text-muted)'}}>🔁 {pr<h?'Revisão vencida em ':'Próxima revisão: '}{fmtDBR(pr)}</span>}
+                        {item.revisao_meses && !pr && <span style={{color:'var(--yellow)'}}>🔁 Revisão a cada {item.revisao_meses} meses — informe a última na ficha</span>}
+                        {item.numero_serie && <span style={{color:'var(--text-dim)'}}>Nº série {item.numero_serie}</span>}
+                        {isSup && <span onClick={()=>abrirFicha(item)} style={{cursor:'pointer',color:'var(--accent)',textDecoration:'underline'}}>📋 {temFicha?'Ficha':'Preencher ficha (garantia, revisão)'}</span>}
+                      </div>
+                    );
+                  })()}
                   {manutAbertas[item.id] && (
                     <div style={{display:'inline-block',marginTop:4,fontSize:11,fontWeight:800,color:'#fff',background:'var(--yellow)',borderRadius:6,padding:'2px 8px'}}>
                       🔧 EM MANUTENÇÃO: {qtdEmManut(item.id)} de {item.quantidade} · disponível(is): {Math.max(0, item.quantidade - qtdEmManut(item.id))}
@@ -1887,37 +2079,120 @@ function EstoqueTab({user, sb}) {
         </div>
       </>}
 
-      {aba==='manut' && <>
-        <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:10}}>Quebras e manutenções de equipamentos e instrumentais. Equipamento em manutenção continua no patrimônio; só sai do estoque se voltar sem conserto.</div>
-        <div style={{display:'flex',flexDirection:'column',gap:6}}>
-          {manuts.map(r=>(
-            <div key={r.id} className="card-sm" style={{borderLeft:`3px solid ${!r.data_retorno?'var(--yellow)':r.resultado==='sem_conserto'?'var(--red)':'var(--green)'}`}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                <div style={{flex:1,minWidth:180}}>
-                  <div style={{fontWeight:600,fontSize:13}}>{r.produto_nome}{r.quantidade>1?` (${r.quantidade} un.)`:''}</div>
-                  <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>{r.tipo==='quebra'?'💥 Quebra':'🛠️ Manutenção/revisão'}: {r.motivo}{r.local?` · ${r.local}`:''}</div>
-                  <div style={{fontSize:11,color:'var(--text-dim)',marginTop:2}}>
-                    Saiu {fmtD(r.data_saida)} por {r.responsavel}
-                    {r.data_retorno ? <> · {r.resultado==='sem_conserto'?'❌ Sem conserto (baixa)':'✅ Voltou'} {fmtD(r.data_retorno)}{r.responsavel_retorno?` por ${r.responsavel_retorno}`:''} · {diasDesde(r.data_saida)-diasDesde(r.data_retorno)} dia(s) parado</> : <b style={{color:'var(--yellow)'}}> · ainda em manutenção ({diasDesde(r.data_saida)} dia(s))</b>}
-                    {r.custo != null && <> · Custo: R$ {(+r.custo).toLocaleString('pt-BR',{minimumFractionDigits:2})}</>}
-                  </div>
-                  {r.obs && <div style={{fontSize:11,color:'var(--text-dim)',marginTop:2}}>Obs: {r.obs}</div>}
-                </div>
-                {!r.data_retorno && isSup && <button className="btn btn-sm btn-success" onClick={()=>abrirRetorno(r)}>✅ Voltou</button>}
-              </div>
+      {aba==='manut' && (() => {
+        const t = relatorio.tot;
+        const th = (txt, dir) => <th style={{textAlign:dir?'right':'left',padding:'6px 8px',fontSize:11,color:'var(--text-muted)',borderBottom:'1px solid var(--border)',whiteSpace:'nowrap'}}>{txt}</th>;
+        const td = (v, dir, extra) => <td style={{padding:'6px 8px',textAlign:dir?'right':'left',fontSize:12,borderBottom:'1px solid var(--border)',...(extra||{})}}>{v}</td>;
+        return <>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'flex-end',marginBottom:12}}>
+            <div><label className="inp-label">De</label><input type="date" className="inp" value={relDe} onChange={e=>setRelDe(e.target.value)}/></div>
+            <div><label className="inp-label">Até</label><input type="date" className="inp" value={relAte} onChange={e=>setRelAte(e.target.value)}/></div>
+            <div><label className="inp-label">Mostrar</label>
+              <select className="inp" value={relGrupo} onChange={e=>setRelGrupo(e.target.value)}>
+                <option value="equip">Equipamentos (e instrumentais com ocorrência ou ficha)</option>
+                <option value="todos">Todos, incluindo instrumentais</option>
+              </select>
             </div>
-          ))}
-          {manuts.length===0 && <div style={{textAlign:'center',color:'var(--text-muted)',padding:40}}>Nenhuma quebra ou manutenção registrada. Use o botão 🔧 no equipamento.</div>}
-        </div>
-      </>}
+            <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={exportarRelPDF}>📄 PDF</button>
+            <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={exportarRelExcel}>📊 Excel</button>
+          </div>
 
-      {/* Modal Quebra / Manutencao */}
+          <div className="stat-grid" style={{marginBottom:16}}>
+            {[['Equipamentos',t.equip,'var(--accent)'],['🔧 Em manutenção',t.emManut,'var(--yellow)'],['Ocorrências',t.ocorr,'var(--text)'],['💥 Quebras',t.quebras,'var(--red)'],
+              ['Dias parado',t.dias,'var(--yellow)'],['Custo',brl2(t.custo),'var(--red)'],['🛡️ Na garantia',t.naGarantia,'var(--green)'],['🔁 Revisões vencidas',t.revVencidas,'var(--red)']
+            ].map(([l,v,c])=>(
+              <div key={l} className="stat-box" style={{borderColor:c+'44'}}>
+                <div className="stat-num" style={{color:c,fontSize:typeof v==='string'?16:22}}>{v}</div>
+                <div className="stat-lbl">{l}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="card" style={{marginBottom:16,overflowX:'auto'}}>
+            <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>Por equipamento</div>
+            <table style={{width:'100%',borderCollapse:'collapse'}}>
+              <thead><tr>{th('Equipamento')}{th('Qtd',1)}{th('Garantia')}{th('Próx. revisão')}{th('Ocorr.',1)}{th('Quebras',1)}{th('Dias parado',1)}{th('Custo',1)}{th('')}</tr></thead>
+              <tbody>
+                {relatorio.linhas.map(l => {
+                  const h = hojeISO();
+                  return (
+                    <tr key={l.item.id}>
+                      {td(<><b>{l.item.produto}</b>{l.emManut>0 && <span style={{marginLeft:6,fontSize:10,fontWeight:800,color:'#fff',background:'var(--yellow)',borderRadius:5,padding:'1px 6px'}}>🔧 {l.emManut} em manutenção</span>}<div style={{fontSize:10,color:'var(--text-dim)'}}>{l.item.categoria}{l.item.numero_serie?` · Nº ${l.item.numero_serie}`:''}{l.item.fornecedor_equip?` · ${l.item.fornecedor_equip}`:''}</div></>)}
+                      {td(l.item.quantidade,1)}
+                      {td(txtGarantia(l.item),0,{color: l.gar==='ok'?'var(--green)':l.gar==='vencendo'?'var(--yellow)':'var(--text-muted)'})}
+                      {td(l.prox ? fmtDBR(l.prox) : (l.item.revisao_meses ? 'falta última' : '—'),0,{color: l.prox && l.prox<h ? 'var(--red)' : 'var(--text-muted)', fontWeight: l.prox && l.prox<h ? 700 : 400})}
+                      {td(l.n,1)}{td(l.quebras,1)}{td(l.dias,1)}{td(brl2(l.custo),1)}
+                      {td(isSup ? <span style={{display:'flex',gap:4,justifyContent:'flex-end'}}>
+                        <button className="btn btn-sm btn-ghost" style={{padding:'2px 7px'}} title="Ficha" onClick={()=>abrirFicha(l.item)}>📋</button>
+                        <button className="btn btn-sm" style={{padding:'2px 7px',background:'#f59e0b22',border:'1px solid var(--yellow)',color:'var(--yellow)'}} title="Quebra / manutenção / revisão" onClick={()=>abrirManut(l.item)}>🔧</button>
+                      </span> : '',1)}
+                    </tr>
+                  );
+                })}
+                {relatorio.linhas.length===0 && <tr><td colSpan={9} style={{padding:20,textAlign:'center',color:'var(--text-muted)'}}>Nenhum equipamento</td></tr>}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>Ocorrências no período ({relatorio.ocorr.length})</div>
+          <div style={{display:'flex',flexDirection:'column',gap:6}}>
+            {relatorio.ocorr.map(r=>(
+              <div key={r.id} className="card-sm" style={{borderLeft:`3px solid ${!r.data_retorno?'var(--yellow)':r.resultado==='sem_conserto'?'var(--red)':'var(--green)'}`}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                  <div style={{flex:1,minWidth:180}}>
+                    <div style={{fontWeight:600,fontSize:13}}>{r.produto_nome}{r.quantidade>1?` (${r.quantidade} un.)`:''}{r.em_garantia && <span style={{marginLeft:6,fontSize:11,color:'var(--green)'}}>🛡️ na garantia</span>}</div>
+                    <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>{LABEL_TIPO_MANUT[r.tipo]}: {r.motivo}{r.local?` · Onde: ${r.local}`:''}</div>
+                    {r.servico_realizado && <div style={{fontSize:11,color:'var(--text)',marginTop:2}}>🔩 Feito: {r.servico_realizado}</div>}
+                    <div style={{fontSize:11,color:'var(--text-dim)',marginTop:2}}>
+                      Saiu {fmtD(r.data_saida)} por {r.responsavel}
+                      {r.data_retorno ? <> · {r.resultado==='sem_conserto'?'❌ Sem conserto (baixa)':'✅ Voltou'} {fmtD(r.data_retorno)}{r.responsavel_retorno?` por ${r.responsavel_retorno}`:''} · {diasEntre(r.data_saida,r.data_retorno)} dia(s) parado</> : <b style={{color:'var(--yellow)'}}> · ainda em manutenção ({diasDesde(r.data_saida)} dia(s)){r.previsao_retorno?` · previsão ${fmtD(r.previsao_retorno)}`:''}</b>}
+                      {r.custo != null && <> · Custo: {brl2(r.custo)}</>}
+                    </div>
+                    {r.obs && <div style={{fontSize:11,color:'var(--text-dim)',marginTop:2}}>Obs: {r.obs}</div>}
+                  </div>
+                  {!r.data_retorno && isSup && <button className="btn btn-sm btn-success" onClick={()=>abrirRetorno(r)}>✅ Voltou</button>}
+                </div>
+              </div>
+            ))}
+            {relatorio.ocorr.length===0 && <div style={{textAlign:'center',color:'var(--text-muted)',padding:30}}>Nenhuma ocorrência no período. Use o botão 🔧 no equipamento.</div>}
+          </div>
+        </>;
+      })()}
+
+      {/* Modal Ficha do equipamento */}
+      {modalFicha && (
+        <div className="overlay" onClick={()=>setModalFicha(null)}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <div className="modal-title">📋 Ficha — {modalFicha.produto}</div>
+            <div style={{display:'flex',gap:8,marginBottom:12}}>
+              <div style={{flex:1}}><label className="inp-label">Data da compra</label><input type="date" className="inp" value={ficha.data_compra} onChange={e=>setFicha(f=>({...f,data_compra:e.target.value}))}/></div>
+              <div style={{flex:1}}><label className="inp-label">Garantia até</label><input type="date" className="inp" value={ficha.garantia_ate} onChange={e=>setFicha(f=>({...f,garantia_ate:e.target.value}))}/></div>
+            </div>
+            <div style={{display:'flex',gap:8,marginBottom:12}}>
+              <div style={{flex:1}}><label className="inp-label">Fornecedor / assistência</label><input className="inp" value={ficha.fornecedor_equip} onChange={e=>setFicha(f=>({...f,fornecedor_equip:e.target.value}))} placeholder="Ex: Dabi Atlante"/></div>
+              <div style={{flex:1}}><label className="inp-label">Nº de série</label><input className="inp" value={ficha.numero_serie} onChange={e=>setFicha(f=>({...f,numero_serie:e.target.value}))}/></div>
+            </div>
+            <div style={{display:'flex',gap:8,marginBottom:12}}>
+              <div style={{flex:1}}><label className="inp-label">Revisão a cada (meses)</label><input type="number" min="1" className="inp" value={ficha.revisao_meses} onChange={e=>setFicha(f=>({...f,revisao_meses:e.target.value}))} placeholder="Ex: 6 ou 12"/></div>
+              <div style={{flex:1}}><label className="inp-label">Última revisão</label><input type="date" className="inp" value={ficha.ultima_revisao} onChange={e=>setFicha(f=>({...f,ultima_revisao:e.target.value}))}/></div>
+            </div>
+            {ficha.revisao_meses && (ficha.ultima_revisao || ficha.data_compra) && <div style={{fontSize:12,color:'var(--accent)',marginBottom:12}}>🔁 Próxima revisão: {fmtDBR(addMesesISO(ficha.ultima_revisao || ficha.data_compra, +ficha.revisao_meses))}</div>}
+            <div style={{fontSize:11,color:'var(--text-dim)',marginBottom:12}}>Ao fechar uma ocorrência do tipo "Revisão", a data da última revisão é atualizada sozinha.</div>
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModalFicha(null)}>Cancelar</button>
+              <button className="btn btn-success" style={{flex:1}} onClick={salvarFicha} disabled={busy}>{busy?'Salvando...':'Salvar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Quebra / Manutencao / Revisao */}
       {modalManut && (
         <div className="overlay" onClick={()=>setModalManut(null)}>
           <div className="modal" onClick={e=>e.stopPropagation()}>
-            <div className="modal-title">🔧 Quebra / manutenção — {modalManut.produto}</div>
-            <div style={{display:'flex',gap:8,marginBottom:12}}>
-              {[['quebra','💥 Quebrou'],['manutencao','🛠️ Manutenção / revisão']].map(([k,l])=>(
+            <div className="modal-title">🔧 {modalManut.produto}</div>
+            <div style={{display:'flex',gap:6,marginBottom:12}}>
+              {[['quebra','💥 Quebrou'],['manutencao','🛠️ Manutenção'],['revisao','🔁 Revisão']].map(([k,l])=>(
                 <button key={k} className="btn btn-sm" style={{flex:1,background:mTipo===k?'var(--yellow)':'var(--bg-card2)',color:mTipo===k?'#fff':'var(--text-muted)',border:'1px solid '+(mTipo===k?'var(--yellow)':'var(--border)')}} onClick={()=>setMTipo(k)}>{l}</button>
               ))}
             </div>
@@ -1930,22 +2205,21 @@ function EstoqueTab({user, sb}) {
               </div>
             </div>
             <div style={{marginBottom:12}}>
-              <label className="inp-label">O que aconteceu? *</label>
-              <input className="inp" value={mMotivo} onChange={e=>setMMotivo(e.target.value)} placeholder={mTipo==='quebra'?'Ex: caiu no chão e não liga':'Ex: revisão anual'} autoFocus/>
+              <label className="inp-label">{mTipo==='revisao'?'Qual revisão? *':'O que aconteceu? *'}</label>
+              <input className="inp" value={mMotivo} onChange={e=>setMMotivo(e.target.value)} placeholder={mTipo==='quebra'?'Ex: caiu no chão e não liga':mTipo==='revisao'?'Ex: revisão semestral':'Ex: barulho no motor'} autoFocus/>
             </div>
+            <label style={{display:'flex',alignItems:'center',gap:8,marginBottom:12,fontSize:13,cursor:'pointer'}}>
+              <input type="checkbox" checked={mGarantia} onChange={e=>setMGarantia(e.target.checked)}/>
+              🛡️ Coberto pela garantia
+              <span style={{fontSize:11,color:'var(--text-dim)'}}>{modalManut.garantia_ate ? `(garantia ${situacaoGarantia(modalManut)==='vencida'?'venceu em':'até'} ${fmtDBR(modalManut.garantia_ate)})` : '(garantia não informada na ficha)'}</span>
+            </label>
             <div style={{marginBottom:12}}>
-              <label className="inp-label">Onde está / técnico (opcional)</label>
-              <input className="inp" value={mLocal} onChange={e=>setMLocal(e.target.value)} placeholder="Ex: assistência Dabi, guardado no almoxarifado"/>
+              <label className="inp-label">Onde está para conserto / técnico</label>
+              <input className="inp" value={mLocal} onChange={e=>setMLocal(e.target.value)} placeholder={modalManut.fornecedor_equip ? `Ex: ${modalManut.fornecedor_equip}` : 'Ex: assistência Dabi, guardado no almoxarifado'}/>
             </div>
             <div style={{display:'flex',gap:8,marginBottom:16}}>
-              <div style={{flex:1}}>
-                <label className="inp-label">Previsão de retorno</label>
-                <input type="date" className="inp" value={mPrev} onChange={e=>setMPrev(e.target.value)}/>
-              </div>
-              <div style={{flex:1}}>
-                <label className="inp-label">Custo estimado (R$)</label>
-                <input type="number" className="inp" value={mCusto} onChange={e=>setMCusto(e.target.value)} min="0" step="0.01"/>
-              </div>
+              <div style={{flex:1}}><label className="inp-label">Previsão de retorno</label><input type="date" className="inp" value={mPrev} onChange={e=>setMPrev(e.target.value)}/></div>
+              <div style={{flex:1}}><label className="inp-label">Orçamento (R$)</label><input type="number" className="inp" value={mCusto} onChange={e=>setMCusto(e.target.value)} min="0" step="0.01"/></div>
             </div>
             <div style={{fontSize:11,color:'var(--text-dim)',marginBottom:12}}>O equipamento continua no estoque, marcado como "em manutenção", até voltar.</div>
             <div style={{display:'flex',gap:8}}>
@@ -1961,20 +2235,25 @@ function EstoqueTab({user, sb}) {
         <div className="overlay" onClick={()=>setModalRetorno(null)}>
           <div className="modal" onClick={e=>e.stopPropagation()}>
             <div className="modal-title">✅ Retorno — {modalRetorno.produto_nome}</div>
-            <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:12}}>{modalRetorno.tipo==='quebra'?'Quebrou':'Manutenção'} em {fmtD(modalRetorno.data_saida)}: {modalRetorno.motivo}</div>
+            <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:12}}>{LABEL_TIPO_MANUT[modalRetorno.tipo]} em {fmtD(modalRetorno.data_saida)}: {modalRetorno.motivo}{modalRetorno.local?` · ${modalRetorno.local}`:''}{modalRetorno.em_garantia?' · 🛡️ na garantia':''}</div>
             <div style={{display:'flex',gap:8,marginBottom:12}}>
               {[['consertado','✅ Voltou funcionando'],['sem_conserto','❌ Sem conserto (dar baixa)']].map(([k,l])=>(
                 <button key={k} className="btn btn-sm" style={{flex:1,background:rResultado===k?(k==='consertado'?'var(--green)':'var(--red)'):'var(--bg-card2)',color:rResultado===k?'#fff':'var(--text-muted)',border:'1px solid var(--border)'}} onClick={()=>setRResultado(k)}>{l}</button>
               ))}
             </div>
             <div style={{marginBottom:12}}>
-              <label className="inp-label">Custo final do conserto (R$, opcional)</label>
+              <label className="inp-label">O que foi feito</label>
+              <textarea className="inp" value={rServico} onChange={e=>setRServico(e.target.value)} placeholder="Ex: troca do rolamento da turbina e lubrificação" style={{width:'100%',minHeight:60,resize:'vertical'}}/>
+            </div>
+            <div style={{marginBottom:12}}>
+              <label className="inp-label">Custo final (R$){modalRetorno.em_garantia ? ' — na garantia, normalmente 0' : ''}</label>
               <input type="number" className="inp" value={rCusto} onChange={e=>setRCusto(e.target.value)} min="0" step="0.01"/>
             </div>
             <div style={{marginBottom:12}}>
               <label className="inp-label">Observação (opcional)</label>
-              <input className="inp" value={rObs} onChange={e=>setRObs(e.target.value)} placeholder="Ex: trocada a turbina"/>
+              <input className="inp" value={rObs} onChange={e=>setRObs(e.target.value)} placeholder="Ex: técnico recomendou trocar em 1 ano"/>
             </div>
+            {modalRetorno.tipo==='revisao' && rResultado==='consertado' && <div style={{fontSize:11,color:'var(--accent)',marginBottom:12}}>🔁 A última revisão do equipamento passa a ser hoje.</div>}
             {rResultado==='sem_conserto' && <div style={{fontSize:11,color:'var(--red)',marginBottom:12}}>{modalRetorno.quantidade} unidade(s) sairão do estoque como baixa de equipamento.</div>}
             <div style={{display:'flex',gap:8}}>
               <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModalRetorno(null)}>Cancelar</button>
@@ -4596,7 +4875,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.17 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.18 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -4854,6 +5133,7 @@ function App() {
           })()}
 
           {aba==='guia' && <GuiaTab user={user}/>}
+          {user.nivel===8 && (user.area==='clinico'||!user.area) && <PainelManutencao key={'pm-s-'+aba} sb={sb}/>}
         </div>
       </div>
     );
@@ -4887,6 +5167,7 @@ function App() {
           {abaFin==='notasfiscais' && <NotasFiscaisTab user={user} sb={sb}/>}
           {abaFin==='analise' && <AnaliseTab user={user} sb={sb}/>}
           {abaFin==='pacientes' && <PacientesTab user={user} sb={sb}/>}
+          <PainelManutencao key={'pm-f-'+abaFin} sb={sb}/>
         </div>
       </div>
     );
@@ -5232,6 +5513,7 @@ function App() {
           {abaA==='notasfiscais' && <NotasFiscaisTab user={user} sb={sb}/>}
           {abaA==='analise' && <AnaliseTab user={user} sb={sb}/>}
           {abaA==='pacientes' && <PacientesTab user={user} sb={sb}/>}
+          {!isAvaliador && <PainelManutencao key={'pm-a-'+abaA} sb={sb}/>}
 
         {modalAval && (
           <div className="overlay" onClick={()=>setModalAval(null)}>
