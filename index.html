@@ -1378,6 +1378,11 @@ function CuidadosHoje({sb, user, modo}) {
   const [aberto, setAberto] = useState(null);
   const [recolhido, setRecolhido] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [listaEquip, setListaEquip] = useState([]);
+  const [avisoAberto, setAvisoAberto] = useState(false);
+  const [avEquip, setAvEquip] = useState('');
+  const [avTxt, setAvTxt] = useState('');
+  const [avOk, setAvOk] = useState('');
   const h = hojeISO();
   const verTudo = modo === 'gestao' || user.tipo === 'admin' || user.nivel === 8;
 
@@ -1386,12 +1391,13 @@ function CuidadosHoje({sb, user, modo}) {
     const [{data:c}, {data:x}, {data:e}, {data:m}] = await Promise.all([
       sb.from('equipamentos_cuidados').select('*').eq('ativo', true).order('ordem'),
       sb.from('equipamentos_cuidados_exec').select('cuidado_id,data,responsavel').gte('data', addMesesISO(h, -13)).order('data', {ascending:false}),
-      sb.from('estoque').select('id,produto').eq('permanente', true),
+      sb.from('estoque').select('id,produto,categoria,garantia_ate').eq('permanente', true).order('produto'),
       sb.from('equipamentos_manutencao').select('produto_id').is('data_retorno', null)
     ]);
     const ult = {}, hoje = {};
     (x || []).forEach(r => { if (!ult[r.cuidado_id]) ult[r.cuidado_id] = r; if (r.data === h) hoje[r.cuidado_id] = r; });
     const eq = {}; (e || []).forEach(i => { eq[i.id] = i.produto; });
+    setListaEquip(e || []);
     const mm = {}; (m || []).forEach(r => { mm[r.produto_id] = true; });
     setCuidados(c || []); setUltimo(ult); setFeitosHoje(hoje); setEquips(eq); setEmManut(mm);
   };
@@ -1411,11 +1417,25 @@ function CuidadosHoje({sb, user, modo}) {
     setBusy(false);
   };
 
+  const enviarAviso = async () => {
+    const eq = listaEquip.find(i => i.id === avEquip);
+    if (!eq || !avTxt.trim()) return;
+    setBusy(true);
+    const {error} = await sb.from('equipamentos_manutencao').insert([{
+      produto_id: eq.id, produto_nome: eq.produto, quantidade: 1, tipo: 'quebra', motivo: avTxt.trim(),
+      local: 'Separado — aguardando a supervisora', responsavel: user.nome,
+      em_garantia: ['ok','vencendo'].includes(situacaoGarantia(eq))
+    }]);
+    if (error) alert('Erro ao avisar: ' + error.message);
+    else { setAvOk(`✅ Aviso registrado: ${eq.produto}. A supervisora já vê no painel.`); setAvisoAberto(false); setAvEquip(''); setAvTxt(''); }
+    await carregar();
+    setBusy(false);
+  };
+
   const visiveis = cuidados.filter(c => (verTudo || c.quem === 'auxiliar') && !emManut[c.produto_id]);
   const pendentes = visiveis.filter(c => situacao(c).devido && !feitosHoje[c.id]);
   const feitos = visiveis.filter(c => feitosHoje[c.id]);
-  if (!visiveis.length) return null;
-  if (modo !== 'gestao' && !pendentes.length && !feitos.length) return null;
+  if (!visiveis.length && modo === 'gestao') return null;
 
   const freqTxt = (c) => c.momento === 'cada_uso' ? 'após cada uso' : c.frequencia_dias === 1 ? 'diário' : c.frequencia_dias === 7 ? 'semanal' : c.frequencia_dias === 14 ? 'a cada 14 dias' : c.frequencia_dias === 30 ? 'mensal' : c.frequencia_dias === 90 ? 'trimestral' : c.frequencia_dias === 180 ? 'semestral' : `a cada ${c.frequencia_dias} dias`;
   const lista = modo === 'gestao' ? visiveis : pendentes;
@@ -1459,6 +1479,29 @@ function CuidadosHoje({sb, user, modo}) {
           </div>
         ))}
         {modo !== 'gestao' && !pendentes.length && <div style={{fontSize:12,color:'var(--green)',marginTop:8}}>Todos os cuidados de hoje foram feitos. 👏</div>}
+        {modo !== 'gestao' && <div style={{marginTop:10}}>
+          {avOk && <div style={{fontSize:12,color:'var(--green)',marginBottom:6}}>{avOk}</div>}
+          {!avisoAberto ? (
+            <button className="btn btn-sm" style={{background:'#ef444418',border:'1px solid var(--red)',color:'var(--red)'}} onClick={()=>{setAvisoAberto(true);setAvOk('');}}>🔧 Avisar equipamento com problema</button>
+          ) : (
+            <div style={{background:'var(--bg-card2)',border:'1px solid var(--red)',borderRadius:8,padding:'10px 12px'}}>
+              <div style={{fontWeight:700,fontSize:13,marginBottom:6}}>🔧 Qual equipamento está com problema?</div>
+              <select className="inp" value={avEquip} onChange={e=>setAvEquip(e.target.value)} style={{marginBottom:6}}>
+                <option value="">Escolha o equipamento</option>
+                {listaEquip.filter(i => i.categoria !== 'Instrumentais').map(i => <option key={i.id} value={i.id}>{i.produto}{emManut[i.id]?' (já em manutenção)':''}</option>)}
+                <optgroup label="Instrumentais">
+                  {listaEquip.filter(i => i.categoria === 'Instrumentais').map(i => <option key={i.id} value={i.id}>{i.produto}</option>)}
+                </optgroup>
+              </select>
+              <input className="inp" value={avTxt} onChange={e=>setAvTxt(e.target.value)} placeholder="O que aconteceu? Ex: alta rotação da sala 3 com barulho e perdendo força" style={{marginBottom:6}}/>
+              <div style={{fontSize:11,color:'var(--text-dim)',marginBottom:6}}>Separe o equipamento e não use até a supervisora ver.</div>
+              <div style={{display:'flex',gap:6}}>
+                <button className="btn btn-sm btn-ghost" onClick={()=>setAvisoAberto(false)}>Cancelar</button>
+                <button className="btn btn-sm" style={{background:'var(--red)',color:'#fff'}} disabled={busy||!avEquip||!avTxt.trim()} onClick={enviarAviso}>Enviar aviso</button>
+              </div>
+            </div>
+          )}
+        </div>}
         <div style={{fontSize:10,color:'var(--text-dim)',marginTop:8}}>Toque no cuidado para ver o passo a passo do manual. "Após cada uso": confirme uma vez no fim do dia que foi feito em todos os atendimentos.</div>
       </>}
     </div>
@@ -1873,7 +1916,7 @@ function EstoqueTab({user, sb}) {
   const itensFiltrados = useMemo(() => itens.filter(i => {
     const buscaOk = !busca || i.produto.toLowerCase().includes(busca.toLowerCase());
     const catOk   = !catFiltro || i.categoria === catFiltro;
-    const stOk    = !statusFiltro || i.status === statusFiltro;
+    const stOk    = !statusFiltro || (i.status === statusFiltro && !(i.permanente && statusFiltro !== 'OK'));
     const vencOk  = !vencFiltro || situacaoVencimento(i) === vencFiltro;
     const semPrecoOk = !semPrecoFiltro || (precos[i.id] == null && !(i.valor_unitario > 0));
     const equipOk = !equipFiltro || i.permanente;
@@ -1884,8 +1927,8 @@ function EstoqueTab({user, sb}) {
   const stats = useMemo(() => ({
     total: itens.length,
     ok: itens.filter(i=>i.status==='OK').length,
-    comprar: itens.filter(i=>i.status==='COMPRAR').length,
-    critico: itens.filter(i=>i.status==='CRÍTICO').length,
+    comprar: itens.filter(i=>!i.permanente && i.status==='COMPRAR').length,
+    critico: itens.filter(i=>!i.permanente && i.status==='CRÍTICO').length,
     vencido: itens.filter(i=>situacaoVencimento(i)==='vencido').length,
     vencendo: itens.filter(i=>situacaoVencimento(i)==='vencendo').length,
   }), [itens]);
@@ -4010,7 +4053,7 @@ function ListaCompraTab({user, sb}) {
   useEffect(() => { carregar(); }, []);
 
   const listaCompra = useMemo(() => itens
-    .filter(i => i.status === 'COMPRAR' || i.status === 'CRÍTICO')
+    .filter(i => !i.permanente && (i.status === 'COMPRAR' || i.status === 'CRÍTICO'))
     .map(i => {
       const p = precos[i.id];
       const variacao = (p && p.ultimo != null && p.penultimo) ? ((p.ultimo - p.penultimo) / p.penultimo * 100) : null;
@@ -5151,7 +5194,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.19 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.20 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -5411,7 +5454,7 @@ function App() {
           })()}
 
           {aba==='guia' && <GuiaTab user={user}/>}
-          {user.nivel===8 && (user.area==='clinico'||!user.area) && <PainelManutencao key={'pm-s-'+aba} sb={sb}/>}
+          {(user.area==='clinico'||!user.area) && <PainelManutencao key={'pm-s-'+aba} sb={sb}/>}
         </div>
       </div>
     );
