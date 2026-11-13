@@ -1638,6 +1638,8 @@ function EstoqueTab({user, sb}) {
   const [msgNF, setMsgNF]                 = useState('');
   const [nfsDoItem, setNfsDoItem]         = useState([]);
   const [garMeses, setGarMeses]           = useState('');
+  const [pendEdit, setPendEdit]           = useState({}); // item_id -> {quantidade, marca, modelo, tipo_equip, local_equip}
+  const [pendSalvando, setPendSalvando]   = useState(null);
 
   const isSup = user.nivel === 8 || user.tipo === 'admin' || user.tipo === 'financeiro' || user.tipo === 'genesis';
 
@@ -1760,11 +1762,47 @@ function EstoqueTab({user, sb}) {
     setBusy(false);
   };
 
+  const TIPOS_EQUIP = ['', 'Pneumático (a ar)', 'Elétrico'];
+  const precisaTipo = (i) => /micromotor|motor/i.test(i.produto || '');
+  const dadosFaltando = (i) => {
+    const f = [];
+    if (!(i.quantidade > 0)) f.push('quantidade');
+    if (!i.marca) f.push('marca');
+    if (!i.modelo) f.push('modelo');
+    if (precisaTipo(i) && !i.tipo_equip) f.push('tipo');
+    return f;
+  };
+  const salvarDadosEquip = async (item, d) => {
+    const novaQtd = Math.max(0, parseInt(d.quantidade, 10) || 0);
+    const campos = {marca: (d.marca || '').trim() || null, modelo: (d.modelo || '').trim() || null,
+      tipo_equip: d.tipo_equip || null, local_equip: (d.local_equip || '').trim() || null, updated_at: new Date().toISOString()};
+    if (novaQtd !== (item.quantidade || 0)) campos.quantidade = novaQtd;
+    let r = await sb.from('estoque').update(campos).eq('id', item.id);
+    if (r.error) throw r.error;
+    if (campos.quantidade !== undefined) {
+      const dif = novaQtd - (item.quantidade || 0);
+      r = await sb.from('estoque_movimentacoes').insert([{produto_id: item.id, produto_nome: item.produto, tipo: dif > 0 ? 'entrada' : 'saida',
+        quantidade: Math.abs(dif), responsavel: user.nome, obs: 'Ajuste de quantidade do equipamento (inventário)'}]);
+      if (r.error) throw r.error;
+    }
+  };
+  const salvarPendente = async (item) => {
+    const d = {quantidade: item.quantidade, marca: item.marca, modelo: item.modelo, tipo_equip: item.tipo_equip, local_equip: item.local_equip, ...(pendEdit[item.id] || {})};
+    setPendSalvando(item.id);
+    try {
+      await salvarDadosEquip(item, d);
+      setPendEdit(p => { const n = {...p}; delete n[item.id]; return n; });
+      await carregar();
+    } catch (e) { alert('Erro ao salvar: ' + (e.message || e)); }
+    setPendSalvando(null);
+  };
+
   const abrirFicha = (item) => {
     setModalFicha(item);
     setFicha({data_compra: item.data_compra || '', garantia_ate: item.garantia_ate || '', fornecedor_equip: item.fornecedor_equip || '',
       numero_serie: item.numero_serie || '', revisao_meses: item.revisao_meses || '', ultima_revisao: item.ultima_revisao || '',
-      manual_url: item.manual_url || '', obs_equip: item.obs_equip || '', nf_compra_id: item.nf_compra_id || null, anexos: item.anexos || []});
+      manual_url: item.manual_url || '', obs_equip: item.obs_equip || '', nf_compra_id: item.nf_compra_id || null, anexos: item.anexos || [],
+      quantidade: item.quantidade || 0, marca: item.marca || '', modelo: item.modelo || '', tipo_equip: item.tipo_equip || '', local_equip: item.local_equip || ''});
     setGarMeses(''); setMsgNF(''); setNfsDoItem([]);
     (async () => {
       const {data} = await sb.from('notas_fiscais_itens').select('quantidade,valor_unitario,produto_nome,notas_fiscais(id,numero,fornecedor,data_emissao,valor_total)').eq('produto_id', item.id);
@@ -1791,6 +1829,7 @@ function EstoqueTab({user, sb}) {
   const salvarFicha = async () => {
     const item = modalFicha; if (!item) return;
     setBusy(true);
+    try { await salvarDadosEquip(item, ficha); } catch (e) { alert('Erro ao salvar: ' + (e.message || e)); setBusy(false); return; }
     const {error} = await sb.from('estoque').update({
       data_compra: ficha.data_compra || null, garantia_ate: ficha.garantia_ate || null,
       fornecedor_equip: (ficha.fornecedor_equip || '').trim() || null, numero_serie: (ficha.numero_serie || '').trim() || null,
@@ -1840,7 +1879,7 @@ function EstoqueTab({user, sb}) {
     if (!window.XLSX) { alert('Leitor de Excel não carregou. Atualize a página.'); return; }
     const wb = window.XLSX.utils.book_new();
     const eq = relatorio.linhas.map(l => ({
-      'Equipamento': l.item.produto, 'Categoria': l.item.categoria, 'Qtd': l.item.quantidade, 'Em manutenção': l.emManut,
+      'Equipamento': l.item.produto, 'Categoria': l.item.categoria, 'Marca': l.item.marca || '', 'Modelo': l.item.modelo || '', 'Tipo': l.item.tipo_equip || '', 'Onde fica': l.item.local_equip || '', 'Qtd': l.item.quantidade, 'Em manutenção': l.emManut,
       'Nº de série': l.item.numero_serie || '', 'Fornecedor': l.item.fornecedor_equip || '', 'Compra': fmtDBR(l.item.data_compra), 'Manual': l.item.manual_url || '',
       'Garantia': txtGarantia(l.item), 'Revisão a cada (meses)': l.item.revisao_meses || '', 'Última revisão': fmtDBR(l.item.ultima_revisao),
       'Próxima revisão': fmtDBR(l.prox), 'Ocorrências': l.n, 'Quebras': l.quebras, 'Manutenções': l.manut, 'Revisões': l.revisoes,
@@ -2256,6 +2295,7 @@ function EstoqueTab({user, sb}) {
                     {item.lote && <> · Lote: {item.lote}</>}
                     {isSup && <span onClick={()=>alternarPermanente(item)} style={{cursor:'pointer',marginLeft:6,fontSize:11,color: item.permanente?'var(--purple)':'var(--text-dim)'}} title={item.permanente?'Desmarcar como equipamento':'Marcar como equipamento/instrumental'}>{item.permanente ? '🛠️ Equipamento' : '🛠️?'}</span>}
                     {!isSup && item.permanente && <span style={{marginLeft:6,fontSize:11,color:'var(--purple)'}}>🛠️ Equipamento</span>}
+                    {isSup && item.permanente && item.categoria !== 'Instrumentais' && dadosFaltando(item).length > 0 && <span onClick={()=>abrirFicha(item)} style={{cursor:'pointer',marginLeft:6,fontSize:11,color:'var(--yellow)',fontWeight:700}}>📝 falta {dadosFaltando(item).join(', ')}</span>}
                   </div>
                   )}
                   {item.permanente && (() => {
@@ -2266,6 +2306,8 @@ function EstoqueTab({user, sb}) {
                         {g && <span style={{fontWeight:700,color: g==='vencida'?'var(--text-dim)':g==='vencendo'?'var(--yellow)':'var(--green)'}}>🛡️ {g==='vencida'?'Fora da garantia':`Garantia até ${fmtDBR(item.garantia_ate)}`}</span>}
                         {pr && <span style={{fontWeight:700,color: pr<h?'var(--red)':diasEntre(h,pr)<=30?'var(--yellow)':'var(--text-muted)'}}>🔁 {pr<h?'Revisão vencida em ':'Próxima revisão: '}{fmtDBR(pr)}</span>}
                         {item.revisao_meses && !pr && <span style={{color:'var(--yellow)'}}>🔁 Revisão a cada {item.revisao_meses} meses — informe a última na ficha</span>}
+                        {(item.marca || item.modelo) && <span style={{color:'var(--text-muted)',fontWeight:600}}>{[item.marca, item.modelo].filter(Boolean).join(' ')}{item.tipo_equip ? ` · ${item.tipo_equip}` : ''}</span>}
+                        {item.local_equip && <span style={{color:'var(--text-dim)'}}>📍 {item.local_equip}</span>}
                         {item.numero_serie && <span style={{color:'var(--text-dim)'}}>Nº série {item.numero_serie}</span>}
                         {item.manual_url && <a href={item.manual_url} target="_blank" rel="noopener noreferrer" style={{color:'var(--accent)'}}>📖 Manual</a>}
                         {isSup && <span onClick={()=>abrirFicha(item)} style={{cursor:'pointer',color:'var(--accent)',textDecoration:'underline'}}>📋 {temFicha?'Ficha':'Preencher ficha (garantia, revisão)'}</span>}
@@ -2358,6 +2400,32 @@ function EstoqueTab({user, sb}) {
             <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={exportarRelExcel}>📊 Excel</button>
           </div>
 
+          {isSup && (() => {
+            const pend = itens.filter(i => i.permanente && i.categoria !== 'Instrumentais' && dadosFaltando(i).length);
+            if (!pend.length) return null;
+            const v = (i, k) => (pendEdit[i.id] && pendEdit[i.id][k] !== undefined) ? pendEdit[i.id][k] : (i[k] == null ? '' : i[k]);
+            const set = (i, k, val) => setPendEdit(p => ({...p, [i.id]: {...(p[i.id] || {}), [k]: val}}));
+            return (
+              <div className="card" style={{marginBottom:16,border:'2px solid var(--yellow)'}}>
+                <div style={{fontWeight:800,fontSize:14,color:'var(--yellow)',marginBottom:4}}>📝 Dados a completar ({pend.length})</div>
+                <div style={{fontSize:11,color:'var(--text-muted)',marginBottom:10}}>Informe quantidade, marca e modelo. Com a marca e o modelo, os cuidados passam a seguir o manual certo do fabricante. Para garantia, revisão, NF e manual, use 📋 Ficha.</div>
+                {pend.map(i => (
+                  <div key={i.id} style={{background:'var(--bg-card2)',borderRadius:8,padding:'8px 10px',marginBottom:6}}>
+                    <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>{i.produto} <span style={{fontSize:11,fontWeight:400,color:'var(--yellow)'}}>· falta: {dadosFaltando(i).join(', ')}</span></div>
+                    <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'flex-end'}}>
+                      <div style={{width:70}}><label className="inp-label">Qtd</label><input type="number" min="0" className="inp" value={v(i,'quantidade')} onChange={e=>set(i,'quantidade',e.target.value)} style={{padding:'4px 6px'}}/></div>
+                      <div style={{flex:1,minWidth:110}}><label className="inp-label">Marca</label><input className="inp" value={v(i,'marca')} onChange={e=>set(i,'marca',e.target.value)} style={{padding:'4px 6px'}} placeholder="Ex: Dabi Atlante"/></div>
+                      <div style={{flex:1,minWidth:110}}><label className="inp-label">Modelo</label><input className="inp" value={v(i,'modelo')} onChange={e=>set(i,'modelo',e.target.value)} style={{padding:'4px 6px'}}/></div>
+                      {precisaTipo(i) && <div style={{minWidth:130}}><label className="inp-label">Tipo</label><select className="inp" value={v(i,'tipo_equip')} onChange={e=>set(i,'tipo_equip',e.target.value)} style={{padding:'4px 6px'}}>{TIPOS_EQUIP.map(t=><option key={t} value={t}>{t || '—'}</option>)}</select></div>}
+                      <div style={{flex:1,minWidth:120}}><label className="inp-label">Onde fica</label><input className="inp" value={v(i,'local_equip')} onChange={e=>set(i,'local_equip',e.target.value)} style={{padding:'4px 6px'}} placeholder="Ex: salas 1 a 6"/></div>
+                      <button className="btn btn-sm btn-success" disabled={pendSalvando===i.id} onClick={()=>salvarPendente(i)}>{pendSalvando===i.id?'...':'💾 Salvar'}</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
           <CuidadosHoje sb={sb} user={user} modo="gestao"/>
 
           <div className="stat-grid" style={{marginBottom:16}}>
@@ -2380,7 +2448,7 @@ function EstoqueTab({user, sb}) {
                   const h = hojeISO();
                   return (
                     <tr key={l.item.id}>
-                      {td(<><b>{l.item.produto}</b>{l.emManut>0 && <span style={{marginLeft:6,fontSize:10,fontWeight:800,color:'#fff',background:'var(--yellow)',borderRadius:5,padding:'1px 6px'}}>🔧 {l.emManut} em manutenção</span>}<div style={{fontSize:10,color:'var(--text-dim)'}}>{l.item.categoria}{l.item.numero_serie?` · Nº ${l.item.numero_serie}`:''}{l.item.fornecedor_equip?` · ${l.item.fornecedor_equip}`:''}</div></>)}
+                      {td(<><b>{l.item.produto}</b>{l.emManut>0 && <span style={{marginLeft:6,fontSize:10,fontWeight:800,color:'#fff',background:'var(--yellow)',borderRadius:5,padding:'1px 6px'}}>🔧 {l.emManut} em manutenção</span>}<div style={{fontSize:10,color:'var(--text-dim)'}}>{l.item.categoria}{(l.item.marca||l.item.modelo)?` · ${[l.item.marca,l.item.modelo].filter(Boolean).join(' ')}`:''}{l.item.local_equip?` · ${l.item.local_equip}`:''}{l.item.numero_serie?` · Nº ${l.item.numero_serie}`:''}{l.item.fornecedor_equip?` · ${l.item.fornecedor_equip}`:''}</div></>)}
                       {td(l.item.quantidade,1)}
                       {td(txtGarantia(l.item),0,{color: l.gar==='ok'?'var(--green)':l.gar==='vencendo'?'var(--yellow)':'var(--text-muted)'})}
                       {td(l.prox ? fmtDBR(l.prox) : (l.item.revisao_meses ? 'falta última' : '—'),0,{color: l.prox && l.prox<h ? 'var(--red)' : 'var(--text-muted)', fontWeight: l.prox && l.prox<h ? 700 : 400})}
@@ -2443,6 +2511,17 @@ function EstoqueTab({user, sb}) {
                 ))}
               </>}
             </div>
+            <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
+              <div style={{width:90}}><label className="inp-label">Quantidade</label><input type="number" min="0" className="inp" value={ficha.quantidade} onChange={e=>setFicha(f=>({...f,quantidade:e.target.value}))}/></div>
+              <div style={{flex:1,minWidth:110}}><label className="inp-label">Marca</label><input className="inp" value={ficha.marca} onChange={e=>setFicha(f=>({...f,marca:e.target.value}))} placeholder="Ex: Dabi Atlante"/></div>
+              <div style={{flex:1,minWidth:110}}><label className="inp-label">Modelo</label><input className="inp" value={ficha.modelo} onChange={e=>setFicha(f=>({...f,modelo:e.target.value}))} placeholder="Ex: Extra Torque 605"/></div>
+            </div>
+            <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
+              {precisaTipo(modalFicha) && <div style={{flex:1,minWidth:140}}><label className="inp-label">Tipo</label>
+                <select className="inp" value={ficha.tipo_equip} onChange={e=>setFicha(f=>({...f,tipo_equip:e.target.value}))}>{TIPOS_EQUIP.map(t=><option key={t} value={t}>{t || '—'}</option>)}</select></div>}
+              <div style={{flex:2,minWidth:160}}><label className="inp-label">Onde fica (salas)</label><input className="inp" value={ficha.local_equip} onChange={e=>setFicha(f=>({...f,local_equip:e.target.value}))} placeholder="Ex: salas 1 a 6, centro cirúrgico"/></div>
+            </div>
+            {+ficha.quantidade !== (modalFicha.quantidade||0) && <div style={{fontSize:11,color:'var(--yellow)',marginBottom:12}}>A quantidade vai de {modalFicha.quantidade||0} para {+ficha.quantidade||0}; o ajuste fica registrado no histórico do estoque.</div>}
             <div style={{display:'flex',gap:8,marginBottom:12}}>
               <div style={{flex:1}}><label className="inp-label">Data da compra</label><input type="date" className="inp" value={ficha.data_compra} onChange={e=>setFicha(f=>({...f,data_compra:e.target.value}))}/></div>
               <div style={{flex:1}}><label className="inp-label">Garantia até</label><input type="date" className="inp" value={ficha.garantia_ate} onChange={e=>setFicha(f=>({...f,garantia_ate:e.target.value}))}/></div>
@@ -5194,7 +5273,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.20 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.21 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
