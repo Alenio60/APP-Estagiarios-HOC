@@ -1351,6 +1351,21 @@ function EstoqueTab({user, sb}) {
   const [catEditValor, setCatEditValor]   = useState('');
   const [modalDup, setModalDup]           = useState(false);
   const [modalValorArea, setModalValorArea] = useState(false);
+  // Equipamentos: quebra / manutencao
+  const [manuts, setManuts]               = useState([]);
+  const [equipFiltro, setEquipFiltro]     = useState(false);
+  const [manutFiltro, setManutFiltro]     = useState(false);
+  const [modalManut, setModalManut]       = useState(null); // item
+  const [mQtd, setMQtd]                   = useState(1);
+  const [mTipo, setMTipo]                 = useState('quebra');
+  const [mMotivo, setMMotivo]             = useState('');
+  const [mLocal, setMLocal]               = useState('');
+  const [mPrev, setMPrev]                 = useState('');
+  const [mCusto, setMCusto]               = useState('');
+  const [modalRetorno, setModalRetorno]   = useState(null); // registro de manutencao
+  const [rResultado, setRResultado]       = useState('consertado');
+  const [rCusto, setRCusto]               = useState('');
+  const [rObs, setRObs]                   = useState('');
 
   const isSup = user.nivel === 8 || user.tipo === 'admin' || user.tipo === 'financeiro' || user.tipo === 'genesis';
 
@@ -1370,9 +1385,81 @@ function EstoqueTab({user, sb}) {
       mp.forEach(mv => { if (ultimo[mv.produto_id]===undefined) ultimo[mv.produto_id] = +mv.valor_unitario; });
       setPrecos(ultimo);
     }
+    const {data:mn} = await sb.from('equipamentos_manutencao').select('*').order('created_at',{ascending:false}).limit(300);
+    if (mn) setManuts(mn);
   };
 
   useEffect(() => { carregar(); }, []);
+
+  // produto_id -> registros de manutencao em aberto
+  const manutAbertas = useMemo(() => {
+    const m = {};
+    manuts.filter(r => !r.data_retorno).forEach(r => { (m[r.produto_id] = m[r.produto_id] || []).push(r); });
+    return m;
+  }, [manuts]);
+  const qtdEmManut = (id) => (manutAbertas[id] || []).reduce((s, r) => s + (r.quantidade || 0), 0);
+  const listaAbertas = useMemo(() => manuts.filter(r => !r.data_retorno), [manuts]);
+  const fmtD = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '';
+  const diasDesde = (d) => Math.max(0, Math.round((new Date().setHours(0,0,0,0) - new Date(d + 'T00:00:00')) / 86400000));
+
+  const abrirManut = (item) => {
+    setModalManut(item); setMQtd(1); setMTipo('quebra'); setMMotivo(''); setMLocal(''); setMPrev(''); setMCusto('');
+  };
+
+  const registrarManut = async () => {
+    const item = modalManut;
+    if (!item || !mMotivo.trim()) return;
+    const livres = (item.quantidade || 0) - qtdEmManut(item.id);
+    if (mQtd < 1 || mQtd > Math.max(livres, 0)) { alert(`Só há ${Math.max(livres,0)} unidade(s) disponível(is) para enviar.`); return; }
+    setBusy(true);
+    const {error} = await sb.from('equipamentos_manutencao').insert([{
+      produto_id: item.id, produto_nome: item.produto, quantidade: mQtd, tipo: mTipo,
+      motivo: mMotivo.trim(), local: mLocal.trim() || null, previsao_retorno: mPrev || null,
+      custo: mCusto ? +mCusto : null, responsavel: user.nome
+    }]);
+    if (error) alert('Erro ao registrar: ' + error.message);
+    else setModalManut(null);
+    await carregar();
+    setBusy(false);
+  };
+
+  const abrirRetorno = (reg) => { setModalRetorno(reg); setRResultado('consertado'); setRCusto(reg.custo != null ? String(reg.custo) : ''); setRObs(''); };
+
+  const registrarRetorno = async () => {
+    const reg = modalRetorno;
+    if (!reg) return;
+    setBusy(true);
+    try {
+      const hoje = new Date().toLocaleDateString('en-CA', {timeZone:'America/Sao_Paulo'});
+      let r = await sb.from('equipamentos_manutencao').update({
+        data_retorno: hoje, resultado: rResultado, custo: rCusto ? +rCusto : null,
+        responsavel_retorno: user.nome, obs: rObs.trim() || null
+      }).eq('id', reg.id);
+      if (r.error) throw r.error;
+      if (rResultado === 'sem_conserto') {
+        const item = itens.find(i => i.id === reg.produto_id);
+        if (item) {
+          r = await sb.from('estoque').update({quantidade: Math.max(0, (item.quantidade || 0) - reg.quantidade), updated_at: new Date().toISOString()}).eq('id', item.id);
+          if (r.error) throw r.error;
+          r = await sb.from('estoque_movimentacoes').insert([{produto_id: item.id, produto_nome: item.produto, tipo: 'saida', quantidade: reg.quantidade, responsavel: user.nome, obs: 'Baixa: equipamento sem conserto' + (rObs.trim() ? ' - ' + rObs.trim() : '')}]);
+          if (r.error) throw r.error;
+        }
+      }
+      setModalRetorno(null);
+    } catch (e) { alert('Erro ao registrar retorno: ' + (e.message || e)); }
+    await carregar();
+    setBusy(false);
+  };
+
+  const alternarPermanente = async (item) => {
+    const novo = !item.permanente;
+    if (!window.confirm(novo
+      ? `Marcar "${item.produto}" como equipamento/instrumental?\n\nAs saídas dele deixam de contar como consumo de material e ele passa a ter controle de quebra e manutenção.`
+      : `Desmarcar "${item.produto}" como equipamento? Ele volta a contar como material de consumo.`)) return;
+    const {error} = await sb.from('estoque').update({permanente: novo, updated_at: new Date().toISOString()}).eq('id', item.id);
+    if (error) { alert('Erro: ' + error.message); return; }
+    await carregar();
+  };
 
   const CATEGORIAS_PADRAO = ['Materiais Clínicos','Materiais Ortodônticos','Materiais Cirúrgicos','Material de Implante','Material de Higiene e Limpeza','Equipamentos','Instrumentais','Material de Escritório'];
   const cats = useMemo(() => [...new Set([...CATEGORIAS_PADRAO, ...itens.map(i=>i.categoria)])].sort(), [itens]);
@@ -1393,8 +1480,10 @@ function EstoqueTab({user, sb}) {
     const stOk    = !statusFiltro || i.status === statusFiltro;
     const vencOk  = !vencFiltro || situacaoVencimento(i) === vencFiltro;
     const semPrecoOk = !semPrecoFiltro || (precos[i.id] == null && !(i.valor_unitario > 0));
-    return buscaOk && catOk && stOk && vencOk && semPrecoOk;
-  }), [itens, busca, catFiltro, statusFiltro, vencFiltro, semPrecoFiltro, precos]);
+    const equipOk = !equipFiltro || i.permanente;
+    const manutOk = !manutFiltro || !!manutAbertas[i.id];
+    return buscaOk && catOk && stOk && vencOk && semPrecoOk && equipOk && manutOk;
+  }), [itens, busca, catFiltro, statusFiltro, vencFiltro, semPrecoFiltro, precos, equipFiltro, manutFiltro, manutAbertas]);
 
   const stats = useMemo(() => ({
     total: itens.length,
@@ -1620,6 +1709,30 @@ function EstoqueTab({user, sb}) {
         </div>
       </div>
 
+      {/* Equipamentos em manutencao */}
+      {listaAbertas.length > 0 && (
+        <div style={{background:'#f59e0b14',border:'1px solid #f59e0b66',borderRadius:12,padding:'14px 16px',marginBottom:16}}>
+          <div style={{fontWeight:800,fontSize:14,color:'var(--yellow)',marginBottom:8}}>🔧 Equipamento em manutenção ({listaAbertas.reduce((s,r)=>s+r.quantidade,0)})</div>
+          <div style={{display:'flex',flexDirection:'column',gap:6}}>
+            {listaAbertas.map(r => (
+              <div key={r.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap',background:'var(--bg-card)',borderRadius:8,padding:'8px 10px'}}>
+                <div style={{flex:1,minWidth:180}}>
+                  <div style={{fontWeight:700,fontSize:13}}>{r.produto_nome}{r.quantidade > 1 ? ` (${r.quantidade} un.)` : ''}</div>
+                  <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>
+                    {r.tipo === 'quebra' ? '💥 Quebrou' : '🛠️ Manutenção/revisão'}: {r.motivo}
+                  </div>
+                  <div style={{fontSize:11,color:'var(--text-dim)',marginTop:2}}>
+                    Desde {fmtD(r.data_saida)} ({diasDesde(r.data_saida)} dia{diasDesde(r.data_saida)===1?'':'s'}){r.local ? ` · ${r.local}` : ''}{r.previsao_retorno ? ` · Previsão: ${fmtD(r.previsao_retorno)}` : ''} · por {r.responsavel}
+                    {r.previsao_retorno && r.previsao_retorno < new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'}) && <b style={{color:'var(--red)'}}> · atrasado</b>}
+                  </div>
+                </div>
+                {isSup && <button className="btn btn-sm btn-success" onClick={()=>abrirRetorno(r)}>✅ Voltou</button>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* KPIs */}
       <div className="stat-grid" style={{marginBottom:16}}>
         {[['Total',stats.total,'var(--accent)'],['✅ OK',stats.ok,'var(--green)'],
@@ -1639,7 +1752,7 @@ function EstoqueTab({user, sb}) {
 
       {/* Abas */}
       <div className="tabs" style={{marginBottom:16}}>
-        {[['estoque','📦 Estoque'],['historico','📋 Histórico']].map(([k,l])=>(
+        {[['estoque','📦 Estoque'],['historico','📋 Histórico'],['manut','🔧 Manutenções']].map(([k,l])=>(
           <button key={k} className={`tab ${aba===k?'active':''}`} onClick={()=>setAba(k)}>{l}</button>
         ))}
       </div>
@@ -1652,13 +1765,15 @@ function EstoqueTab({user, sb}) {
             <option value="">Todas categorias</option>
             {cats.map(c=><option key={c} value={c}>{c}</option>)}
           </select>
-          {(statusFiltro || vencFiltro || semPrecoFiltro) && <button className="btn btn-ghost btn-sm" onClick={()=>{setStatusFiltro('');setVencFiltro('');setSemPrecoFiltro(false);}}>✕ Limpar filtro</button>}
+          {(statusFiltro || vencFiltro || semPrecoFiltro || equipFiltro || manutFiltro) && <button className="btn btn-ghost btn-sm" onClick={()=>{setStatusFiltro('');setVencFiltro('');setSemPrecoFiltro(false);setEquipFiltro(false);setManutFiltro(false);}}>✕ Limpar filtro</button>}
           {isSup && <button className="btn btn-success btn-sm" onClick={()=>setModalCad(true)}>+ Novo item</button>}
           {isSup && <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={()=>{setAvisoScan('');setScannerAberto('busca');}}>📷 Bipar item</button>}
           {isSup && <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={()=>setModalImportar(true)}>📥 Importar</button>}
           <button className="btn btn-sm" style={{background:'var(--bg-card2)',border:'1px solid var(--border)',color:'var(--text-muted)'}} onClick={()=>setModalValorArea(true)}>📊 Valor por área</button>
           {isSup && <button className="btn btn-sm" style={{background: duplicados.total?'#f59e0b20':'var(--bg-card2)',border:'1px solid '+(duplicados.total?'var(--yellow)':'var(--border)'),color: duplicados.total?'var(--yellow)':'var(--text-muted)'}} onClick={()=>setModalDup(true)}>🧹 Duplicados ({duplicados.total})</button>}
           <button className="btn btn-sm" style={{background: semPrecoFiltro?'#f59e0b30':'var(--bg-card2)',border:'1px solid '+(semPrecoFiltro?'var(--yellow)':'var(--border)'),color: semPrecoFiltro?'var(--yellow)':'var(--text-muted)'}} onClick={()=>setSemPrecoFiltro(v=>!v)}>💲 Sem preço ({valorEstoque.semPreco})</button>
+          <button className="btn btn-sm" style={{background: equipFiltro?'#8b5cf630':'var(--bg-card2)',border:'1px solid '+(equipFiltro?'var(--purple)':'var(--border)'),color: equipFiltro?'var(--purple)':'var(--text-muted)'}} onClick={()=>setEquipFiltro(v=>!v)}>🛠️ Equipamentos ({itens.filter(i=>i.permanente).length})</button>
+          <button className="btn btn-sm" style={{background: manutFiltro?'#f59e0b30':'var(--bg-card2)',border:'1px solid '+(manutFiltro?'var(--yellow)':'var(--border)'),color: manutFiltro?'var(--yellow)':'var(--text-muted)'}} onClick={()=>setManutFiltro(v=>!v)}>🔧 Em manutenção ({Object.keys(manutAbertas).length})</button>
         </div>
 
         {avisoScan && (
@@ -1700,7 +1815,14 @@ function EstoqueTab({user, sb}) {
                     {isSup && <span onClick={()=>{setCatEditId(item.id);setCatEditValor(item.categoria||'');}} style={{cursor:'pointer',fontSize:11,marginLeft:4}} title="Editar categoria">✏️</span>}
                     {' '}· Mín: {item.minimo} {item.unidade||'un'}
                     {item.lote && <> · Lote: {item.lote}</>}
+                    {isSup && <span onClick={()=>alternarPermanente(item)} style={{cursor:'pointer',marginLeft:6,fontSize:11,color: item.permanente?'var(--purple)':'var(--text-dim)'}} title={item.permanente?'Desmarcar como equipamento':'Marcar como equipamento/instrumental'}>{item.permanente ? '🛠️ Equipamento' : '🛠️?'}</span>}
+                    {!isSup && item.permanente && <span style={{marginLeft:6,fontSize:11,color:'var(--purple)'}}>🛠️ Equipamento</span>}
                   </div>
+                  )}
+                  {manutAbertas[item.id] && (
+                    <div style={{display:'inline-block',marginTop:4,fontSize:11,fontWeight:800,color:'#fff',background:'var(--yellow)',borderRadius:6,padding:'2px 8px'}}>
+                      🔧 EM MANUTENÇÃO: {qtdEmManut(item.id)} de {item.quantidade} · disponível(is): {Math.max(0, item.quantidade - qtdEmManut(item.id))}
+                    </div>
                   )}
                   {item.vencimento && (
                     <div style={{fontSize:11,marginTop:2,fontWeight:700,color: venc==='vencido'?'var(--red)':venc==='vencendo'?'var(--yellow)':'var(--text-dim)'}}>
@@ -1732,6 +1854,7 @@ function EstoqueTab({user, sb}) {
                   {isSup && <div style={{display:'flex',gap:4}}>
                     <button className="btn btn-sm btn-success" onClick={()=>{setModal({item,tipo:'entrada'});setQtdMov(1);setObsMov('');setValorMov('');setLoteMov('');setVencMov('');}}>+ Entrada</button>
                     <button className="btn btn-sm btn-danger" onClick={()=>{setModal({item,tipo:'saida'});setQtdMov(1);setObsMov('');setValorMov('');setLoteMov('');setVencMov('');}}>− Saída</button>
+                    {item.permanente && <button className="btn btn-sm" style={{background:'#f59e0b22',border:'1px solid var(--yellow)',color:'var(--yellow)'}} title="Registrar quebra ou envio para manutenção" onClick={()=>abrirManut(item)}>🔧</button>}
                   </div>}
                 </div>
               </div>
@@ -1763,6 +1886,103 @@ function EstoqueTab({user, sb}) {
           {movs.length===0 && <div style={{textAlign:'center',color:'var(--text-muted)',padding:40}}>Nenhuma movimentação ainda</div>}
         </div>
       </>}
+
+      {aba==='manut' && <>
+        <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:10}}>Quebras e manutenções de equipamentos e instrumentais. Equipamento em manutenção continua no patrimônio; só sai do estoque se voltar sem conserto.</div>
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          {manuts.map(r=>(
+            <div key={r.id} className="card-sm" style={{borderLeft:`3px solid ${!r.data_retorno?'var(--yellow)':r.resultado==='sem_conserto'?'var(--red)':'var(--green)'}`}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                <div style={{flex:1,minWidth:180}}>
+                  <div style={{fontWeight:600,fontSize:13}}>{r.produto_nome}{r.quantidade>1?` (${r.quantidade} un.)`:''}</div>
+                  <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>{r.tipo==='quebra'?'💥 Quebra':'🛠️ Manutenção/revisão'}: {r.motivo}{r.local?` · ${r.local}`:''}</div>
+                  <div style={{fontSize:11,color:'var(--text-dim)',marginTop:2}}>
+                    Saiu {fmtD(r.data_saida)} por {r.responsavel}
+                    {r.data_retorno ? <> · {r.resultado==='sem_conserto'?'❌ Sem conserto (baixa)':'✅ Voltou'} {fmtD(r.data_retorno)}{r.responsavel_retorno?` por ${r.responsavel_retorno}`:''} · {diasDesde(r.data_saida)-diasDesde(r.data_retorno)} dia(s) parado</> : <b style={{color:'var(--yellow)'}}> · ainda em manutenção ({diasDesde(r.data_saida)} dia(s))</b>}
+                    {r.custo != null && <> · Custo: R$ {(+r.custo).toLocaleString('pt-BR',{minimumFractionDigits:2})}</>}
+                  </div>
+                  {r.obs && <div style={{fontSize:11,color:'var(--text-dim)',marginTop:2}}>Obs: {r.obs}</div>}
+                </div>
+                {!r.data_retorno && isSup && <button className="btn btn-sm btn-success" onClick={()=>abrirRetorno(r)}>✅ Voltou</button>}
+              </div>
+            </div>
+          ))}
+          {manuts.length===0 && <div style={{textAlign:'center',color:'var(--text-muted)',padding:40}}>Nenhuma quebra ou manutenção registrada. Use o botão 🔧 no equipamento.</div>}
+        </div>
+      </>}
+
+      {/* Modal Quebra / Manutencao */}
+      {modalManut && (
+        <div className="overlay" onClick={()=>setModalManut(null)}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <div className="modal-title">🔧 Quebra / manutenção — {modalManut.produto}</div>
+            <div style={{display:'flex',gap:8,marginBottom:12}}>
+              {[['quebra','💥 Quebrou'],['manutencao','🛠️ Manutenção / revisão']].map(([k,l])=>(
+                <button key={k} className="btn btn-sm" style={{flex:1,background:mTipo===k?'var(--yellow)':'var(--bg-card2)',color:mTipo===k?'#fff':'var(--text-muted)',border:'1px solid '+(mTipo===k?'var(--yellow)':'var(--border)')}} onClick={()=>setMTipo(k)}>{l}</button>
+              ))}
+            </div>
+            <div style={{marginBottom:12}}>
+              <label className="inp-label">Quantidade (disponível: {Math.max(0,(modalManut.quantidade||0)-qtdEmManut(modalManut.id))})</label>
+              <div style={{display:'flex',alignItems:'center',gap:10}}>
+                <button className="counter-btn" onClick={()=>setMQtd(Math.max(1,mQtd-1))}>−</button>
+                <span className="counter-val" style={{fontSize:22,fontWeight:800,minWidth:40,textAlign:'center'}}>{mQtd}</span>
+                <button className="counter-btn" onClick={()=>setMQtd(mQtd+1)}>+</button>
+              </div>
+            </div>
+            <div style={{marginBottom:12}}>
+              <label className="inp-label">O que aconteceu? *</label>
+              <input className="inp" value={mMotivo} onChange={e=>setMMotivo(e.target.value)} placeholder={mTipo==='quebra'?'Ex: caiu no chão e não liga':'Ex: revisão anual'} autoFocus/>
+            </div>
+            <div style={{marginBottom:12}}>
+              <label className="inp-label">Onde está / técnico (opcional)</label>
+              <input className="inp" value={mLocal} onChange={e=>setMLocal(e.target.value)} placeholder="Ex: assistência Dabi, guardado no almoxarifado"/>
+            </div>
+            <div style={{display:'flex',gap:8,marginBottom:16}}>
+              <div style={{flex:1}}>
+                <label className="inp-label">Previsão de retorno</label>
+                <input type="date" className="inp" value={mPrev} onChange={e=>setMPrev(e.target.value)}/>
+              </div>
+              <div style={{flex:1}}>
+                <label className="inp-label">Custo estimado (R$)</label>
+                <input type="number" className="inp" value={mCusto} onChange={e=>setMCusto(e.target.value)} min="0" step="0.01"/>
+              </div>
+            </div>
+            <div style={{fontSize:11,color:'var(--text-dim)',marginBottom:12}}>O equipamento continua no estoque, marcado como "em manutenção", até voltar.</div>
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModalManut(null)}>Cancelar</button>
+              <button className="btn" style={{flex:1,background:'var(--yellow)',color:'#fff'}} onClick={registrarManut} disabled={busy||!mMotivo.trim()}>{busy?'Salvando...':'Registrar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Retorno de manutencao */}
+      {modalRetorno && (
+        <div className="overlay" onClick={()=>setModalRetorno(null)}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <div className="modal-title">✅ Retorno — {modalRetorno.produto_nome}</div>
+            <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:12}}>{modalRetorno.tipo==='quebra'?'Quebrou':'Manutenção'} em {fmtD(modalRetorno.data_saida)}: {modalRetorno.motivo}</div>
+            <div style={{display:'flex',gap:8,marginBottom:12}}>
+              {[['consertado','✅ Voltou funcionando'],['sem_conserto','❌ Sem conserto (dar baixa)']].map(([k,l])=>(
+                <button key={k} className="btn btn-sm" style={{flex:1,background:rResultado===k?(k==='consertado'?'var(--green)':'var(--red)'):'var(--bg-card2)',color:rResultado===k?'#fff':'var(--text-muted)',border:'1px solid var(--border)'}} onClick={()=>setRResultado(k)}>{l}</button>
+              ))}
+            </div>
+            <div style={{marginBottom:12}}>
+              <label className="inp-label">Custo final do conserto (R$, opcional)</label>
+              <input type="number" className="inp" value={rCusto} onChange={e=>setRCusto(e.target.value)} min="0" step="0.01"/>
+            </div>
+            <div style={{marginBottom:12}}>
+              <label className="inp-label">Observação (opcional)</label>
+              <input className="inp" value={rObs} onChange={e=>setRObs(e.target.value)} placeholder="Ex: trocada a turbina"/>
+            </div>
+            {rResultado==='sem_conserto' && <div style={{fontSize:11,color:'var(--red)',marginBottom:12}}>{modalRetorno.quantidade} unidade(s) sairão do estoque como baixa de equipamento.</div>}
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModalRetorno(null)}>Cancelar</button>
+              <button className="btn btn-success" style={{flex:1}} onClick={registrarRetorno} disabled={busy}>{busy?'Salvando...':'Confirmar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Movimentação */}
       {modal && (
@@ -2823,7 +3043,7 @@ function PacientesTab({user, sb}) {
       const [a, m, e] = await Promise.all([
         buscarTudo(() => sb.from('atendimentos_pacientes').select('*').order('data').order('id')),
         buscarTudo(() => sb.from('estoque_movimentacoes').select('id,produto_id,produto_nome,tipo,quantidade,valor_unitario,created_at,obs').order('id')),
-        buscarTudo(() => sb.from('estoque').select('id,produto,categoria,valor_unitario').order('id'))
+        buscarTudo(() => sb.from('estoque').select('id,produto,categoria,valor_unitario,permanente').order('id'))
       ]);
       setAtend(a); setMovs(m); setItens(e);
     } catch (err) {
@@ -2852,7 +3072,7 @@ function PacientesTab({user, sb}) {
     const pacientes = atendF.reduce((s, a) => s + a.pacientes, 0);
     const diasComPac = new Set(atendF.map(a => a.data));
     const saidas = movs
-      .filter(m => m.tipo === 'saida' && !/^cancelamento nf/i.test(m.obs || ''))
+      .filter(m => m.tipo === 'saida' && !/^cancelamento nf/i.test(m.obs || '') && !(porId[m.produto_id] && porId[m.produto_id].permanente))
       .map(m => ({...m, dia: dataLocal(m.created_at)}))
       .filter(m => m.dia >= de && m.dia <= ate && (diasComPac.size === 0 || diasComPac.has(m.dia)));
 
@@ -4376,7 +4596,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.16 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.17 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
