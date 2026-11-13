@@ -4376,7 +4376,7 @@ function App() {
           )}
         </div>
         <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'var(--text-dim)'}}>
-          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.15 · Ativo desde 23/06/2026
+          HOC Hospital Odontológico · CRO-SP CL 7833 · v9.16 · Ativo desde 23/06/2026
         </div>
       </div>
     </div>
@@ -4475,7 +4475,7 @@ function App() {
 
           <div className="tabs" style={{marginBottom:20}}>
             {(user.nivel===8 && (user.area==='clinico'||!user.area)
-              ? [['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas'],['guia','📚 Guia'],['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais'],['analise','📊 Análise']]
+              ? [['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas'],['guia','📚 Guia'],['estoque','📦 Estoque'],['listacompra','🛒 Lista de Compra'],['notasfiscais','🧾 Notas Fiscais'],['analise','📊 Análise'],['pacientes','👥 Pacientes']]
               : user.area==='clinico'||!user.area
               ? [['reg','📝 Registrar'],['hist','📊 Histórico'],['metas','🎯 Metas'],['guia','📚 Guia']]
               : user.area==='comercial'
@@ -4491,6 +4491,7 @@ function App() {
           {aba==='listacompra' && <ListaCompraTab user={user} sb={sb}/>}
           {aba==='notasfiscais' && <NotasFiscaisTab user={user} sb={sb}/>}
           {aba==='analise' && <AnaliseTab user={user} sb={sb}/>}
+          {aba==='pacientes' && <PacientesTab user={user} sb={sb}/>}
 
           {aba==='reg' && <>
             {user.area==='marketing' && <div className="alert alert-info" style={{marginBottom:16}}>📱 Estagiário de Marketing</div>}
